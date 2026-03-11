@@ -154,13 +154,24 @@
 
             itemEl.appendChild(iconEl);
             itemEl.appendChild(titleEl);
+
+            // 添加鼠标悬停监听器
+            itemEl.addEventListener('mouseenter', () => {
+                if (isRightMouseDown) {
+                    selectedIndex = index;
+                    switcherActive = true;
+                    // 只更新高亮，不自动滚动，避免鼠标悬停导致列表上下移动
+                    updateHighlight(false);
+                }
+            });
+
             container.appendChild(itemEl);
         });
 
         scrollToSelected();
     }
 
-    function updateHighlight() {
+    function updateHighlight(autoScroll = true) {
         if (!shadowRoot) return;
         const container = shadowRoot.querySelector('.switcher-container');
         const items = container.querySelectorAll('.tab-item');
@@ -171,7 +182,9 @@
                 item.classList.remove('active');
             }
         });
-        scrollToSelected();
+        if (autoScroll) {
+            scrollToSelected();
+        }
     }
 
     function scrollToSelected() {
@@ -239,7 +252,7 @@
                 // 向上滚动，选中上一个
                 selectedIndex = (selectedIndex - 1 + tabsList.length) % tabsList.length;
             }
-            updateHighlight();
+            updateHighlight(true);
         }
     }, { passive: false, capture: true }); // capture 确保我们可以尽早拦截滚动
 
