@@ -1,0 +1,38 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景渐变 -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4A90E2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7B68EE;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="lightningGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FFA500;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 圆形背景 -->
+  <circle cx="64" cy="64" r="60" fill="url(#bgGradient)" stroke="#fff" stroke-width="2"/>
+  
+  <!-- 智能芯片外框 -->
+  <rect x="24" y="24" width="80" height="80" rx="12" fill="none" stroke="#fff" stroke-width="3"/>
+  
+  <!-- 智能芯片内部线条 -->
+  <line x1="34" y1="40" x2="94" y2="40" stroke="#fff" stroke-width="2" opacity="0.8"/>
+  <line x1="34" y1="88" x2="94" y2="88" stroke="#fff" stroke-width="2" opacity="0.8"/>
+  <line x1="34" y1="64" x2="60" y2="64" stroke="#fff" stroke-width="2" opacity="0.8"/>
+  
+  <!-- 闪电符号 -->
+  <path d="M 52 48 L 42 68 L 56 68 L 48 80 L 68 56 L 58 56 L 66 42 Z" 
+        fill="url(#lightningGradient)" stroke="#fff" stroke-width="1"/>
+  
+  <!-- 加速线条 -->
+  <path d="M 72 50 L 88 50" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.9"/>
+  <path d="M 76 58 L 90 58" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  <path d="M 80 66 L 92 66" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+  
+  <!-- 小圆点装饰 -->
+  <circle cx="38" cy="50" r="2" fill="#fff" opacity="0.8"/>
+  <circle cx="38" cy="58" r="2" fill="#fff" opacity="0.8"/>
+  <circle cx="38" cy="66" r="2" fill="#fff" opacity="0.8"/>
+</svg>

@@ -1,0 +1,91 @@
+{
+    "manifest_version": 3,
+    "name": "All in One Extension",
+    "version": "1.0.0",
+    "description": "Chrome extension for multi-functional utilities (Incognito, Hotkeys, Video Speeder, Home Assistant Monitor).",
+    "permissions": [
+        "tabs",
+        "storage",
+        "activeTab",
+        "scripting",
+        "alarms",
+        "notifications"
+    ],
+    "host_permissions": [
+        "*://*/*"
+    ],
+    "background": {
+        "service_worker": "background/background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "content/aio_tabs.js",
+                "content/ezincognito.js",
+                "content/hotkey_changer.js"
+            ],
+            "run_at": "document_start"
+        },
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "content/hotkey_inject.js"
+            ],
+            "run_at": "document_start",
+            "all_frames": true,
+            "world": "MAIN"
+        },
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "content/smart_speeder.js"
+            ],
+            "run_at": "document_end"
+        }
+    ],
+    "action": {
+        "default_popup": "ui/popup.html",
+        "default_title": "All in One Extension",
+        "default_icon": {
+            "16": "icons/icon16.png",
+            "48": "icons/icon48.png",
+            "128": "icons/icon128.png"
+        }
+    },
+    "options_page": "ui/options.html",
+    "icons": {
+        "16": "icons/icon16.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+    },
+    "commands": {
+        "toggle-speed": {
+            "suggested_key": {
+                "default": "Ctrl+Shift+Right",
+                "mac": "Command+Shift+Right"
+            },
+            "description": "提高当前页面视频速度"
+        },
+        "decrease-speed": {
+            "suggested_key": {
+                "default": "Ctrl+Shift+Left",
+                "mac": "Command+Shift+Left"
+            },
+            "description": "降低当前页面视频速度"
+        },
+        "preset-speed": {
+            "suggested_key": {
+                "default": "Ctrl+Shift+Space",
+                "mac": "Command+Shift+Space"
+            },
+            "description": "切换到预设倍速/正常速度"
+        }
+    }
+}

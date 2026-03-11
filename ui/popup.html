@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <title>All in One Extension</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+  <div class="header" style="display: flex; justify-content: space-between; align-items: center;">
+    <span class="title">🌟 All in One Extension</span>
+    <span id="open-options-icon" style="cursor: pointer; font-size: 18px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));" title="综合设置">⚙️</span>
+  </div>
+
+  <div class="dashboard">
+    <!-- Home Assistant 监控 -->
+    <div class="card" id="card-ha">
+      <div class="card-title">🏠 家庭助理</div>
+      <div id="ha-entity-list" class="ha-list">加载中...</div>
+    </div>
+
+    <!-- Smart Speeder 视频加速 -->
+    <div class="card" id="card-speeder">
+      <div class="card-title">
+        🎬 视频倍速
+        <label class="toggle" title="全局启用/禁用倍速插件">
+          <input type="checkbox" id="speeder-global-toggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="speeder-controls">
+        <div id="speeder-display" class="speed-value">1.00x</div>
+        <div class="btn-group">
+          <button id="speeder-decrease">- 降低 (0.25x)</button>
+          <button id="speeder-increase">+ 提高 (0.25x)</button>
+          <button id="speeder-preset" title="切换到预设速度">预设切换</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hotkey Changer 页面快捷键重映射 -->
+    <div class="card" id="card-hotkey">
+      <div class="card-title">
+        🎹 快捷键映射
+        <label class="toggle" title="在此网站启用映射">
+          <input type="checkbox" id="hotkey-enable-toggle" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="hotkey-info">
+        <span class="label">当前网站:</span>
+        <span id="hotkey-current-site" class="highlight">加载中...</span>
+      </div>
+      <div class="input-group">
+        <input type="text" id="hotkey-original" placeholder="点击后按原键" readonly>
+        <span class="arrow">→</span>
+        <input type="text" id="hotkey-new" placeholder="点击后按新键" readonly>
+      </div>
+      <div class="btn-group">
+        <button id="hotkey-add" class="primary">添加映射</button>
+        <button id="hotkey-clear-all" class="danger">清空本站</button>
+      </div>
+      <div id="hotkey-mappings-list" class="mappings-container"></div>
+    </div>
+
+    <!-- EZ Incognito 无痕快捷键 -->
+    <div class="card" id="card-ez">
+      <div class="card-title">🕵️ 无痕快捷键</div>
+      <div class="ez-info">
+        唤醒组合键: <span id="ez-current-key" class="highlight" style="margin: 0 4px;">...</span> + 鼠标左键
+      </div>
+    </div>
+  </div>
+
+
+
+  <script src="popup.js"></script>
+</body>
+
+</html>
