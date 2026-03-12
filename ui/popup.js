@@ -4,11 +4,39 @@ document.addEventListener('DOMContentLoaded', () => {
     initHAMonitor();
     initSmartSpeeder();
     initHotkeyChanger();
+    initSync(); // 新增同步逻辑
 
     document.getElementById('open-options-icon').addEventListener('click', () => {
         chrome.runtime.openOptionsPage();
     });
 });
+
+// ==== Sync Logic ====
+function initSync() {
+    chrome.storage.onChanged.addListener((changes, namespace) => {
+        if (namespace !== 'sync') return;
+        
+        // 映射存储键名到 DOM ID
+        const syncMap = {
+            aioTabsEnabled: 'aio-tabs-toggle',
+            globalEnabled: 'speeder-global-toggle'
+        };
+
+        for (const [key, id] of Object.entries(syncMap)) {
+            if (changes[key]) {
+                const el = document.getElementById(id);
+                if (el) el.checked = changes[key].newValue !== false;
+            }
+        }
+    });
+
+    // 监听重载消息（例如 Smart Speeder 复杂配置更新）
+    chrome.runtime.onMessage.addListener((msg) => {
+        if (msg.action === 'reloadSettings') {
+            initSmartSpeeder();
+        }
+    });
+}
 
 // === EZ Incognito ===
 function initEZIncognito() {

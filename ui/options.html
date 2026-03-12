@@ -110,6 +110,11 @@
                 <div class="help-text" style="margin-top:10px;">
                     说明：开启后，在任意网页按住 <kbd>鼠标右键</kbd> 不放，同时滚动 <kbd>鼠标滚轮</kbd>，即可快速呼出浮窗并在打开的标签页之间切换。
                 </div>
+                <div class="form-group" style="margin-top: 20px;">
+                    <label for="aiotabs-delay">右键判定延迟 (毫秒)</label>
+                    <input type="number" id="aiotabs-delay" min="0" step="100" value="1000">
+                    <div class="help-text">设置按住右键多久后唤起列表。设为 0 则立即唤起（可能会干扰右键菜单）。</div>
+                </div>
             </div>
         </div>
 

@@ -5,18 +5,29 @@
     let tabsList = [];
     let selectedIndex = 0;
 
-    // 开关配置状态
+    // 开关与延迟配置状态
     let isAioTabsEnabled = true;
+    let aioTabsDelay = 1000;
+    let activationTimer = null;
 
     // 初始化读取设置并监听更改
-    chrome.storage.sync.get(['aioTabsEnabled'], (result) => {
+    chrome.storage.sync.get(['aioTabsEnabled', 'aioTabsDelay'], (result) => {
         if (result.aioTabsEnabled !== undefined) {
             isAioTabsEnabled = result.aioTabsEnabled;
         }
+        if (result.aioTabsDelay !== undefined) {
+            aioTabsDelay = parseInt(result.aioTabsDelay);
+        }
     });
+
     chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === 'sync' && changes.aioTabsEnabled !== undefined) {
-            isAioTabsEnabled = changes.aioTabsEnabled.newValue;
+        if (area === 'sync') {
+            if (changes.aioTabsEnabled !== undefined) {
+                isAioTabsEnabled = changes.aioTabsEnabled.newValue;
+            }
+            if (changes.aioTabsDelay !== undefined) {
+                aioTabsDelay = parseInt(changes.aioTabsDelay.newValue);
+            }
         }
     });
 
@@ -204,64 +215,84 @@
         }
     }
 
+    function activateSwitcher() {
+        if (switcherActive) return;
+        
+        // 请求所有 tabs 数据
+        try {
+            chrome.runtime.sendMessage({ action: 'getTabs' }, (tabs) => {
+                if (chrome.runtime.lastError) {
+                    console.error("Error communicating with aio background:", chrome.runtime.lastError);
+                    return;
+                }
+                if (tabs && tabs.length > 0) {
+                    tabsList = tabs;
+                    selectedIndex = tabs.findIndex(t => t.active);
+                    if (selectedIndex === -1) selectedIndex = 0;
+
+                    switcherActive = true;
+                    initUI();
+                    renderTabs();
+                }
+            });
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
     // 事件监听器
     document.addEventListener('mousedown', (e) => {
         if (e.button === 2 && isAioTabsEnabled) {
             isRightMouseDown = true;
-            switcherActive = false; // 按下右键时，默认还没开始切换
+            switcherActive = false;
 
-            // 请求所有 tabs 数据
-            try {
-                chrome.runtime.sendMessage({ action: 'getTabs' }, (tabs) => {
-                    if (chrome.runtime.lastError) {
-                        console.error("Error communicating with aio background:", chrome.runtime.lastError);
-                        return;
-                    }
-                    if (tabs && tabs.length > 0) {
-                        tabsList = tabs;
-                        // 默认选中当前 active 的标签页，如果没有获取到，则选中第一个
-                        selectedIndex = tabs.findIndex(t => t.active);
-                        if (selectedIndex === -1) selectedIndex = 0;
+            // 清除之前的定时器
+            if (activationTimer) clearTimeout(activationTimer);
 
-                        // 不要立即显示UI，等到真的有滚动行为再显示，或者是按下后延迟显示？
-                        // 需求说“按住鼠标右键的时候，当前页面浮窗显示...” 我们立即显示。
-                        initUI();
-                        renderTabs();
+            // 开启延迟判定
+            if (aioTabsDelay > 0) {
+                activationTimer = setTimeout(() => {
+                    if (isRightMouseDown) {
+                        activateSwitcher();
                     }
-                });
-            } catch (err) {
-                // 如果插件被重新加载导致 context invalidated 会抛错
-                console.error(err);
+                }, aioTabsDelay);
+            } else {
+                // 如果设置为0，则立即触发（兼容旧行为）
+                activateSwitcher();
             }
         }
     }, true);
 
     window.addEventListener('wheel', (e) => {
-        if (isRightMouseDown && tabsList.length > 0) {
+        if (isRightMouseDown && isAioTabsEnabled) {
+            // 如果滚轮滚动，且右键还按着，无论是否到了延迟时间，立即唤起
             if (!switcherActive) {
-                switcherActive = true;
+                if (activationTimer) clearTimeout(activationTimer);
+                activateSwitcher();
+                // 注意：由于 activateSwitcher 是异步获取 tabs 的，
+                // 第一个滚动事件可能无法直接操作列表，UI会在 tabs 返回后显示。
             }
 
-            e.preventDefault();
-            e.stopPropagation();
+            if (tabsList.length > 0) {
+                e.preventDefault();
+                e.stopPropagation();
 
-            if (e.deltaY > 0) {
-                // 向下滚动，选中下一个
-                selectedIndex = (selectedIndex + 1) % tabsList.length;
-            } else if (e.deltaY < 0) {
-                // 向上滚动，选中上一个
-                selectedIndex = (selectedIndex - 1 + tabsList.length) % tabsList.length;
+                if (e.deltaY > 0) {
+                    selectedIndex = (selectedIndex + 1) % tabsList.length;
+                } else if (e.deltaY < 0) {
+                    selectedIndex = (selectedIndex - 1 + tabsList.length) % tabsList.length;
+                }
+                updateHighlight(true);
             }
-            updateHighlight(true);
         }
-    }, { passive: false, capture: true }); // capture 确保我们可以尽早拦截滚动
+    }, { passive: false, capture: true });
 
     window.addEventListener('mouseup', (e) => {
         if (e.button === 2) {
             isRightMouseDown = false;
+            if (activationTimer) clearTimeout(activationTimer);
 
             if (switcherActive) {
-                // 确实切换了，发送切换指令
                 const selectedTab = tabsList[selectedIndex];
                 if (selectedTab) {
                     try {
@@ -270,9 +301,10 @@
                         console.error(err);
                     }
                 }
+                // 标志着已经处理了切换动作，contextmenu 应该被屏蔽
+                // 但这里直接 destroyUI 并等待 contextmenu 事件
             }
 
-            // 无论如何都要隐藏UI
             destroyUI();
         }
     }, true);
@@ -284,7 +316,6 @@
             e.stopPropagation();
             switcherActive = false; // 重置状态
         }
-        // 如果没有切换（只是普通的右键点击），让原生的菜单正常弹出
     }, true);
 
 })();

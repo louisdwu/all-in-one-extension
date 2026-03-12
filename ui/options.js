@@ -123,7 +123,8 @@ function setupSync() {
             ezEnabled: ['ez-enable', 'db-ez-enable'],
             hotkeyEnabled: ['hotkey-enable', 'db-hotkey-enable'],
             haEnabled: ['ha-enable', 'db-ha-enable'],
-            biliAutoSubtitle: ['bili-autoSubtitle', 'db-bili-enable']
+            biliAutoSubtitle: ['bili-autoSubtitle', 'db-bili-enable'],
+            globalEnabled: ['speed-globalToggle', 'db-speed-enable']
         };
 
         for (const [key, ids] of Object.entries(syncMap)) {
@@ -154,15 +155,29 @@ function setupSync() {
 // ==== AIO Tabs ====
 function initAioTabs() {
     const toggle = document.getElementById('aiotabs-enable');
+    const delayInput = document.getElementById('aiotabs-delay');
 
-    chrome.storage.sync.get(['aioTabsEnabled'], (res) => {
+    chrome.storage.sync.get(['aioTabsEnabled', 'aioTabsDelay'], (res) => {
         // 默认为 true
         toggle.checked = res.aioTabsEnabled !== false;
+        // 默认 1000ms
+        delayInput.value = res.aioTabsDelay !== undefined ? res.aioTabsDelay : 1000;
     });
 
     toggle.addEventListener('change', (e) => {
         chrome.storage.sync.set({ aioTabsEnabled: e.target.checked }, () => {
             showStatus('右键切换功能状态已保存！');
+        });
+    });
+
+    delayInput.addEventListener('change', (e) => {
+        const val = parseInt(e.target.value);
+        if (isNaN(val) || val < 0) {
+            showStatus('延迟时间无效', 'error');
+            return;
+        }
+        chrome.storage.sync.set({ aioTabsDelay: val }, () => {
+            showStatus('切换延迟已保存！');
         });
     });
 }
