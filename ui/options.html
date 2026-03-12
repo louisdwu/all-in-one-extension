@@ -15,6 +15,7 @@
             <li data-target="tab-aiotabs">🖱️ 标签页切换</li>
             <li data-target="tab-general">🕵️ 无痕按键</li>
             <li data-target="tab-speeder">🎬 视频倍速</li>
+            <li data-target="tab-bilibili">📺 B站字幕</li>
             <li data-target="tab-hotkey">🎹 快捷键映射</li>
             <li data-target="tab-ha">🏠 家庭监控</li>
             <li data-target="tab-backup" class="nav-backup">💾 全局备份</li>
@@ -67,6 +68,16 @@
                         </div>
                         <label class="toggle">
                             <input type="checkbox" id="db-hotkey-enable">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="dash-card" data-nav-target="tab-bilibili">
+                        <div class="dash-info">
+                            <h3>📺 B站字幕</h3>
+                            <p>自动开启与按键切换</p>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="db-bili-enable">
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -238,6 +249,39 @@
                     温馨提示：倍速规则和快捷键已支持自动保存。如需备份，请前往“💾 全局备份”页面。
                 </div>
                 <input type="file" id="speed-importFile" accept=".json" style="display:none;">
+            </div>
+        </div>
+
+        <!-- ================= Tab: Bilibili Subtitles ================= -->
+        <div id="tab-bilibili" class="tab-pane">
+            <div class="section">
+                <h2>📺 哔哩哔哩字幕增强</h2>
+                <div class="toggle-container" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
+                    <span class="label" style="font-size: 16px;">自动开启中文字幕</span>
+                    <label class="toggle">
+                        <input type="checkbox" id="bili-autoSubtitle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <h3>快捷键配置</h3>
+                <div class="help-text" style="margin-bottom: 15px;">
+                    点击下方输入框并按键盘录入切换字幕的快捷键（支持单按键，如 <kbd>s</kbd>）。
+                </div>
+                <div class="form-group">
+                    <label>字幕切换快捷键</label>
+                    <div class="shortcut-input-group">
+                        <input type="text" id="bili-subtitleHotkey" placeholder="按键盘录入，如 s" readonly style="cursor: pointer; background: #f8f9fa;">
+                    </div>
+                </div>
+
+                <div class="btn-group" style="margin-top:30px;">
+                    <button id="bili-saveBtn" class="primary">保存 B站字幕设置</button>
+                </div>
+
+                <div class="help-text" style="color: var(--text-muted); margin-top: 20px;">
+                    温馨提示：B站字幕配置已纳入全量备份。如需导出，请前往“💾 全局备份”页面。
+                </div>
             </div>
         </div>
 

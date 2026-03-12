@@ -4,7 +4,8 @@ try {
         "ezincognito.js",
         "hotkey_changer.js",
         "smart_speeder.js",
-        "home_assistant.js"
+        "home_assistant.js",
+        "bilibili_subtitles.js"
     );
     console.log('[All in One Extension] All background scripts loaded successfully.');
 } catch (e) {

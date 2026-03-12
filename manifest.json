@@ -48,6 +48,15 @@
                 "content/smart_speeder.js"
             ],
             "run_at": "document_end"
+        },
+        {
+            "matches": [
+                "*://*.bilibili.com/video/*"
+            ],
+            "js": [
+                "content/bilibili_subtitles.js"
+            ],
+            "run_at": "document_end"
         }
     ],
     "action": {

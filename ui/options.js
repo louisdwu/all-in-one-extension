@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initHAMonitor();
     initHotkeyPanel();
     initGlobalBackup();
+    initBilibiliSubtitles();
     setupSync();     // 新增全量同步逻辑
 });
 
@@ -91,6 +92,25 @@ function initDashboard() {
             }
         });
     });
+
+    // Bilibili Subtitles Dashboard Toggle
+    const dbBili = document.getElementById('db-bili-enable');
+    chrome.runtime.sendMessage({ action: 'getSettings' }, (res) => {
+        if (dbBili && res && res.bilibiliSubtitles) {
+            dbBili.checked = res.bilibiliSubtitles.autoEnableSubtitle !== false;
+        }
+    });
+
+    dbBili.addEventListener('change', (e) => {
+        chrome.runtime.sendMessage({ action: 'getSettings' }, (res) => {
+            if (res && res.bilibiliSubtitles) {
+                res.bilibiliSubtitles.autoEnableSubtitle = e.target.checked;
+                chrome.runtime.sendMessage({ action: 'saveBilibiliSettings', settings: res.bilibiliSubtitles });
+                // 同时触发全量同步用的 storage key
+                chrome.storage.sync.set({ biliAutoSubtitle: e.target.checked });
+            }
+        });
+    });
 }
 
 function setupSync() {
@@ -102,7 +122,8 @@ function setupSync() {
             aioTabsEnabled: ['aiotabs-enable', 'db-aiotabs-enable'],
             ezEnabled: ['ez-enable', 'db-ez-enable'],
             hotkeyEnabled: ['hotkey-enable', 'db-hotkey-enable'],
-            haEnabled: ['ha-enable', 'db-ha-enable']
+            haEnabled: ['ha-enable', 'db-ha-enable'],
+            biliAutoSubtitle: ['bili-autoSubtitle', 'db-bili-enable']
         };
 
         for (const [key, ids] of Object.entries(syncMap)) {
@@ -702,4 +723,115 @@ function initGlobalBackup() {
             });
         }
     });
+}
+
+// ==== Bilibili Subtitles ====
+function initBilibiliSubtitles() {
+    const autoToggle = document.getElementById('bili-autoSubtitle');
+    const hotkeyInput = document.getElementById('bili-subtitleHotkey');
+    const saveBtn = document.getElementById('bili-saveBtn');
+
+    let config = {
+        autoEnableSubtitle: true,
+        subtitleHotkey: 's'
+    };
+
+    function load() {
+        chrome.runtime.sendMessage({ action: 'getSettings' }, (res) => {
+            if (res && res.bilibiliSubtitles) {
+                config = res.bilibiliSubtitles;
+            }
+            autoToggle.checked = config.autoEnableSubtitle;
+            hotkeyInput.value = config.subtitleHotkey;
+        });
+    }
+
+    // 处理单按键录入
+    function setupHotkeyRecording() {
+        let isRecording = false;
+
+        hotkeyInput.addEventListener('click', () => {
+            if (isRecording) return;
+            isRecording = true;
+            hotkeyInput.value = '正在倾听按键... (按 Esc 取消)';
+            hotkeyInput.style.background = '#fff3cd';
+
+            const handleKey = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (e.key === 'Escape') {
+                    stopRecording();
+                    return;
+                }
+
+                // 允许控制键，但不单独作为快捷键（除非是单按键逻辑）
+                // 用户要求单按键 s，所以我们支持任何非修饰键作为主键
+                if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
+
+                let p = [];
+                if (e.ctrlKey) p.push('Ctrl');
+                if (e.altKey) p.push('Alt');
+                if (e.shiftKey) p.push('Shift');
+                if (e.metaKey) p.push('Meta');
+
+                let k = e.key;
+                if (k === ' ') k = 'Space';
+                else if (k.length === 1) k = k.toUpperCase();
+                p.push(k);
+
+                const code = p.join('+');
+                hotkeyInput.value = code;
+                config.subtitleHotkey = code;
+                stopRecording();
+            };
+
+            const stopRecording = () => {
+                isRecording = false;
+                hotkeyInput.style.background = '#f8f9fa';
+                document.removeEventListener('keydown', handleKey, true);
+                if (hotkeyInput.value === '正在倾听按键... (按 Esc 取消)') {
+                    hotkeyInput.value = config.subtitleHotkey;
+                }
+            };
+
+            document.addEventListener('keydown', handleKey, true);
+        });
+    }
+
+    saveBtn.addEventListener('click', () => {
+        config.autoEnableSubtitle = autoToggle.checked;
+        config.subtitleHotkey = hotkeyInput.value;
+
+        chrome.runtime.sendMessage({
+            action: 'saveBilibiliSettings',
+            settings: config
+        }, (res) => {
+            if (res && res.success) {
+                showStatus('B站字幕配置已保存！');
+                // 同步到 Dashboard
+                const dbToggle = document.getElementById('db-bili-enable');
+                if (dbToggle) dbToggle.checked = config.autoEnableSubtitle;
+            } else {
+                showStatus('保存失败', 'error');
+            }
+        });
+    });
+
+    // 监听开关变化实时保存（类似其他模块）
+    autoToggle.addEventListener('change', () => {
+        config.autoEnableSubtitle = autoToggle.checked;
+        chrome.runtime.sendMessage({
+            action: 'saveBilibiliSettings',
+            settings: config
+        }, () => {
+            const dbToggle = document.getElementById('db-bili-enable');
+            if (dbToggle) dbToggle.checked = config.autoEnableSubtitle;
+            // 通知 storage 以触发 setupSync 里的变化监听
+            chrome.storage.sync.set({ biliAutoSubtitle: config.autoEnableSubtitle });
+        });
+    });
+
+    load();
+    setupHotkeyRecording();
 }
