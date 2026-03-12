@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     initEZIncognito();
+    initAioTabs();
     initHAMonitor();
     initSmartSpeeder();
     initHotkeyChanger();
@@ -21,6 +22,18 @@ function initEZIncognito() {
     chrome.storage.sync.get(['modifierKey'], (result) => {
         const key = result.modifierKey || 'ctrlKey';
         currentKeyElement.textContent = keyNames[key] || keyNames['ctrlKey'];
+    });
+}
+
+// === AIO Tabs ===
+function initAioTabs() {
+    const toggle = document.getElementById('aio-tabs-toggle');
+    chrome.storage.sync.get(['aioTabsEnabled'], (result) => {
+        toggle.checked = result.aioTabsEnabled !== false;
+    });
+
+    toggle.addEventListener('change', (e) => {
+        chrome.storage.sync.set({ aioTabsEnabled: e.target.checked });
     });
 }
 
