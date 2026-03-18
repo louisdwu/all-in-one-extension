@@ -11,7 +11,7 @@
 
   // 从存储加载设置
   function loadSettings() {
-    chrome.runtime.sendMessage({ action: 'getSettings' }, (response) => {
+    chrome.runtime.sendMessage({ action: 'getBilibiliSettings' }, (response) => {
       if (response && response.bilibiliSubtitles) {
         bilibiliSettings = {
           autoEnableSubtitle: response.bilibiliSubtitles.autoEnableSubtitle !== false,

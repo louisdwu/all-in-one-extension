@@ -1,6 +1,6 @@
 // Background script for Bilibili Subtitle settings
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'getSettings') {
+  if (request.action === 'getBilibiliSettings') {
     chrome.storage.sync.get(['bilibiliSubtitles'], (result) => {
       sendResponse({
         bilibiliSubtitles: result.bilibiliSubtitles || {

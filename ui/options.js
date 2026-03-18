@@ -80,29 +80,29 @@ function initDashboard() {
 
     // Smart Speeder 专用 (因为它涉及复杂的 config 对象)
     const dbSpeed = document.getElementById('db-speed-enable');
-    chrome.runtime.sendMessage({ action: 'getSettings' }, (res) => {
+    chrome.runtime.sendMessage({ action: 'getSpeederSettings' }, (res) => {
         if (dbSpeed && res) dbSpeed.checked = res.globalEnabled !== false;
     });
 
     dbSpeed.addEventListener('change', (e) => {
-        chrome.runtime.sendMessage({ action: 'getSettings' }, (res) => {
+        chrome.runtime.sendMessage({ action: 'getSpeederSettings' }, (res) => {
             if (res) {
                 res.globalEnabled = e.target.checked;
-                chrome.runtime.sendMessage({ action: 'saveSettings', settings: res });
+                chrome.runtime.sendMessage({ action: 'saveSpeederSettings', settings: res });
             }
         });
     });
 
     // Bilibili Subtitles Dashboard Toggle
     const dbBili = document.getElementById('db-bili-enable');
-    chrome.runtime.sendMessage({ action: 'getSettings' }, (res) => {
+    chrome.runtime.sendMessage({ action: 'getBilibiliSettings' }, (res) => {
         if (dbBili && res && res.bilibiliSubtitles) {
             dbBili.checked = res.bilibiliSubtitles.autoEnableSubtitle !== false;
         }
     });
 
     dbBili.addEventListener('change', (e) => {
-        chrome.runtime.sendMessage({ action: 'getSettings' }, (res) => {
+        chrome.runtime.sendMessage({ action: 'getBilibiliSettings' }, (res) => {
             if (res && res.bilibiliSubtitles) {
                 res.bilibiliSubtitles.autoEnableSubtitle = e.target.checked;
                 chrome.runtime.sendMessage({ action: 'saveBilibiliSettings', settings: res.bilibiliSubtitles });
@@ -142,7 +142,7 @@ function setupSync() {
     // 专门针对 Smart Speeder 的同步
     chrome.runtime.onMessage.addListener((msg) => {
         if (msg.action === 'reloadSettings') {
-            chrome.runtime.sendMessage({ action: 'getSettings' }, (res) => {
+            chrome.runtime.sendMessage({ action: 'getSpeederSettings' }, (res) => {
                 const dbSpeed = document.getElementById('db-speed-enable');
                 const pageSpeed = document.getElementById('speed-globalToggle');
                 if (dbSpeed && res) dbSpeed.checked = res.globalEnabled !== false;
@@ -225,7 +225,7 @@ function initSmartSpeeder() {
     };
 
     function load() {
-        chrome.runtime.sendMessage({ action: 'getSettings' }, (res) => {
+        chrome.runtime.sendMessage({ action: 'getSpeederSettings' }, (res) => {
             if (res) {
                 config = {
                     globalEnabled: res.globalEnabled !== false,
@@ -233,7 +233,7 @@ function initSmartSpeeder() {
                     excludeRules: Array.isArray(res.excludeRules) ? res.excludeRules : [],
                     includeRules: Array.isArray(res.includeRules) ? res.includeRules : [],
                     defaultSpeed: res.defaultSpeed || 1.0,
-                    presetSpeed: res.presetSpeed || 2.0
+                    presetSpeed: res.presetSpeed !== undefined ? String(res.presetSpeed) : "2.0"
                 };
             }
             render();
@@ -306,14 +306,18 @@ function initSmartSpeeder() {
 
     function saveConfig(showToast = true) {
         const dSpeed = parseFloat(elements.defaultSpeed.value);
-        const pSpeed = parseFloat(elements.presetSpeed.value);
-        if (isNaN(dSpeed) || dSpeed < 0.25 || dSpeed > 16) return showStatus('速度须在 0.25 - 16 之间', 'error');
-        if (isNaN(pSpeed) || pSpeed < 0.25 || pSpeed > 16) return showStatus('速度须在 0.25 - 16 之间', 'error');
+        const pSpeedStr = elements.presetSpeed.value.trim();
+        if (isNaN(dSpeed) || dSpeed < 0.25 || dSpeed > 16) return showStatus('默认速度须在 0.25 - 16 之间', 'error');
+        
+        // 验证预设速度（允许逗号分隔）
+        const pSpeeds = pSpeedStr.split(/[,，]/).map(s => parseFloat(s.trim())).filter(s => !isNaN(s));
+        if (pSpeeds.length === 0) return showStatus('请输入有效的预设速度', 'error');
+        if (pSpeeds.some(s => s < 0.25 || s > 16)) return showStatus('预设速度须在 0.25 - 16 之间', 'error');
 
         config.defaultSpeed = dSpeed;
-        config.presetSpeed = pSpeed;
+        config.presetSpeed = pSpeedStr;
 
-        chrome.runtime.sendMessage({ action: 'saveSettings', settings: config }, (res) => {
+        chrome.runtime.sendMessage({ action: 'saveSpeederSettings', settings: config }, (res) => {
             if (res && res.success) {
                 if (showToast) showStatus('倍速配置已保存');
             } else if (showToast) {
@@ -324,20 +328,7 @@ function initSmartSpeeder() {
 
     // 移除旧的保存按钮监听，改为内部自动调用
 
-    function saveConfig() {
-        const dSpeed = parseFloat(elements.defaultSpeed.value);
-        const pSpeed = parseFloat(elements.presetSpeed.value);
-        if (isNaN(dSpeed) || dSpeed < 0.25 || dSpeed > 16) return showStatus('速度须在 0.25 - 16 之间', 'error');
-        if (isNaN(pSpeed) || pSpeed < 0.25 || pSpeed > 16) return showStatus('速度须在 0.25 - 16 之间', 'error');
-
-        config.defaultSpeed = dSpeed;
-        config.presetSpeed = pSpeed;
-
-        chrome.runtime.sendMessage({ action: 'saveSettings', settings: config }, (res) => {
-            if (res && res.success) showStatus('倍速配置已保存');
-            else showStatus('保存失败', 'error');
-        });
-    }
+    // 冗余代码已移除
 
     // 移除冗余的 reset 监听（已移至全局备份页）
 
@@ -356,7 +347,7 @@ function initSpeederShortcuts() {
     const con = document.getElementById('shortcutsContainer');
 
     function boot() {
-        chrome.runtime.sendMessage({ action: 'getShortcuts' }, (r) => {
+        chrome.runtime.sendMessage({ action: 'getSpeederShortcuts' }, (r) => {
             current = (r && Object.keys(r).length > 0) ? { ...r } : { ...defaultShortcuts };
             build(); showText();
         });
@@ -430,7 +421,7 @@ function initSpeederShortcuts() {
     }
 
     document.getElementById('shortcuts-saveBtn').addEventListener('click', () => {
-        chrome.runtime.sendMessage({ action: 'updateShortcuts', shortcuts: current }, () => {
+        chrome.runtime.sendMessage({ action: 'updateSpeederShortcuts', shortcuts: current }, () => {
             showStatus('所有拦截快捷键已下发保存！');
         });
     });
@@ -752,7 +743,7 @@ function initBilibiliSubtitles() {
     };
 
     function load() {
-        chrome.runtime.sendMessage({ action: 'getSettings' }, (res) => {
+        chrome.runtime.sendMessage({ action: 'getBilibiliSettings' }, (res) => {
             if (res && res.bilibiliSubtitles) {
                 config = res.bilibiliSubtitles;
             }

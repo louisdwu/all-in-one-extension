@@ -27,7 +27,7 @@ function loadShortcuts() {
 
 // Listen for messages from popup/options to update settings
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'getSettings') {
+  if (request.action === 'getSpeederSettings') {
     chrome.storage.sync.get(['globalEnabled', 'hideFloatingBall', 'excludeRules', 'includeRules', 'defaultSpeed', 'presetSpeed'], (result) => {
       sendResponse({
         globalEnabled: result.globalEnabled !== false, // default true
@@ -35,13 +35,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         excludeRules: result.excludeRules || [],
         includeRules: result.includeRules || [],
         defaultSpeed: result.defaultSpeed || 1.0,
-        presetSpeed: result.presetSpeed || 2.0
+        presetSpeed: result.presetSpeed !== undefined ? String(result.presetSpeed) : "2.0"
       });
     });
     return true; // Will respond asynchronously
   }
   
-  if (request.action === 'saveSettings') {
+  if (request.action === 'saveSpeederSettings') {
     chrome.storage.sync.set(request.settings, () => {
       sendResponse({ success: true });
       // Notify all tabs to reload settings
@@ -79,7 +79,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   
   // 自定义快捷键处理
-  if (request.action === 'getShortcuts') {
+  if (request.action === 'getSpeederShortcuts') {
     chrome.storage.sync.get(['shortcuts'], (result) => {
       const shortcuts = result.shortcuts || {};
       // 如果没有自定义设置，返回默认值
@@ -99,7 +99,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   
-  if (request.action === 'updateShortcuts') {
+  if (request.action === 'updateSpeederShortcuts') {
     chrome.storage.sync.set({ shortcuts: request.shortcuts }, () => {
       // 通知所有标签页更新快捷键
       chrome.tabs.query({}, (tabs) => {

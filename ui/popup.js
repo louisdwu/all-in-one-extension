@@ -99,10 +99,11 @@ function initSmartSpeeder() {
     let currentSpeed = 1.0;
     let settings = { globalEnabled: true, presetSpeed: 2.0 };
 
-    chrome.runtime.sendMessage({ action: 'getSettings' }, (response) => {
+    chrome.runtime.sendMessage({ action: 'getSpeederSettings' }, (response) => {
         if (response) {
             settings.globalEnabled = response.globalEnabled !== false;
-            settings.presetSpeed = response.presetSpeed || 2.0;
+            settings.presetSpeed = response.presetSpeed !== undefined ? String(response.presetSpeed) : "2.0";
+            settings.defaultSpeed = response.defaultSpeed || 1.0; // 需要默认速度用于单速度切回
             globalToggle.checked = settings.globalEnabled;
         }
     });
@@ -123,7 +124,7 @@ function initSmartSpeeder() {
 
     globalToggle.addEventListener('change', (e) => {
         settings.globalEnabled = e.target.checked;
-        chrome.runtime.sendMessage({ action: 'saveSettings', settings }, () => {
+        chrome.runtime.sendMessage({ action: 'saveSpeederSettings', settings }, () => {
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                 if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'reloadSettings' });
             });
@@ -139,8 +140,18 @@ function initSmartSpeeder() {
                         if (actionStr === 'decreaseSpeed') currentSpeed = Math.max(currentSpeed - 0.25, 0.25);
                         else if (actionStr === 'increaseSpeed') currentSpeed = Math.min(currentSpeed + 0.25, 16.0);
                         else if (actionStr === 'presetSpeed') {
-                            if (Math.abs(currentSpeed - settings.presetSpeed) < 0.01) currentSpeed = 1.0;
-                            else currentSpeed = settings.presetSpeed;
+                            const speedStr = String(settings.presetSpeed || "2.0");
+                            const pSpeeds = speedStr.split(/[,，]/).map(s => parseFloat(s.trim())).filter(s => !isNaN(s));
+                            
+                            if (pSpeeds.length === 1) {
+                                // 单个速度：在预设和默认之间切换
+                                if (Math.abs(currentSpeed - pSpeeds[0]) < 0.01) currentSpeed = settings.defaultSpeed || 1.0;
+                                else currentSpeed = pSpeeds[0];
+                            } else if (pSpeeds.length > 1) {
+                                // 多个速度：轮流循环
+                                let idx = pSpeeds.findIndex(s => Math.abs(currentSpeed - s) < 0.01);
+                                currentSpeed = pSpeeds[(idx + 1) % pSpeeds.length];
+                            }
                         }
                         speedDisplay.textContent = `${currentSpeed.toFixed(2)}x`;
                     }

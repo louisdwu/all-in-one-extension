@@ -5,7 +5,7 @@ let settings = {
   excludeRules: [],
   includeRules: [],
   defaultSpeed: 1.0,
-  presetSpeed: 2.0  // 新增预设速度
+  presetSpeed: "2.0"  // 存储为字符串，支持逗号分隔
 };
 
 let currentSpeed = 1.0;
@@ -14,7 +14,7 @@ let originalSpeed = 1.0; // 用于记录切换前的速度
 
 // Load settings from storage
 function loadSettings() {
-  chrome.runtime.sendMessage({ action: 'getSettings' }, (response) => {
+  chrome.runtime.sendMessage({ action: 'getSpeederSettings' }, (response) => {
     if (response) {
       // Ensure all required properties exist
       settings = {
@@ -23,7 +23,7 @@ function loadSettings() {
         excludeRules: Array.isArray(response.excludeRules) ? response.excludeRules : [],
         includeRules: Array.isArray(response.includeRules) ? response.includeRules : [],
         defaultSpeed: response.defaultSpeed || 1.0,
-        presetSpeed: response.presetSpeed || 2.0
+        presetSpeed: response.presetSpeed !== undefined ? String(response.presetSpeed) : "2.0"
       };
       currentSpeed = settings.defaultSpeed;
       checkAndApplySpeed();
@@ -35,7 +35,7 @@ function loadSettings() {
         excludeRules: [],
         includeRules: [],
         defaultSpeed: 1.0,
-        presetSpeed: 2.0
+        presetSpeed: "2.0"
       };
       currentSpeed = 1.0;
       checkAndApplySpeed();
@@ -162,20 +162,38 @@ function decreaseSpeed() {
   showSpeedIndicator();
 }
 
+
+// 获取解析后的预设速度列表
+function getPresetSpeeds() {
+  const speedStr = String(settings.presetSpeed || "2.0");
+  return speedStr.split(/[,，]/)
+    .map(s => parseFloat(s.trim()))
+    .filter(s => !isNaN(s) && s > 0);
+}
+
 // Preset speed toggle
 function presetSpeed() {
   if (!shouldApplySpeed()) return;
   
-  const preset = settings.presetSpeed || 2.0;
-  
-  // 如果当前速度接近预设速度，则切换回正常速度
-  if (Math.abs(currentSpeed - preset) < 0.01) {
-    currentSpeed = 1.0; // 正常速度
-    showSpeedIndicator('切换回正常速度');
+  const presetSpeeds = getPresetSpeeds();
+  if (presetSpeeds.length === 0) return;
+
+  if (presetSpeeds.length === 1) {
+    // 单预设速度：在预设和默认之间切换 (修复 Bug)
+    const targetPreset = presetSpeeds[0];
+    if (Math.abs(currentSpeed - targetPreset) < 0.01) {
+      currentSpeed = settings.defaultSpeed;
+      showSpeedIndicator(`返回默认速度 ${currentSpeed.toFixed(2)}x`);
+    } else {
+      currentSpeed = targetPreset;
+      showSpeedIndicator(`切换到预设 ${currentSpeed.toFixed(2)}x`);
+    }
   } else {
-    // 否则切换到预设速度
-    currentSpeed = preset;
-    showSpeedIndicator(`切换到 ${preset}x`);
+    // 多预设速度：仅在预设列表内循环
+    let currentIndex = presetSpeeds.findIndex(s => Math.abs(currentSpeed - s) < 0.01);
+    let nextIndex = (currentIndex + 1) % presetSpeeds.length;
+    currentSpeed = presetSpeeds[nextIndex];
+    showSpeedIndicator(`预设循环: ${currentSpeed.toFixed(2)}x`);
   }
   
   applySpeedToVideos();
@@ -221,7 +239,7 @@ let customShortcuts = {};
 
 // 加载自定义快捷键
 function loadCustomShortcuts() {
-  chrome.runtime.sendMessage({ action: 'getShortcuts' }, (response) => {
+  chrome.runtime.sendMessage({ action: 'getSpeederShortcuts' }, (response) => {
     if (response) {
       customShortcuts = response;
       updateShortcutListeners();
@@ -450,7 +468,7 @@ function showFloatingMenu() {
     
     <div class="menu-section">
       <div class="menu-section-title">预设速度切换</div>
-      <div class="menu-speed-display" id="menuPresetDisplay">${settings.presetSpeed.toFixed(2)}x</div>
+      <div class="menu-speed-display" id="menuPresetDisplay">${settings.presetSpeed}x</div>
       <div class="menu-button-group">
         <button class="menu-btn" id="menuPresetBtn">切换预设</button>
       </div>
@@ -740,7 +758,7 @@ function updateMenuUI() {
   
   const presetDisplay = menu.querySelector('#menuPresetDisplay');
   if (presetDisplay) {
-    presetDisplay.textContent = `${settings.presetSpeed.toFixed(2)}x`;
+    presetDisplay.textContent = `${settings.presetSpeed}x`;
   }
   
   // Update current URL
@@ -761,7 +779,7 @@ function setupMenuEventListeners() {
     toggle.addEventListener('click', () => {
       settings.globalEnabled = !settings.globalEnabled;
       chrome.runtime.sendMessage({
-        action: 'saveSettings',
+        action: 'saveSpeederSettings',
         settings: settings
       }, () => {
         updateMenuUI();
