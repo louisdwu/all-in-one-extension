@@ -125,7 +125,9 @@ function setupSync() {
             haEnabled: ['ha-enable', 'db-ha-enable'],
             biliAutoSubtitle: ['bili-autoSubtitle', 'db-bili-enable'],
             globalEnabled: ['speed-globalToggle', 'db-speed-enable'],
-            bilibili1080PEnabled: ['bili-1080p-enable']
+            bilibili1080PEnabled: ['bili-1080p-enable'],
+            biliCommentsEnabled: ['bili-comments-enable'],
+            biliAISubtitleEnabled: ['bili-ai-subtitle-enable']
         };
 
         for (const [key, ids] of Object.entries(syncMap)) {
@@ -738,6 +740,10 @@ function initBilibiliSubtitles() {
     const hotkeyInput = document.getElementById('bili-subtitleHotkey');
     const saveBtn = document.getElementById('bili-saveBtn');
     const bypassToggle = document.getElementById('bili-1080p-enable');
+    const commentToggle = document.getElementById('bili-comments-enable');
+    const aiSubToggle = document.getElementById('bili-ai-subtitle-enable');
+    const sessdataInput = document.getElementById('bili-sessdata');
+    const dedeUserIdInput = document.getElementById('bili-dede-userid');
 
     let config = {
         autoEnableSubtitle: true,
@@ -753,28 +759,36 @@ function initBilibiliSubtitles() {
             hotkeyInput.value = config.subtitleHotkey;
         });
 
-        // Load 1080P bypass settings
-        chrome.runtime.sendMessage({ action: 'getBilibili1080PSettings' }, (res) => {
-            if (bypassToggle) bypassToggle.checked = res ? res.enabled : true;
+        // Load bypass settings
+        chrome.storage.sync.get(['bilibili1080PEnabled', 'biliCommentsEnabled', 'biliAISubtitleEnabled', 'biliCookies'], (res) => {
+            if (bypassToggle) bypassToggle.checked = res.bilibili1080PEnabled !== false;
+            if (commentToggle) commentToggle.checked = res.biliCommentsEnabled !== false;
+            if (aiSubToggle) aiSubToggle.checked = res.biliAISubtitleEnabled !== false;
+            if (res.biliCookies) {
+                if (sessdataInput) sessdataInput.value = res.biliCookies.sessdata || '';
+                if (dedeUserIdInput) dedeUserIdInput.value = res.biliCookies.dedeUserId || '';
+            }
         });
     }
 
-    // 1080p Bypass Toggle Event
-    if (bypassToggle) {
-        bypassToggle.addEventListener('change', () => {
-            chrome.runtime.sendMessage({
-                action: 'saveBilibili1080PSettings',
-                enabled: bypassToggle.checked
-            }, (res) => {
-                if (res && res.success) {
-                    showStatus('B站1080P 畅享状态已保存！');
-                    chrome.storage.sync.set({ bilibili1080PEnabled: bypassToggle.checked });
-                } else {
-                    showStatus('保存失败', 'error');
-                }
+    // Toggle Event Listeners
+    [
+        { el: bypassToggle, key: 'bilibili1080PEnabled', msg: 'B站1080P 畅享状态已保存！' },
+        { el: commentToggle, key: 'biliCommentsEnabled', msg: '免登录看评论状态已保存！' },
+        { el: aiSubToggle, key: 'biliAISubtitleEnabled', msg: 'AI 字幕注入状态已保存！' }
+    ].forEach(item => {
+        if (item.el) {
+            item.el.addEventListener('change', () => {
+                const update = {};
+                update[item.key] = item.el.checked;
+                chrome.storage.sync.set(update, () => {
+                    showStatus(item.msg);
+                    // 广播设置变更
+                    chrome.runtime.sendMessage({ action: 'reloadBilibiliSettings' });
+                });
             });
-        });
-    }
+        }
+    });
 
     // 处理单按键录入
     function setupHotkeyRecording() {
@@ -833,18 +847,24 @@ function initBilibiliSubtitles() {
         config.autoEnableSubtitle = autoToggle.checked;
         config.subtitleHotkey = hotkeyInput.value;
 
-        chrome.runtime.sendMessage({
-            action: 'saveBilibiliSettings',
-            settings: config
-        }, (res) => {
-            if (res && res.success) {
-                showStatus('B站字幕配置已保存！');
-                // 同步到 Dashboard
-                const dbToggle = document.getElementById('db-bili-enable');
-                if (dbToggle) dbToggle.checked = config.autoEnableSubtitle;
-            } else {
-                showStatus('保存失败', 'error');
-            }
+        const cookies = {
+            sessdata: sessdataInput ? sessdataInput.value.trim() : '',
+            dedeUserId: dedeUserIdInput ? dedeUserIdInput.value.trim() : ''
+        };
+
+        chrome.storage.sync.set({ biliCookies: cookies }, () => {
+            chrome.runtime.sendMessage({
+                action: 'saveBilibiliSettings',
+                settings: config
+            }, (res) => {
+                if (res && res.success) {
+                    showStatus('B站设置已保存！请刷新视频页面生效。');
+                    const dbToggle = document.getElementById('db-bili-enable');
+                    if (dbToggle) dbToggle.checked = config.autoEnableSubtitle;
+                } else {
+                    showStatus('保存失败', 'error');
+                }
+            });
         });
     });
 

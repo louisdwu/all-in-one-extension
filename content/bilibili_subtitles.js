@@ -11,13 +11,52 @@
 
   // 从存储加载设置
   function loadSettings() {
-    chrome.runtime.sendMessage({ action: 'getBilibiliSettings' }, (response) => {
-      if (response && response.bilibiliSubtitles) {
+    // 聚合所有 B 站相关的配置
+    chrome.storage.sync.get([
+      'bilibiliSubtitles', 
+      'bilibili1080PEnabled', 
+      'biliCommentsEnabled', 
+      'biliAISubtitleEnabled',
+      'biliCookies'
+    ], (res) => {
+      // 1. 本地逻辑配置
+      if (res.bilibiliSubtitles) {
         bilibiliSettings = {
-          autoEnableSubtitle: response.bilibiliSubtitles.autoEnableSubtitle !== false,
-          subtitleHotkey: response.bilibiliSubtitles.subtitleHotkey || 's'
+          autoEnableSubtitle: res.bilibiliSubtitles.autoEnableSubtitle !== false,
+          subtitleHotkey: res.bilibiliSubtitles.subtitleHotkey || 's'
         };
       }
+
+      // 2. 桥接配置：将 Cookies 写入到 Bilibili 原生 localStorage，以便 MAIN script 能同步读取
+      const oldBridge = localStorage.getItem('aio_bili_cookies');
+      if (res.biliCookies && res.biliCookies.sessdata) {
+          const newBridge = JSON.stringify(res.biliCookies);
+          if (oldBridge !== newBridge) {
+              localStorage.setItem('aio_bili_cookies', newBridge);
+              document.cookie = `SESSDATA=${res.biliCookies.sessdata}; path=/; domain=.bilibili.com`;
+              if (res.biliCookies.dedeUserId) {
+                  document.cookie = `DedeUserID=${res.biliCookies.dedeUserId}; path=/; domain=.bilibili.com`;
+              }
+              // 【重要】如果是全新填写的验证信息（比如新开无痕窗口），立即刷新当前页面
+              // 确保 MAIN script(document_start) 能够同步拿到并覆盖底层 API 初始化！
+              console.log('[AIO Bili] Detected new cookies. Syncing to localStorage and triggering reload to apply...');
+              location.reload();
+              return; // 刷新后不执行后面逻辑
+          }
+      } else {
+          if (oldBridge) {
+              localStorage.removeItem('aio_bili_cookies');
+          }
+      }
+
+      // 3. 注入给 MAIN World 的常规配置
+      const mainConfig = {
+        bili1080PEnabled: res.bilibili1080PEnabled !== false,
+        biliCommentsEnabled: res.biliCommentsEnabled !== false,
+        biliAISubtitleEnabled: res.biliAISubtitleEnabled !== false
+      };
+      document.documentElement.setAttribute('data-aio-bili-config', JSON.stringify(mainConfig));
+
       if (bilibiliSettings.autoEnableSubtitle) {
         initAutoSubtitle();
       }

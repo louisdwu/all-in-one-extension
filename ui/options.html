@@ -268,13 +268,43 @@
                         <span class="slider"></span>
                     </label>
                 </div>
-                <!-- 之前的字幕增强内容作为下方的另一个功能模块 -->
+
+                <div class="toggle-container" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
+                    <span class="label" style="font-size: 16px;">免登录查看评论区</span>
+                    <label class="toggle">
+                        <input type="checkbox" id="bili-comments-enable" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-container" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
+                    <span class="label" style="font-size: 16px;">AI 字幕注入 (解除登录可见限制)</span>
+                    <label class="toggle">
+                        <input type="checkbox" id="bili-ai-subtitle-enable" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
                 <div class="toggle-container" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
                     <span class="label" style="font-size: 16px;">自动开启中文字幕</span>
                     <label class="toggle">
                         <input type="checkbox" id="bili-autoSubtitle" checked>
                         <span class="slider"></span>
                     </label>
+                </div>
+
+                <h3>🔑 B站 Cookie 配置（可选）</h3>
+                <div class="help-text" style="margin-bottom: 15px;">
+                    填入专用账号的 SESSDATA 后，可解锁完整评论区和 AI 字幕。<br>
+                    获取方法：登录 B站 → F12 → Application → Cookies → 复制对应值。
+                </div>
+                <div class="form-group">
+                    <label>SESSDATA</label>
+                    <input type="text" id="bili-sessdata" placeholder="粘贴 SESSDATA 值" style="font-family: monospace; font-size: 13px;">
+                </div>
+                <div class="form-group">
+                    <label>DedeUserID</label>
+                    <input type="text" id="bili-dede-userid" placeholder="粘贴 DedeUserID 值" style="font-family: monospace; font-size: 13px;">
                 </div>
 
                 <h3>快捷键配置</h3>
