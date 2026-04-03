@@ -15,7 +15,7 @@
             <li data-target="tab-aiotabs">🖱️ 标签页切换</li>
             <li data-target="tab-general">🕵️ 无痕按键</li>
             <li data-target="tab-speeder">🎬 视频倍速</li>
-            <li data-target="tab-bilibili">📺 B站字幕</li>
+            <li data-target="tab-bilibili">📺 B站增强</li>
             <li data-target="tab-hotkey">🎹 快捷键映射</li>
             <li data-target="tab-ha">🏠 家庭监控</li>
             <li data-target="tab-backup" class="nav-backup">💾 全局备份</li>
@@ -73,8 +73,8 @@
                     </div>
                     <div class="dash-card" data-nav-target="tab-bilibili">
                         <div class="dash-info">
-                            <h3>📺 B站字幕</h3>
-                            <p>自动开启与按键切换</p>
+                            <h3>📺 B站增强</h3>
+                            <p>字幕增强与免登录1080P</p>
                         </div>
                         <label class="toggle">
                             <input type="checkbox" id="db-bili-enable">
@@ -257,10 +257,18 @@
             </div>
         </div>
 
-        <!-- ================= Tab: Bilibili Subtitles ================= -->
+        <!-- ================= Tab: Bilibili ================= -->
         <div id="tab-bilibili" class="tab-pane">
             <div class="section">
-                <h2>📺 哔哩哔哩字幕增强</h2>
+                <h2>📺 哔哩哔哩功能增强</h2>
+                <div class="toggle-container" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
+                    <span class="label" style="font-size: 16px;">免登录 1080P 畅享 (自动防打断)</span>
+                    <label class="toggle">
+                        <input type="checkbox" id="bili-1080p-enable" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <!-- 之前的字幕增强内容作为下方的另一个功能模块 -->
                 <div class="toggle-container" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
                     <span class="label" style="font-size: 16px;">自动开启中文字幕</span>
                     <label class="toggle">

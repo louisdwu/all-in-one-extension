@@ -124,7 +124,8 @@ function setupSync() {
             hotkeyEnabled: ['hotkey-enable', 'db-hotkey-enable'],
             haEnabled: ['ha-enable', 'db-ha-enable'],
             biliAutoSubtitle: ['bili-autoSubtitle', 'db-bili-enable'],
-            globalEnabled: ['speed-globalToggle', 'db-speed-enable']
+            globalEnabled: ['speed-globalToggle', 'db-speed-enable'],
+            bilibili1080PEnabled: ['bili-1080p-enable']
         };
 
         for (const [key, ids] of Object.entries(syncMap)) {
@@ -731,11 +732,12 @@ function initGlobalBackup() {
     });
 }
 
-// ==== Bilibili Subtitles ====
+// ==== Bilibili Features ====
 function initBilibiliSubtitles() {
     const autoToggle = document.getElementById('bili-autoSubtitle');
     const hotkeyInput = document.getElementById('bili-subtitleHotkey');
     const saveBtn = document.getElementById('bili-saveBtn');
+    const bypassToggle = document.getElementById('bili-1080p-enable');
 
     let config = {
         autoEnableSubtitle: true,
@@ -749,6 +751,28 @@ function initBilibiliSubtitles() {
             }
             autoToggle.checked = config.autoEnableSubtitle;
             hotkeyInput.value = config.subtitleHotkey;
+        });
+
+        // Load 1080P bypass settings
+        chrome.runtime.sendMessage({ action: 'getBilibili1080PSettings' }, (res) => {
+            if (bypassToggle) bypassToggle.checked = res ? res.enabled : true;
+        });
+    }
+
+    // 1080p Bypass Toggle Event
+    if (bypassToggle) {
+        bypassToggle.addEventListener('change', () => {
+            chrome.runtime.sendMessage({
+                action: 'saveBilibili1080PSettings',
+                enabled: bypassToggle.checked
+            }, (res) => {
+                if (res && res.success) {
+                    showStatus('B站1080P 畅享状态已保存！');
+                    chrome.storage.sync.set({ bilibili1080PEnabled: bypassToggle.checked });
+                } else {
+                    showStatus('保存失败', 'error');
+                }
+            });
         });
     }
 

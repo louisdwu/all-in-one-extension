@@ -5,7 +5,8 @@ try {
         "hotkey_changer.js",
         "smart_speeder.js",
         "home_assistant.js",
-        "bilibili_subtitles.js"
+        "bilibili_subtitles.js",
+        "bilibili_1080p.js"
     );
     console.log('[All in One Extension] All background scripts loaded successfully.');
 } catch (e) {

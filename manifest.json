@@ -51,12 +51,27 @@
         },
         {
             "matches": [
-                "*://*.bilibili.com/video/*"
+                "*://*.bilibili.com/video/*",
+                "*://*.bilibili.com/bangumi/*",
+                "*://*.bilibili.com/list/*"
             ],
             "js": [
-                "content/bilibili_subtitles.js"
+                "content/bilibili_1080p_inject.js"
             ],
-            "run_at": "document_end"
+            "run_at": "document_start",
+            "world": "MAIN"
+        },
+        {
+            "matches": [
+                "*://*.bilibili.com/video/*",
+                "*://*.bilibili.com/bangumi/*",
+                "*://*.bilibili.com/list/*"
+            ],
+            "js": [
+                "content/bilibili_subtitles.js",
+                "content/bilibili_1080p.js"
+            ],
+            "run_at": "document_start"
         }
     ],
     "action": {
