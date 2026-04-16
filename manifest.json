@@ -45,6 +45,9 @@
                 "<all_urls>"
             ],
             "js": [
+                "content/modules/speeder_styles.js",
+                "content/modules/speeder_ball.js",
+                "content/modules/speeder_menu.js",
                 "content/smart_speeder.js"
             ],
             "run_at": "document_end"
