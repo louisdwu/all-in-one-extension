@@ -4,11 +4,13 @@ import { showStatus } from '../../libs/utils.js';
 export function initBilibiliSubtitles() {
     const autoToggle = document.getElementById('bili-autoSubtitle');
     const hotkeyInput = document.getElementById('bili-subtitleHotkey');
+    const autoplayToggle = document.getElementById('bili-autoplay-enable');
     const bypassToggle = document.getElementById('bili-1080p-enable');
     const commentToggle = document.getElementById('bili-comments-enable');
     const aiSubToggle = document.getElementById('bili-ai-subtitle-enable');
     const sessdataInput = document.getElementById('bili-sessdata');
     const dedeUserIdInput = document.getElementById('bili-dede-userid');
+    const saveBtn = document.getElementById('bili-saveBtn');
 
     if (!autoToggle) return;
 
@@ -23,7 +25,8 @@ export function initBilibiliSubtitles() {
             hotkeyInput.value = config.subtitleHotkey;
         });
 
-        ConfigBridge.get(['bilibili1080PEnabled', 'biliCommentsEnabled', 'biliAISubtitleEnabled', 'biliCookies']).then((res) => {
+        ConfigBridge.get(['biliAutoPlay', 'bilibili1080PEnabled', 'biliCommentsEnabled', 'biliAISubtitleEnabled', 'biliCookies']).then((res) => {
+            if (autoplayToggle) autoplayToggle.checked = !!res.biliAutoPlay;
             if (bypassToggle) bypassToggle.checked = res.bilibili1080PEnabled !== false;
             if (commentToggle) commentToggle.checked = res.biliCommentsEnabled !== false;
             if (aiSubToggle) aiSubToggle.checked = res.biliAISubtitleEnabled !== false;
@@ -34,53 +37,45 @@ export function initBilibiliSubtitles() {
         });
     }
 
-    [
-        { el: bypassToggle, key: 'bilibili1080PEnabled', msg: 'B站1080P 畅享状态已保存！' },
-        { el: commentToggle, key: 'biliCommentsEnabled', msg: '免登录看评论状态已保存！' },
-        { el: aiSubToggle, key: 'biliAISubtitleEnabled', msg: 'AI 字幕注入状态已保存！' }
-    ].forEach(item => {
-        item.el?.addEventListener('change', () => {
-            const update = {};
-            update[item.key] = item.el.checked;
-            ConfigBridge.set(update).then(() => {
-                showStatus(item.msg);
-                ConfigBridge.sendMessage({ action: 'reloadBilibiliSettings' });
+    // 统一保存逻辑（除了快捷键和字幕开关，因为它们有独立逻辑，或者也可以统一）
+    function saveAll() {
+        const cookies = {
+            sessdata: sessdataInput.value.trim(),
+            dedeUserId: dedeUserIdInput.value.trim()
+        };
+
+        const update = {
+            biliAutoPlay: autoplayToggle.checked,
+            bilibili1080PEnabled: bypassToggle.checked,
+            biliCommentsEnabled: commentToggle.checked,
+            biliAISubtitleEnabled: aiSubToggle.checked,
+            biliCookies: cookies,
+            biliAutoSubtitle: autoToggle.checked // 同步字幕开关到顶层
+        };
+
+        ConfigBridge.set(update).then(() => {
+            // 同时保存字幕专用对象
+            config.autoEnableSubtitle = autoToggle.checked;
+            ConfigBridge.saveBilibiliSettings(config).then(() => {
+                showStatus('B站所有设置已保存');
+                ConfigBridge.sendMessage({ action: 'reloadSettings' });
             });
         });
-    });
+    }
 
-    // 快捷键录制逻辑 (简化版)
+    saveBtn?.addEventListener('click', saveAll);
+
+    // 快捷键录制逻辑
     hotkeyInput?.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') return;
         e.preventDefault();
         const key = e.key.toLowerCase();
         hotkeyInput.value = key;
         config.subtitleHotkey = key;
-        save();
-    });
-
-    autoToggle?.addEventListener('change', () => {
-        config.autoEnableSubtitle = autoToggle.checked;
-        save();
-        ConfigBridge.set({ biliAutoSubtitle: autoToggle.checked });
-    });
-
-    function save() {
+        // 快捷键录制后自动保存该子项
         ConfigBridge.saveBilibiliSettings(config).then(() => {
-            showStatus('B站字幕偏好已保存');
-        });
-    }
-
-    // Cookie 保存逻辑
-    [sessdataInput, dedeUserIdInput].forEach(el => {
-        el?.addEventListener('change', () => {
-            const cookies = {
-                sessdata: sessdataInput.value.trim(),
-                dedeUserId: dedeUserIdInput.value.trim()
-            };
-            ConfigBridge.set({ biliCookies: cookies }).then(() => {
-                showStatus('B站身份凭证已更新');
-            });
+            showStatus('快捷键已更新');
+            ConfigBridge.sendMessage({ action: 'reloadSettings' });
         });
     });
 

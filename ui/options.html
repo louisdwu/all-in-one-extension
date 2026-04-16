@@ -261,69 +261,84 @@
         <div id="tab-bilibili" class="tab-pane">
             <div class="section">
                 <h2>📺 哔哩哔哩功能增强</h2>
-                <div class="toggle-container" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <span class="label" style="font-size: 16px;">免登录 1080P 畅享 (自动防打断)</span>
-                    <label class="toggle">
-                        <input type="checkbox" id="bili-1080p-enable" checked>
-                        <span class="slider"></span>
-                    </label>
+                
+                <div class="section-group" style="margin-top: 20px;">
+                    <h3 style="border-left: 4px solid var(--primary); padding-left: 10px; margin-bottom: 20px;">🎬 播放增强</h3>
+                    
+                    <div class="toggle-container" style="margin-bottom: 15px;">
+                        <span class="label">自动播放视频 (覆盖 B 站原生设置)</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="bili-autoplay-enable">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="toggle-container" style="margin-bottom: 15px;">
+                        <span class="label">自动开启中文字幕 (优先官方字幕)</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="bili-autoSubtitle" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label>字幕切换快捷键 (点击并录入，支持单字母)</label>
+                        <div class="shortcut-input-group">
+                            <input type="text" id="bili-subtitleHotkey" placeholder="按键盘录入，如 s" readonly style="cursor: pointer; background: #f8f9fa;">
+                        </div>
+                    </div>
                 </div>
 
-                <div class="toggle-container" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <span class="label" style="font-size: 16px;">免登录查看评论区</span>
-                    <label class="toggle">
-                        <input type="checkbox" id="bili-comments-enable" checked>
-                        <span class="slider"></span>
-                    </label>
-                </div>
+                <hr style="margin: 25px 0; border: none; border-top: 1px dashed #e0e6ed;">
 
-                <div class="toggle-container" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <span class="label" style="font-size: 16px;">AI 字幕注入 (解除登录可见限制)</span>
-                    <label class="toggle">
-                        <input type="checkbox" id="bili-ai-subtitle-enable" checked>
-                        <span class="slider"></span>
-                    </label>
-                </div>
+                <div class="section-group">
+                    <h3 style="border-left: 4px solid #6f42c1; padding-left: 10px; margin-bottom: 5px;">🕵️ 无痕模式增强</h3>
+                    <div class="help-text" style="color: #6f42c1; font-weight: bold; margin-bottom: 15px;">⚠️ 以下功能仅在浏览器无痕窗口中激活</div>
 
-                <div class="toggle-container" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <span class="label" style="font-size: 16px;">自动开启中文字幕</span>
-                    <label class="toggle">
-                        <input type="checkbox" id="bili-autoSubtitle" checked>
-                        <span class="slider"></span>
-                    </label>
-                </div>
+                    <div class="toggle-container" style="margin-bottom: 15px;">
+                        <span class="label">免登录 1080P 畅享 (自动防打断)</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="bili-1080p-enable" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
 
-                <h3>🔑 B站 Cookie 配置（可选）</h3>
-                <div class="help-text" style="margin-bottom: 15px;">
-                    填入专用账号的 SESSDATA 后，可解锁完整评论区和 AI 字幕。<br>
-                    获取方法：登录 B站 → F12 → Application → Cookies → 复制对应值。
-                </div>
-                <div class="form-group">
-                    <label>SESSDATA</label>
-                    <input type="text" id="bili-sessdata" placeholder="粘贴 SESSDATA 值" style="font-family: monospace; font-size: 13px;">
-                </div>
-                <div class="form-group">
-                    <label>DedeUserID</label>
-                    <input type="text" id="bili-dede-userid" placeholder="粘贴 DedeUserID 值" style="font-family: monospace; font-size: 13px;">
-                </div>
+                    <div class="toggle-container" style="margin-bottom: 15px;">
+                        <span class="label">免登录查看评论区</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="bili-comments-enable" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
 
-                <h3>快捷键配置</h3>
-                <div class="help-text" style="margin-bottom: 15px;">
-                    点击下方输入框并按键盘录入切换字幕的快捷键（支持单按键，如 <kbd>s</kbd>）。
-                </div>
-                <div class="form-group">
-                    <label>字幕切换快捷键</label>
-                    <div class="shortcut-input-group">
-                        <input type="text" id="bili-subtitleHotkey" placeholder="按键盘录入，如 s" readonly style="cursor: pointer; background: #f8f9fa;">
+                    <div class="toggle-container" style="margin-bottom: 15px;">
+                        <span class="label">AI 字幕注入 (解除登录可见限制)</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="bili-ai-subtitle-enable" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <h4 style="margin-top: 20px;">🔑 B站 Cookie 配置（可选）</h4>
+                    <div class="help-text" style="margin-bottom: 10px;">
+                        填入专用账号的 SESSDATA 后，可在无痕模式解锁完整评论区和 AI 字幕。
+                    </div>
+                    <div class="form-group">
+                        <label>SESSDATA</label>
+                        <input type="text" id="bili-sessdata" placeholder="粘贴 SESSDATA 值" style="font-family: monospace; font-size: 13px;">
+                    </div>
+                    <div class="form-group">
+                        <label>DedeUserID</label>
+                        <input type="text" id="bili-dede-userid" placeholder="粘贴 DedeUserID 值" style="font-family: monospace; font-size: 13px;">
                     </div>
                 </div>
 
                 <div class="btn-group" style="margin-top:30px;">
-                    <button id="bili-saveBtn" class="primary">保存 B站字幕设置</button>
+                    <button id="bili-saveBtn" class="primary">保存 B站设置</button>
                 </div>
 
                 <div class="help-text" style="color: var(--text-muted); margin-top: 20px;">
-                    温馨提示：B站字幕配置已纳入全量备份。如需导出，请前往“💾 全局备份”页面。
+                    温馨提示：B站增强配置已纳入全局备份。
                 </div>
             </div>
         </div>

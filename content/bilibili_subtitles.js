@@ -17,7 +17,8 @@
       'bilibili1080PEnabled', 
       'biliCommentsEnabled', 
       'biliAISubtitleEnabled',
-      'biliCookies'
+      'biliCookies',
+      'biliAutoPlay'
     ], (res) => {
       // 1. 本地逻辑配置
       if (res.bilibiliSubtitles) {
@@ -29,7 +30,10 @@
 
       // 2. 桥接配置：将 Cookies 写入到 Bilibili 原生 localStorage，以便 MAIN script 能同步读取
       const oldBridge = localStorage.getItem('aio_bili_cookies');
-      if (res.biliCookies && res.biliCookies.sessdata) {
+      const inIncognito = chrome.extension.inIncognitoContext;
+
+      // 仅在无痕模式下同步 Cookies
+      if (inIncognito && res.biliCookies && res.biliCookies.sessdata) {
           const newBridge = JSON.stringify(res.biliCookies);
           if (oldBridge !== newBridge) {
               localStorage.setItem('aio_bili_cookies', newBridge);
@@ -37,23 +41,22 @@
               if (res.biliCookies.dedeUserId) {
                   document.cookie = `DedeUserID=${res.biliCookies.dedeUserId}; path=/; domain=.bilibili.com`;
               }
-              // 【重要】如果是全新填写的验证信息（比如新开无痕窗口），立即刷新当前页面
-              // 确保 MAIN script(document_start) 能够同步拿到并覆盖底层 API 初始化！
-              console.log('[AIO Bili] Detected new cookies. Syncing to localStorage and triggering reload to apply...');
+              console.log('[AIO Bili] Detected new cookies in Incognito. Syncing and reloading...');
               location.reload();
-              return; // 刷新后不执行后面逻辑
+              return;
           }
-      } else {
-          if (oldBridge) {
-              localStorage.removeItem('aio_bili_cookies');
-          }
+      } else if (!inIncognito && oldBridge) {
+          // 如果切回普通模式且残留了无痕专用桥接，清除它
+          localStorage.removeItem('aio_bili_cookies');
       }
 
       // 3. 注入给 MAIN World 的常规配置
       const mainConfig = {
         bili1080PEnabled: res.bilibili1080PEnabled !== false,
         biliCommentsEnabled: res.biliCommentsEnabled !== false,
-        biliAISubtitleEnabled: res.biliAISubtitleEnabled !== false
+        biliAISubtitleEnabled: res.biliAISubtitleEnabled !== false,
+        biliAutoPlay: !!res.biliAutoPlay,
+        inIncognito: inIncognito
       };
       document.documentElement.setAttribute('data-aio-bili-config', JSON.stringify(mainConfig));
 
