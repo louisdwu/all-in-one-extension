@@ -2,7 +2,7 @@ import { initDashboard, setupSync } from './modules/dashboard.js';
 import { initAioTabs } from './modules/aiotabs.js';
 import { initEZIncognito } from './modules/incognito.js';
 import { initSmartSpeeder } from './modules/speeder.js';
-import { initHAMonitor } from './modules/ha.js';
+import { initHUDPanel } from './modules/hud/index.js';
 import { initHotkeyPanel } from './modules/hotkeys.js';
 import { initGlobalBackup } from './modules/backup.js';
 import { initBilibiliSubtitles } from './modules/bilibili.js';
@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initAioTabs();
     initEZIncognito();
     initSmartSpeeder();
-    initHAMonitor();
+    initHUDPanel();
     initHotkeyPanel();
     initGlobalBackup();
     initBilibiliSubtitles();

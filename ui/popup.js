@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     initEZIncognito();
     initAioTabs();
-    initHAMonitor();
+    initHUDMonitor();
     initSmartSpeeder();
     initHotkeyChanger();
     initSync(); // 新增同步逻辑
@@ -65,20 +65,22 @@ function initAioTabs() {
     });
 }
 
-// === HA Monitor ===
-async function initHAMonitor() {
-    const listEl = document.getElementById('ha-entity-list');
-    const data = await chrome.storage.local.get(['entityResults']);
-    const results = data.entityResults || {};
-    const keys = Object.keys(results);
+// === HUD Monitor ===
+async function initHUDMonitor() {
+    const listEl = document.getElementById('hud-list');
+    const data = await chrome.storage.local.get(['hudState', 'hudQueueKeys']);
+    const results = data.hudState || {};
+    const queue = data.hudQueueKeys || [];
 
-    if (keys.length === 0) {
-        listEl.innerHTML = '<div class="ha-empty">未配置监控实体或暂无数据</div>';
+    if (queue.length === 0) {
+        listEl.innerHTML = '<div class="ha-empty">未配置监控项或暂无数据</div>';
         return;
     }
 
-    listEl.innerHTML = keys.map(key => {
+    listEl.innerHTML = queue.map(key => {
         const item = results[key];
+        if (!item) return '';
+        
         // 根据错误状态变更颜色
         const colorStyle = item.error ? 'color: var(--danger-color);' : '';
         return `<div class="entity-row">

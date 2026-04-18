@@ -16,7 +16,7 @@ export function initDashboard() {
         'db-aiotabs-enable': 'aioTabsEnabled',
         'db-ez-enable': 'ezEnabled',
         'db-hotkey-enable': 'hotkeyEnabled',
-        'db-ha-enable': 'haEnabled'
+        'db-hud-enable': 'hudEnabled'
     };
 
     // 初始化状态
@@ -35,7 +35,7 @@ export function initDashboard() {
                 const update = {};
                 update[key] = e.target.checked;
                 ConfigBridge.set(update);
-                if (key === 'haEnabled') ConfigBridge.sendMessage({ type: "UPDATE_CONFIG" });
+                if (key === 'hudEnabled') ConfigBridge.sendMessage({ type: "UPDATE_HUD_CONFIG" });
             });
         }
     }
@@ -82,7 +82,7 @@ export function setupSync() {
             aioTabsEnabled: ['aiotabs-enable', 'db-aiotabs-enable'],
             ezEnabled: ['ez-enable', 'db-ez-enable'],
             hotkeyEnabled: ['hotkey-enable', 'db-hotkey-enable'],
-            haEnabled: ['ha-enable', 'db-ha-enable'],
+            hudEnabled: ['hud-enable', 'db-hud-enable'],
             biliAutoSubtitle: ['bili-autoSubtitle', 'db-bili-enable'],
             globalEnabled: ['speed-globalToggle', 'db-speed-enable'],
             bilibili1080PEnabled: ['bili-1080p-enable'],

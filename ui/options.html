@@ -17,7 +17,7 @@
             <li data-target="tab-speeder">🎬 视频倍速</li>
             <li data-target="tab-bilibili">📺 B站增强</li>
             <li data-target="tab-hotkey">🎹 快捷键映射</li>
-            <li data-target="tab-ha">🏠 家庭监控</li>
+            <li data-target="tab-hud">🖥️ HUD 监控</li>
             <li data-target="tab-backup" class="nav-backup">💾 全局备份</li>
         </ul>
     </div>
@@ -81,13 +81,13 @@
                             <span class="slider"></span>
                         </label>
                     </div>
-                    <div class="dash-card" data-nav-target="tab-ha">
+                    <div class="dash-card" data-nav-target="tab-hud">
                         <div class="dash-info">
-                            <h3>🏠 家庭监控</h3>
-                            <p>智能家居状态监控</p>
+                            <h3>🖥️ HUD 监控</h3>
+                            <p>天气与智能家居状态</p>
                         </div>
                         <label class="toggle">
-                            <input type="checkbox" id="db-ha-enable">
+                            <input type="checkbox" id="db-hud-enable">
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -343,42 +343,23 @@
             </div>
         </div>
 
-        <!-- ================= Tab: HA Monitor ================= -->
-        <div id="tab-ha" class="tab-pane">
+        <!-- ================= Tab: HUD Monitor ================= -->
+        <div id="tab-hud" class="tab-pane">
             <div class="section">
-                <h2>🏠 家庭监控</h2>
+                <h2>🖥️ HUD 监控</h2>
                 <div class="toggle-container" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <span class="label" style="font-size: 16px;">启用功能</span>
+                    <span class="label" style="font-size: 16px;">启用 HUD 监控功能 (工具栏图标状态显示)</span>
                     <label class="toggle">
-                        <input type="checkbox" id="ha-enable">
+                        <input type="checkbox" id="hud-enable">
                         <span class="slider"></span>
                     </label>
                 </div>
-                <h3>服务端连接配置</h3>
 
-                <div class="form-group">
-                    <label>服务端地址 (含协议与端口)</label>
-                    <input type="url" id="ha-url" placeholder="http://192.168.1.3:8123" required>
-                </div>
-
-                <div class="form-group">
-                    <label>长期访问令牌 (Long-Lived Access Token)</label>
-                    <input type="password" id="ha-token" placeholder="从 HA 用户个人资料页生成" required>
-                </div>
-
-                <div class="row" style="margin-top: 20px;">
+                <h3>🔄 轮播策略</h3>
+                <div class="row" style="margin-top: 15px; margin-bottom: 30px;">
                     <div class="form-group">
-                        <label>后台轮询刷新频率</label>
-                        <select id="ha-refresh-rate">
-                            <option value="0.25">15 秒</option>
-                            <option value="0.5">30 秒</option>
-                            <option value="1" selected>1 分钟</option>
-                            <option value="5">5 分钟</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>多实体轮播间隔时间</label>
-                        <select id="ha-carousel-interval">
+                        <label>单个指标在图标上展示的时间 (秒)</label>
+                        <select id="hud-carousel-interval">
                             <option value="2">2 秒</option>
                             <option value="3" selected>3 秒</option>
                             <option value="5">5 秒</option>
@@ -389,16 +370,110 @@
 
                 <hr style="margin: 30px 0; border: none; border-top: 1px solid #e0e6ed;">
 
-                <h3>要监控的实体列表</h3>
-                <div class="help-text" style="margin-bottom:10px;">若添加多个实体，将在工具栏图标上按上方设定的时间间隔轮播显示。</div>
+                <h3>🌤️ 实时天气 (QWeather)</h3>
+                <div class="help-text" style="margin-bottom: 15px;">
+                    建议仅用于获取<strong>温度</strong>。
+                </div>
 
-                <div id="ha-entity-list" class="entity-list-container"></div>
-                <button id="ha-add-entity" class="secondary" style="margin-top:10px; width:100%; text-align:center;">+
-                    追加实体映射项</button>
+                <div class="row" style="margin-bottom: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>和风天气 API Key</label>
+                        <input type="text" id="qw-key" placeholder="在此填入 Key">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>自定义域名 (可选)</label>
+                        <input type="text" id="qw-host" placeholder="例如: mg3jpha9r7.re.qweatherapi.com">
+                    </div>
+                </div>
+                <div class="row" style="margin-bottom: 15px;">
+                    <div class="form-group" style="flex: 2;">
+                        <label>Location ID (数字) 或 经度,纬度</label>
+                        <input type="text" id="qw-location" placeholder="输入 Location ID">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>刷新频率 (分钟)</label>
+                        <input type="number" id="qw-refresh-rate" value="20" min="5">
+                    </div>
+                </div>
+
+                <div class="form-group" style="background:#f8f9fa; padding:15px; border-radius:8px;">
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                        <label class="toggle-container" style="justify-content: flex-start; gap: 8px;">
+                            <input type="checkbox" id="qw-metric-temp">启用温度显示 (QWeather)
+                        </label>
+                    </div>
+                </div>
+
+                <hr style="margin: 30px 0; border: none; border-top: 1px solid #e0e6ed;">
+
+                <h3 style="color: #673ab7;">🧪 空气质量 (WAQI)</h3>
+                <div class="help-text" style="margin-bottom: 15px;">
+                    数据来源于 aqicn.org (World Air Quality Index)。全球最专业的空气质量源。
+                </div>
+
+                <div class="row" style="margin-bottom: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>WAQI API Token</label>
+                        <input type="text" id="waqi-token" placeholder="填入您的 WAQI Token">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>监测点/城市名称</label>
+                        <input type="text" id="waqi-city" placeholder="例如: guangzhou 或 huangpu">
+                    </div>
+                </div>
+
+                <div class="form-group" style="background:#f3e5f5; padding:15px; border-radius:8px;">
+                    <label style="margin-bottom: 10px; display: block;">需要轮播的空气指标 (WAQI)</label>
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                        <label class="toggle-container" style="justify-content: flex-start; gap: 8px;">
+                            <input type="checkbox" id="waqi-metric-aqi">AQI
+                        </label>
+                        <label class="toggle-container" style="justify-content: flex-start; gap: 8px;">
+                            <input type="checkbox" id="waqi-metric-o3" checked>臭氧 (O3)
+                        </label>
+                        <label class="toggle-container" style="justify-content: flex-start; gap: 8px;">
+                            <input type="checkbox" id="waqi-metric-pm25">PM2.5
+                        </label>
+                        <label class="toggle-container" style="justify-content: flex-start; gap: 8px;">
+                            <input type="checkbox" id="waqi-metric-pm10">PM10
+                        </label>
+                    </div>
+                </div>
+
+
+                <hr style="margin: 30px 0; border: none; border-top: 1px solid #e0e6ed;">
+
+                <h3>🏠 智能家居 (Home Assistant)</h3>
+                <div class="form-group">
+                    <label>HA 服务端地址 (含 http/https 与端口)</label>
+                    <input type="url" id="ha-url" placeholder="http://192.168.1.3:8123">
+                </div>
+                <div class="row" style="margin-bottom: 15px;">
+                    <div class="form-group" style="flex: 2;">
+                        <label>长期访问令牌 (Long-Lived Access Token)</label>
+                        <input type="password" id="ha-token" placeholder="从 HA 个人资料页生成">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>HA 刷新频率</label>
+                        <select id="ha-refresh-rate">
+                            <option value="0.25">15 秒</option>
+                            <option value="0.5">30 秒</option>
+                            <option value="1" selected>1 分钟</option>
+                            <option value="5">5 分钟</option>
+                            <option value="10">10 分钟</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group" style="background:#f8f9fa; padding:15px; border-radius:8px; margin-top: 15px;">
+                    <label style="margin-bottom: 10px; display: block;">需要轮播的智能家居实体</label>
+                    <div id="ha-entity-list" class="entity-list-container"></div>
+                    <button id="ha-add-entity" class="secondary" style="margin-top:10px; width:100%; text-align:center;">+ 追加 HA 实体</button>
+                </div>
 
                 <div class="btn-group" style="margin-top:30px;">
-                    <button id="ha-save" class="primary">保存 HA 配置</button>
-                    <button id="ha-test" class="success" style="background:#4CAF50;color:#fff;">网络连接测试</button>
+                    <button id="hud-save" class="primary">💾 保存 HUD 配置</button>
+                    <button id="hud-test" class="success" style="background:#4CAF50;color:#fff;">🔄 立即抓取数据测试</button>
                 </div>
             </div>
         </div>
