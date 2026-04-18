@@ -9,7 +9,8 @@
         "activeTab",
         "scripting",
         "alarms",
-        "notifications"
+        "notifications",
+        "idle"
     ],
     "host_permissions": [
         "*://*/*"

@@ -34,6 +34,25 @@ export function initHUDPanel() {
     if (!container) return;
 
     // --- Dynamic Display Logic ---
+    function formatTime(timestamp) {
+        if (!timestamp) return '从未';
+        const date = new Date(timestamp);
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        const h = String(date.getHours()).padStart(2, '0');
+        const min = String(date.getMinutes()).padStart(2, '0');
+        const s = String(date.getSeconds()).padStart(2, '0');
+        return `${y}-${m}-${d} ${h}:${min}:${s}`;
+    }
+
+    function updateHUDTimestamps(data = {}) {
+        const waqiEl = document.getElementById('waqi-last-success-time');
+        const haEl = document.getElementById('ha-last-success-time');
+        if (waqiEl) waqiEl.textContent = formatTime(data.hudLastSuccessWaqi);
+        if (haEl) haEl.textContent = formatTime(data.hudLastSuccessHa);
+    }
+
     function updateHUDValueLabels(state = {}) {
         // 1. Update WAQI values
         const waqiKeys = ['aqi', 'o3', 'pm25', 'pm10', 'no2', 'so2', 'co', 't', 'h', 'p', 'w'];
@@ -157,6 +176,11 @@ export function initHUDPanel() {
         if (changes.hudState) {
             updateHUDValueLabels(changes.hudState.newValue);
         }
+        if (changes.hudLastSuccessWaqi || changes.hudLastSuccessHa) {
+            chrome.storage.local.get(['hudLastSuccessWaqi', 'hudLastSuccessHa']).then(data => {
+                updateHUDTimestamps(data);
+            });
+        }
     });
 
     // Load initial state
@@ -193,9 +217,10 @@ export function initHUDPanel() {
         container.innerHTML = '';
         items.haEntities.forEach(e => addHARow(e.name, e.id));
 
-        // Initial Data Fetch for Labels
-        chrome.storage.local.get(['hudState']).then(data => {
+        // Initial Data Fetch for Labels & Timestamps
+        chrome.storage.local.get(['hudState', 'hudLastSuccessWaqi', 'hudLastSuccessHa']).then(data => {
             updateHUDValueLabels(data.hudState || {});
+            updateHUDTimestamps(data);
         });
     });
 

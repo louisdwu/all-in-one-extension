@@ -3,31 +3,49 @@
 const ALARM_WAQI = 'HUD_ALARM_WAQI';
 const ALARM_HA = 'HUD_ALARM_HA';
 const ALARM_CAROUSEL = 'HUD_ALARM_CAROUSEL';
+const ALARM_RETRY = 'HUD_ALARM_RETRY';
 
 // Cache keys for storage
 const STORAGE_HUD_STATE = 'hudState';
 const STORAGE_HUD_QUEUE = 'hudQueueKeys';
 const STORAGE_HUD_INDEX = 'hudCarouselIndex';
+const STORAGE_HUD_LAST_WAQI = 'hudLastSuccessWaqi';
+const STORAGE_HUD_LAST_HA = 'hudLastSuccessHa';
 
+// Fetch data from specified source
 // Fetch data from specified source
 async function updateHUDData(source) {
     try {
         const settings = await chrome.storage.sync.get({
             hudEnabled: true,
-            waqiToken: '', waqiCity: '', waqiMetrics: {},
-            haUrl: '', haToken: '', haEntities: []
+            waqiToken: '', waqiCity: '', waqiMetrics: {}, waqiRefreshRate: 60,
+            haUrl: '', haToken: '', haEntities: [], haRefreshRate: 1
         });
 
         if (!settings.hudEnabled) return {};
 
         let newResults = {};
+        let waqiSuccess = false;
+        let haSuccess = false;
+
         if (source === 'WAQI' || source === 'FULL') {
             const waqiData = await fetchWAQIData(settings);
+            // Check if any waqi result is NOT an error
+            waqiSuccess = Object.values(waqiData).some(v => v.error === false);
             newResults = { ...newResults, ...waqiData };
+            
+            if (waqiSuccess) {
+                await chrome.storage.local.set({ [STORAGE_HUD_LAST_WAQI]: Date.now() });
+            }
         }
         if (source === 'HA' || source === 'FULL') {
             const haData = await fetchHAEntities(settings);
+            haSuccess = Object.values(haData).some(v => v.error === false);
             newResults = { ...newResults, ...haData };
+            
+            if (haSuccess) {
+                await chrome.storage.local.set({ [STORAGE_HUD_LAST_HA]: Date.now() });
+            }
         }
 
         const data = await chrome.storage.local.get([STORAGE_HUD_STATE]);
@@ -58,6 +76,25 @@ async function updateHUDData(source) {
         });
 
         showCurrentHUDCarouselItem();
+
+        // Check if we need a retry due to connection error
+        const hasConnError = Object.values(newResults).some(v => v.value === 'CONN' || v.value === 'X');
+        if (hasConnError) {
+             // If data is older than refresh rate, schedule a quick retry
+             const lastData = await chrome.storage.local.get([STORAGE_HUD_LAST_WAQI, STORAGE_HUD_LAST_HA]);
+             const now = Date.now();
+             const waqiStale = (now - (lastData[STORAGE_HUD_LAST_WAQI] || 0)) > (settings.waqiRefreshRate * 60 * 1000);
+             const haStale = (now - (lastData[STORAGE_HUD_LAST_HA] || 0)) > (settings.haRefreshRate * 60 * 1000);
+             
+             if (waqiStale || haStale) {
+                 console.log('[HUD] Data stale and fetch failed, scheduling retry in 30s...');
+                 chrome.alarms.create(ALARM_RETRY, { delayInMinutes: 0.5 });
+             }
+        } else {
+            // Success! Clear any pending retry
+            chrome.alarms.clear(ALARM_RETRY);
+        }
+
         return newResults;
     } catch (err) {
         console.error('updateHUDData failed:', err);
@@ -168,6 +205,24 @@ function registerHUDEvents() {
         if (alarm.name === ALARM_WAQI) updateHUDData('WAQI');
         else if (alarm.name === ALARM_HA) updateHUDData('HA');
         else if (alarm.name === ALARM_CAROUSEL) advanceHUDCarousel();
+        else if (alarm.name === ALARM_RETRY) {
+            console.log('[HUD] Executing retry fetch...');
+            updateHUDData('FULL');
+        }
+    });
+
+    // Handle System Wake/Unlock
+    chrome.idle.onStateChanged.addListener((newState) => {
+        if (newState === 'active') {
+            console.log('[HUD] System active detected, checking for stale data...');
+            updateHUDData('FULL');
+        }
+    });
+
+    // Handle Network Online
+    globalThis.addEventListener('online', () => {
+        console.log('[HUD] Network online detected, triggering refresh...');
+        updateHUDData('FULL');
     });
 
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
