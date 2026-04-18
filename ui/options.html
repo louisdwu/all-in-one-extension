@@ -347,130 +347,165 @@
         <div id="tab-hud" class="tab-pane">
             <div class="section">
                 <h2>🖥️ HUD 监控</h2>
-                <div class="toggle-container" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <span class="label" style="font-size: 16px;">启用 HUD 监控功能 (工具栏图标状态显示)</span>
-                    <label class="toggle">
-                        <input type="checkbox" id="hud-enable">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-
-                <h3>🔄 轮播策略</h3>
-                <div class="row" style="margin-top: 15px; margin-bottom: 30px;">
-                    <div class="form-group">
-                        <label>单个指标在图标上展示的时间 (秒)</label>
-                        <select id="hud-carousel-interval">
-                            <option value="2">2 秒</option>
-                            <option value="3" selected>3 秒</option>
-                            <option value="5">5 秒</option>
-                            <option value="10">10 秒</option>
+                <!-- HUD Main Control Bar -->
+                <div style="background: #f8f9fa; padding: 12px 15px; border-radius: 10px; border: 1px dashed #d1d9e0; display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <span style="font-weight: bold; color: #444;">HUD 全局主控</span>
+                        <label class="toggle" style="margin: 0;">
+                            <input type="checkbox" id="hud-enable">
+                            <span class="slider"></span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.9em; cursor: pointer; color: #666; margin-left: 10px;">
+                            <input type="checkbox" id="hud-icon-round" checked>
+                            Icon 数值取整 (不显示小数点)
+                        </label>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 0.9em; color: #666;">轮播展示间隔:</span>
+                        <select id="hud-carousel-interval" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd; width: 80px;">
+                            <option value="2">2s</option>
+                            <option value="3" selected>3s</option>
+                            <option value="5">5s</option>
+                            <option value="10">10s</option>
                         </select>
                     </div>
                 </div>
 
-                <hr style="margin: 30px 0; border: none; border-top: 1px solid #e0e6ed;">
+                <!-- WAQI Section -->
+                <div style="margin-bottom: 15px;">
+                    <h3 style="color: #673ab7; margin-bottom: 10px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
+                        🌤️ 环境监控 (WAQI)
+                        <span style="font-weight: normal; font-size: 0.7em; color: #999;">(数据源: aqicn.org)</span>
+                    </h3>
+                    
+                    <div class="row" style="gap: 10px; margin-bottom: 10px;">
+                        <div class="form-group" style="flex: 2;">
+                            <label style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">API Token</label>
+                            <input type="text" id="waqi-token" placeholder="填入您的 Token">
+                        </div>
+                        <div class="form-group" style="flex: 2;">
+                            <label style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">监测城市/站点 ID</label>
+                            <input type="text" id="waqi-city" placeholder="guangzhou 或 @9847">
+                        </div>
+                        <div class="form-group" style="flex: 1.2;">
+                            <label style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">刷新频率</label>
+                            <select id="waqi-refresh-rate" style="padding: 8px;">
+                                <option value="10">10 分钟</option>
+                                <option value="30">30 分钟</option>
+                                <option value="60" selected>1 小时</option>
+                                <option value="120">2 小时</option>
+                                <option value="240">4 小时</option>
+                            </select>
+                        </div>
+                    </div>
 
-                <h3>🌤️ 实时天气 (QWeather)</h3>
-                <div class="help-text" style="margin-bottom: 15px;">
-                    建议仅用于获取<strong>温度</strong>。
-                </div>
+                    <style>
+                        .waqi-grid {
+                            display: grid;
+                            grid-template-columns: repeat(4, 1fr);
+                            gap: 8px;
+                            background: #f3e5f5;
+                            padding: 10px;
+                            border-radius: 8px;
+                        }
+                        .waqi-item {
+                            background: white;
+                            padding: 6px 10px;
+                            border-radius: 6px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            font-size: 0.85em;
+                            border: 1px solid #e1bee7;
+                            cursor: pointer;
+                        }
+                        .waqi-item:hover { border-color: #9c27b0; }
+                        .waqi-item input[type="checkbox"] { 
+                            margin: 0 !important; 
+                            order: 3; /* Always last */
+                        }
+                        .waqi-item .val-tag {
+                            order: 2;
+                            flex: 1;
+                            text-align: center;
+                            font-family: monospace;
+                            font-weight: bold;
+                            color: #673ab7;
+                        }
+                        .waqi-item span:first-child {
+                            order: 1;
+                            color: #444;
+                        }
+                    </style>
 
-                <div class="row" style="margin-bottom: 15px;">
-                    <div class="form-group" style="flex: 1;">
-                        <label>和风天气 API Key</label>
-                        <input type="text" id="qw-key" placeholder="在此填入 Key">
-                    </div>
-                    <div class="form-group" style="flex: 1;">
-                        <label>自定义域名 (可选)</label>
-                        <input type="text" id="qw-host" placeholder="例如: mg3jpha9r7.re.qweatherapi.com">
-                    </div>
-                </div>
-                <div class="row" style="margin-bottom: 15px;">
-                    <div class="form-group" style="flex: 2;">
-                        <label>Location ID (数字) 或 经度,纬度</label>
-                        <input type="text" id="qw-location" placeholder="输入 Location ID">
-                    </div>
-                    <div class="form-group" style="flex: 1;">
-                        <label>刷新频率 (分钟)</label>
-                        <input type="number" id="qw-refresh-rate" value="20" min="5">
-                    </div>
-                </div>
-
-                <div class="form-group" style="background:#f8f9fa; padding:15px; border-radius:8px;">
-                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                        <label class="toggle-container" style="justify-content: flex-start; gap: 8px;">
-                            <input type="checkbox" id="qw-metric-temp">启用温度显示 (QWeather)
+                    <div class="waqi-grid">
+                        <label class="waqi-item">
+                            <span>AQI</span><span class="val-tag" id="val-waqi-aqi">--</span><input type="checkbox" id="waqi-metric-aqi">
+                        </label>
+                        <label class="waqi-item">
+                            <span>O3</span><span class="val-tag" id="val-waqi-o3">--</span><input type="checkbox" id="waqi-metric-o3" checked>
+                        </label>
+                        <label class="waqi-item">
+                            <span>PM2.5</span><span class="val-tag" id="val-waqi-pm25">--</span><input type="checkbox" id="waqi-metric-pm25">
+                        </label>
+                        <label class="waqi-item">
+                            <span>PM10</span><span class="val-tag" id="val-waqi-pm10">--</span><input type="checkbox" id="waqi-metric-pm10">
+                        </label>
+                        <label class="waqi-item">
+                            <span>NO2</span><span class="val-tag" id="val-waqi-no2">--</span><input type="checkbox" id="waqi-metric-no2">
+                        </label>
+                        <label class="waqi-item">
+                            <span>SO2</span><span class="val-tag" id="val-waqi-so2">--</span><input type="checkbox" id="waqi-metric-so2">
+                        </label>
+                        <label class="waqi-item">
+                            <span>CO</span><span class="val-tag" id="val-waqi-co">--</span><input type="checkbox" id="waqi-metric-co">
+                        </label>
+                        <label class="waqi-item">
+                            <span>温度</span><span class="val-tag" id="val-waqi-t">--</span><input type="checkbox" id="waqi-metric-t">
+                        </label>
+                        <label class="waqi-item">
+                            <span>湿度</span><span class="val-tag" id="val-waqi-h">--</span><input type="checkbox" id="waqi-metric-h">
+                        </label>
+                        <label class="waqi-item">
+                            <span>气压</span><span class="val-tag" id="val-waqi-p">--</span><input type="checkbox" id="waqi-metric-p">
+                        </label>
+                        <label class="waqi-item">
+                            <span>风速</span><span class="val-tag" id="val-waqi-w">--</span><input type="checkbox" id="waqi-metric-w">
                         </label>
                     </div>
                 </div>
 
-                <hr style="margin: 30px 0; border: none; border-top: 1px solid #e0e6ed;">
-
-                <h3 style="color: #673ab7;">🧪 空气质量 (WAQI)</h3>
-                <div class="help-text" style="margin-bottom: 15px;">
-                    数据来源于 aqicn.org (World Air Quality Index)。全球最专业的空气质量源。
-                </div>
-
-                <div class="row" style="margin-bottom: 15px;">
-                    <div class="form-group" style="flex: 1;">
-                        <label>WAQI API Token</label>
-                        <input type="text" id="waqi-token" placeholder="填入您的 WAQI Token">
+                <!-- HA Section -->
+                <div style="margin-top: 20px;">
+                    <h3 style="color: #03a9f4; margin-bottom: 10px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
+                        🏠 智能家居 (Home Assistant)
+                        <span style="font-weight: normal; font-size: 0.7em; color: #999;">(本地实体联动)</span>
+                    </h3>
+                    <div class="row" style="gap: 10px; margin-bottom: 8px;">
+                        <div class="form-group" style="flex: 2;">
+                            <label style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">HA 服务地址</label>
+                            <input type="url" id="ha-url" placeholder="http://...:8123">
+                        </div>
+                        <div class="form-group" style="flex: 2;">
+                            <label style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">访问令牌 (Token)</label>
+                            <input type="password" id="ha-token" placeholder="填入长期令牌">
+                        </div>
+                        <div class="form-group" style="flex: 1.2;">
+                            <label style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">刷新频率</label>
+                            <select id="ha-refresh-rate" style="padding: 8px;">
+                                <option value="0.25">15 秒</option>
+                                <option value="0.5">30 秒</option>
+                                <option value="1" selected>1 分钟</option>
+                                <option value="5">5 分钟</option>
+                                <option value="10">10 分钟</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="form-group" style="flex: 1;">
-                        <label>监测点/城市名称</label>
-                        <input type="text" id="waqi-city" placeholder="例如: guangzhou 或 huangpu">
-                    </div>
+    
+                    <div id="ha-entity-list" style="background:#f8f9fa; padding:10px; border-radius:8px; display: flex; flex-direction: column; gap: 6px;"></div>
+                    <button id="ha-add-entity" class="secondary" style="margin-top: 10px; padding: 6px 15px; font-size: 0.9em;">+ 添加传感器</button>
                 </div>
-
-                <div class="form-group" style="background:#f3e5f5; padding:15px; border-radius:8px;">
-                    <label style="margin-bottom: 10px; display: block;">需要轮播的空气指标 (WAQI)</label>
-                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                        <label class="toggle-container" style="justify-content: flex-start; gap: 8px;">
-                            <input type="checkbox" id="waqi-metric-aqi">AQI
-                        </label>
-                        <label class="toggle-container" style="justify-content: flex-start; gap: 8px;">
-                            <input type="checkbox" id="waqi-metric-o3" checked>臭氧 (O3)
-                        </label>
-                        <label class="toggle-container" style="justify-content: flex-start; gap: 8px;">
-                            <input type="checkbox" id="waqi-metric-pm25">PM2.5
-                        </label>
-                        <label class="toggle-container" style="justify-content: flex-start; gap: 8px;">
-                            <input type="checkbox" id="waqi-metric-pm10">PM10
-                        </label>
-                    </div>
-                </div>
-
-
-                <hr style="margin: 30px 0; border: none; border-top: 1px solid #e0e6ed;">
-
-                <h3>🏠 智能家居 (Home Assistant)</h3>
-                <div class="form-group">
-                    <label>HA 服务端地址 (含 http/https 与端口)</label>
-                    <input type="url" id="ha-url" placeholder="http://192.168.1.3:8123">
-                </div>
-                <div class="row" style="margin-bottom: 15px;">
-                    <div class="form-group" style="flex: 2;">
-                        <label>长期访问令牌 (Long-Lived Access Token)</label>
-                        <input type="password" id="ha-token" placeholder="从 HA 个人资料页生成">
-                    </div>
-                    <div class="form-group" style="flex: 1;">
-                        <label>HA 刷新频率</label>
-                        <select id="ha-refresh-rate">
-                            <option value="0.25">15 秒</option>
-                            <option value="0.5">30 秒</option>
-                            <option value="1" selected>1 分钟</option>
-                            <option value="5">5 分钟</option>
-                            <option value="10">10 分钟</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-group" style="background:#f8f9fa; padding:15px; border-radius:8px; margin-top: 15px;">
-                    <label style="margin-bottom: 10px; display: block;">需要轮播的智能家居实体</label>
-                    <div id="ha-entity-list" class="entity-list-container"></div>
-                    <button id="ha-add-entity" class="secondary" style="margin-top:10px; width:100%; text-align:center;">+ 追加 HA 实体</button>
-                </div>
-
+    
                 <div class="btn-group" style="margin-top:30px;">
                     <button id="hud-save" class="primary">💾 保存 HUD 配置</button>
                     <button id="hud-test" class="success" style="background:#4CAF50;color:#fff;">🔄 立即抓取数据测试</button>

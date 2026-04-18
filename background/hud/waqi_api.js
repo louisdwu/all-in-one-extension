@@ -1,5 +1,3 @@
-// === WAQI API logic (Classic Script) ===
-
 async function fetchWAQIData(settings) {
     if (!settings.waqiToken) return {};
     
@@ -21,33 +19,48 @@ async function fetchWAQIData(settings) {
         
         const results = {};
         const iaqi = data.data.iaqi || {};
-        
-        if (settings.waqiMetrics?.aqi) {
-            results['waqi_aqi'] = { name: 'AQI', value: data.data.aqi, error: false, raw: data };
-        }
-        if (settings.waqiMetrics?.o3) {
-            results['waqi_o3'] = { name: '臭氧', value: iaqi.o3?.v || 'N/A', error: false, raw: data };
-        }
-        if (settings.waqiMetrics?.pm25) {
-            results['waqi_pm25'] = { name: 'PM2.5', value: iaqi.pm25?.v || 'N/A', error: false, raw: data };
-        }
-        if (settings.waqiMetrics?.pm10) {
-            results['waqi_pm10'] = { name: 'PM10', value: iaqi.pm10?.v || 'N/A', error: false, raw: data };
+        const common = { error: false, raw: data };
+
+        const metricsMap = {
+            'aqi': { name: 'AQI', value: data.data.aqi },
+            'o3': { name: '臭氧', value: iaqi.o3?.v },
+            'pm25': { name: 'PM2.5', value: iaqi.pm25?.v },
+            'pm10': { name: 'PM10', value: iaqi.pm10?.v },
+            'no2': { name: 'NO2', value: iaqi.no2?.v },
+            'so2': { name: 'SO2', value: iaqi.so2?.v },
+            'co': { name: 'CO', value: iaqi.co?.v },
+            't': { name: 'T(站)', value: iaqi.t?.v },
+            'h': { name: 'H(站)', value: iaqi.h ? `${iaqi.h.v}%` : undefined },
+            'p': { name: 'P(站)', value: iaqi.p?.v },
+            'w': { name: 'W(站)', value: iaqi.w?.v }
+        };
+
+        for (const [key, config] of Object.entries(metricsMap)) {
+            if (config.value !== undefined) {
+                results[`waqi_${key}`] = { ...common, ...config };
+            }
         }
         
         return results;
     } catch (err) {
         console.error('WAQI Fetch failed:', err);
-        return generateWAQIError('CONN', settings.waqiMetrics);
+        return generateWAQIError('CONN');
     }
 }
 
-function generateWAQIError(code, metrics) {
+function generateWAQIError(code) {
     const errorObj = { value: code, error: true };
     const results = {};
-    if (metrics?.aqi) results['waqi_aqi'] = { ...errorObj, name: 'AQI' };
-    if (metrics?.o3) results['waqi_o3'] = { ...errorObj, name: '臭氧' };
-    if (metrics?.pm25) results['waqi_pm25'] = { ...errorObj, name: 'PM2.5' };
-    if (metrics?.pm10) results['waqi_pm10'] = { ...errorObj, name: 'PM10' };
+    const keys = ['aqi', 'o3', 'pm25', 'pm10', 'no2', 'so2', 'co', 't', 'h', 'p', 'w'];
+    const names = { 
+        aqi: 'AQI', o3: '臭氧', pm25: 'PM2.5', pm10: 'PM10',
+        no2: 'NO2', so2: 'SO2', co: 'CO', 
+        t: 'T(站)', h: 'H(站)', p: 'P(站)', w: 'W(站)'
+    };
+    
+    keys.forEach(key => {
+        results[`waqi_${key}`] = { ...errorObj, name: names[key] };
+    });
     return results;
 }
+

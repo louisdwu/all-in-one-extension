@@ -1,6 +1,6 @@
 // === Main HUD service orchestrator (Classic Script) ===
 
-const ALARM_QW = 'HUD_ALARM_QW';
+const ALARM_WAQI = 'HUD_ALARM_WAQI';
 const ALARM_HA = 'HUD_ALARM_HA';
 const ALARM_CAROUSEL = 'HUD_ALARM_CAROUSEL';
 
@@ -14,7 +14,6 @@ async function updateHUDData(source) {
     try {
         const settings = await chrome.storage.sync.get({
             hudEnabled: true,
-            qwKey: '', qwHost: '', qwLocation: '', qwMetrics: {},
             waqiToken: '', waqiCity: '', waqiMetrics: {},
             haUrl: '', haToken: '', haEntities: []
         });
@@ -22,10 +21,6 @@ async function updateHUDData(source) {
         if (!settings.hudEnabled) return {};
 
         let newResults = {};
-        if (source === 'QW' || source === 'FULL') {
-            const qwData = await fetchQWeather(settings);
-            newResults = { ...newResults, ...qwData };
-        }
         if (source === 'WAQI' || source === 'FULL') {
             const waqiData = await fetchWAQIData(settings);
             newResults = { ...newResults, ...waqiData };
@@ -40,15 +35,16 @@ async function updateHUDData(source) {
         const newState = { ...oldState, ...newResults };
 
         const hudQueueKeys = [];
-        // QW (Weather only)
-        if (settings.qwMetrics?.temp && newState['qw_temp']) hudQueueKeys.push('qw_temp');
         
-        // WAQI (Air Quality)
+        // WAQI (All Metrics)
         if (settings.waqiMetrics) {
-            if (settings.waqiMetrics.aqi && newState['waqi_aqi']) hudQueueKeys.push('waqi_aqi');
-            if (settings.waqiMetrics.o3 && newState['waqi_o3']) hudQueueKeys.push('waqi_o3');
-            if (settings.waqiMetrics.pm25 && newState['waqi_pm25']) hudQueueKeys.push('waqi_pm25');
-            if (settings.waqiMetrics.pm10 && newState['waqi_pm10']) hudQueueKeys.push('waqi_pm10');
+            const waqiKeys = ['aqi', 'o3', 'pm25', 'pm10', 'no2', 'so2', 'co', 't', 'h', 'p', 'w'];
+            waqiKeys.forEach(key => {
+                const fullKey = `waqi_${key}`;
+                if (settings.waqiMetrics[key] && newState[fullKey]) {
+                    hudQueueKeys.push(fullKey);
+                }
+            });
         }
 
         settings.haEntities.forEach(e => {
@@ -71,6 +67,8 @@ async function updateHUDData(source) {
 
 async function showCurrentHUDCarouselItem() {
     const data = await chrome.storage.local.get([STORAGE_HUD_STATE, STORAGE_HUD_QUEUE, STORAGE_HUD_INDEX]);
+    const settings = await chrome.storage.sync.get({ hudIconRound: true });
+    
     const state = data[STORAGE_HUD_STATE] || {};
     const queue = data[STORAGE_HUD_QUEUE] || [];
     let index = data[STORAGE_HUD_INDEX] || 0;
@@ -91,18 +89,27 @@ async function showCurrentHUDCarouselItem() {
 
     let bgColor = currentData.error ? '#9E9E9E' : '#03A9F4';
     if (!currentData.error) {
-        if (currentKey.startsWith('qw_') || currentKey.startsWith('waqi_')) {
-            bgColor = '#4CAF50'; // Default Green
+        if (currentKey.startsWith('waqi_')) {
+            bgColor = '#673ab7'; // Deep Purple for WAQI
             // If it's an air pollutant, check thresholds
             if (currentKey.includes('aqi') || currentKey.includes('o3') || currentKey.includes('pm')) {
                 const val = parseFloat(currentData.value);
                 if (val > 100) bgColor = '#FF9800'; // Orange
                 if (val > 150) bgColor = '#F44336'; // Red
             }
+        } else if (currentKey.startsWith('ha_')) {
+            bgColor = '#03A9F4'; // Blue for HA
         }
     }
 
-    updateExtensionIcon(currentData.name, currentData.value, bgColor);
+    let displayValue = currentData.value;
+    if (settings.hudIconRound !== false && !isNaN(parseFloat(displayValue))) {
+        // If it's a number (or string number), round it for the icon
+        const num = parseFloat(displayValue);
+        displayValue = Math.round(num).toString();
+    }
+
+    updateExtensionIcon(currentData.name, displayValue, bgColor);
 }
 
 async function advanceHUDCarousel() {
@@ -123,17 +130,18 @@ async function advanceHUDCarousel() {
 async function setupHUDAlarms() {
     const settings = await chrome.storage.sync.get({
         hudEnabled: true,
-        qwRefreshRate: 20,
+        waqiRefreshRate: 60,
         haRefreshRate: 1,
         hudCarouselInterval: 3
     });
 
-    // Clear all
-    await Promise.all([
-        chrome.alarms.clear(ALARM_QW),
-        chrome.alarms.clear(ALARM_HA),
-        chrome.alarms.clear(ALARM_CAROUSEL)
-    ]);
+    // Force clear all HUD-related alarms to prevent ghost timers from old versions
+    const allAlarms = await chrome.alarms.getAll();
+    for (const alarm of allAlarms) {
+        if (alarm.name.startsWith('HUD_ALARM')) {
+            await chrome.alarms.clear(alarm.name);
+        }
+    }
 
     if (!settings.hudEnabled) {
         chrome.action.setIcon({ path: { "16": "/icons/icon16.png", "48": "/icons/icon48.png", "128": "/icons/icon128.png" } });
@@ -142,8 +150,8 @@ async function setupHUDAlarms() {
     }
 
     // Create polling alarms
-    chrome.alarms.create(ALARM_QW, { periodInMinutes: parseFloat(settings.qwRefreshRate) });
-    chrome.alarms.create(ALARM_HA, { periodInMinutes: parseFloat(settings.haRefreshRate) });
+    chrome.alarms.create(ALARM_WAQI, { periodInMinutes: parseFloat(settings.waqiRefreshRate || 60) });
+    chrome.alarms.create(ALARM_HA, { periodInMinutes: parseFloat(settings.haRefreshRate || 1) });
 
     // Rotation interval
     const carouselMinutes = parseInt(settings.hudCarouselInterval) / 60;
@@ -157,7 +165,7 @@ async function setupHUDAlarms() {
 
 function registerHUDEvents() {
     chrome.alarms.onAlarm.addListener((alarm) => {
-        if (alarm.name === ALARM_QW) updateHUDData('QW');
+        if (alarm.name === ALARM_WAQI) updateHUDData('WAQI');
         else if (alarm.name === ALARM_HA) updateHUDData('HA');
         else if (alarm.name === ALARM_CAROUSEL) advanceHUDCarousel();
     });
@@ -185,7 +193,7 @@ function registerHUDEvents() {
 
     // Also listen to storage changes for hudEnabled etc to stop immediately
     chrome.storage.onChanged.addListener((changes, namespace) => {
-        if (namespace === 'sync' && (changes.hudEnabled || changes.qwRefreshRate || changes.haRefreshRate || changes.hudCarouselInterval)) {
+        if (namespace === 'sync' && (changes.hudEnabled || changes.waqiRefreshRate || changes.haRefreshRate || changes.hudCarouselInterval)) {
              setupHUDAlarms();
         }
     });
@@ -193,4 +201,3 @@ function registerHUDEvents() {
     chrome.runtime.onInstalled.addListener(() => setupHUDAlarms());
     chrome.runtime.onStartup.addListener(() => setupHUDAlarms());
 }
-

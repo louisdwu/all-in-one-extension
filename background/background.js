@@ -9,7 +9,6 @@ try {
         "hud/utils.js",
         "hud/renderer.js",
         "hud/ha_api.js",
-        "hud/qweather_api.js",
         "hud/waqi_api.js",
         "hud/index.js"
     );
