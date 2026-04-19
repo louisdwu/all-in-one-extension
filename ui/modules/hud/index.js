@@ -81,23 +81,40 @@ export function initHUDPanel() {
     }
 
     // --- HA Entity List Management ---
-    function addHARow(name = '', id = '') {
+    function addHARow(name = '', id = '', op = '>', warn = '', crit = '') {
         const item = document.createElement('div');
         item.className = 'entity-item';
+        item.style.flexDirection = 'column'; // Switch to column if it gets too crowded
+        item.style.gap = '10px';
+        
         const safeId = id.replace(/[\s\r\n]/g, '');
         item.innerHTML = `
-            <input type="text" class="e-name" placeholder="显示简称 (例: 功率)" value="${name}" style="flex:1;">
-            <input type="text" class="e-id" placeholder="Entity ID (例: sensor.power)" value="${id}" style="flex:2;">
-            <span class="val-tag ha-val-tag" id="val-ha-${safeId}">--</span>
-            <button class="danger btn-remove" style="padding: 4px 8px;">移除</button>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="text" class="e-name" placeholder="简称 (例: 功率)" value="${name}" style="flex: 1;">
+                <input type="text" class="e-id" placeholder="Entity ID (例: sensor.power)" value="${id}" style="flex: 2;">
+                <span class="val-tag ha-val-tag" id="val-ha-${safeId}" style="min-width: 40px; text-align: right;">--</span>
+                <button class="danger btn-remove" style="padding: 4px 8px;">移除</button>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center; font-size: 0.85em; color: #666;">
+                <span>触发提示: 当数值</span>
+                <select class="e-op" style="width: 60px; padding: 4px;">
+                    <option value=">" ${op === '>' ? 'selected' : ''}>&gt;</option>
+                    <option value="<" ${op === '<' ? 'selected' : ''}>&lt;</option>
+                </select>
+                <span>时，</span>
+                <input type="number" class="e-warn" placeholder="预警(橙)" value="${warn}" style="width: 80px; padding: 4px;">
+                <span>变橙，</span>
+                <input type="number" class="e-crit" placeholder="告警(红)" value="${crit}" style="width: 80px; padding: 4px;">
+                <span>变红</span>
+            </div>
         `;
         item.querySelector('.btn-remove').addEventListener('click', () => {
             item.remove();
             autoSaveHUD();
         });
 
-        item.querySelectorAll('input').forEach(input => {
-            input.addEventListener('change', autoSaveHUD);
+        item.querySelectorAll('input, select').forEach(el => {
+            el.addEventListener('change', autoSaveHUD);
         });
 
         container.appendChild(item);
@@ -108,7 +125,19 @@ export function initHUDPanel() {
         container.querySelectorAll('.entity-item').forEach(el => {
             const name = el.querySelector('.e-name').value.trim();
             const id = el.querySelector('.e-id').value.trim().replace(/[\s\r\n]/g, '');
-            if (id) entities.push({ name: name || id, id });
+            const op = el.querySelector('.e-op').value;
+            const warn = el.querySelector('.e-warn').value;
+            const crit = el.querySelector('.e-crit').value;
+            
+            if (id) {
+                entities.push({ 
+                    name: name || id, 
+                    id, 
+                    op: op || '>', 
+                    warn: warn || '', 
+                    crit: crit || '' 
+                });
+            }
         });
         return entities;
     }
@@ -215,7 +244,7 @@ export function initHUDPanel() {
         if (els.haRate) els.haRate.value = items.haRefreshRate;
 
         container.innerHTML = '';
-        items.haEntities.forEach(e => addHARow(e.name, e.id));
+        items.haEntities.forEach(e => addHARow(e.name, e.id, e.op, e.warn, e.crit));
 
         // Initial Data Fetch for Labels & Timestamps
         chrome.storage.local.get(['hudState', 'hudLastSuccessWaqi', 'hudLastSuccessHa']).then(data => {

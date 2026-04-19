@@ -128,14 +128,32 @@ async function showCurrentHUDCarouselItem() {
     if (!currentData.error) {
         if (currentKey.startsWith('waqi_')) {
             bgColor = '#673ab7'; // Deep Purple for WAQI
-            // If it's an air pollutant, check thresholds
             if (currentKey.includes('aqi') || currentKey.includes('o3') || currentKey.includes('pm')) {
                 const val = parseFloat(currentData.value);
                 if (val > 100) bgColor = '#FF9800'; // Orange
                 if (val > 150) bgColor = '#F44336'; // Red
             }
         } else if (currentKey.startsWith('ha_')) {
-            bgColor = '#03A9F4'; // Blue for HA
+            // Check HA custom thresholds
+            bgColor = '#03A9F4'; // Default Blue for HA
+            const haEntities = (await chrome.storage.sync.get({ haEntities: [] })).haEntities;
+            const entityId = currentKey.replace(/^ha_/, '');
+            const entityConfig = haEntities.find(e => e.id.replace(/[\s\r\n]/g, '') === entityId);
+
+            if (entityConfig && !isNaN(parseFloat(currentData.value))) {
+                const val = parseFloat(currentData.value);
+                const op = entityConfig.op || '>';
+                const warn = parseFloat(entityConfig.warn);
+                const crit = parseFloat(entityConfig.crit);
+
+                if (op === '>') {
+                    if (!isNaN(crit) && val >= crit) bgColor = '#F44336'; // Red
+                    else if (!isNaN(warn) && val >= warn) bgColor = '#FF9800'; // Orange
+                } else if (op === '<') {
+                    if (!isNaN(crit) && val <= crit) bgColor = '#F44336'; // Red
+                    else if (!isNaN(warn) && val <= warn) bgColor = '#FF9800'; // Orange
+                }
+            }
         }
     }
 
