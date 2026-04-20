@@ -23,7 +23,9 @@ sensor:
     headers:
       Cookie: "uid=YOUR_UID"
       User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    value_template: "{{ value_json.o3 if value_json is defined else states('sensor.bo_hu_chou_yang_jian_ce_yi') }}"
+    value_template: "{{ value_json.o3 if value_json is defined else none }}"
+    json_attributes:
+      - ts
     unit_of_measurement: "ppb"
     icon: mdi:air-filter
     scan_interval: 60
@@ -76,8 +78,12 @@ template:
         unique_id: "bohu_o3_ugm3"
         device_class: gas
         availability: >
-          {{ is_number(states('sensor.bo_hu_chou_yang_jian_ce_yi')) and
-             state_attr('climate.cnhdm_cn_2029279860_wkq01', 'current_temperature') is not none }}
+          {# 判定逻辑：1. 原始值必须是数字 2. 数据更新时间戳 ts 必须在 5 分钟内 #}
+          {% set raw_state = states('sensor.bo_hu_chou_yang_jian_ce_yi') %}
+          {% set last_ts = state_attr('sensor.bo_hu_chou_yang_jian_ce_yi', 'ts') %}
+          
+          {{ is_number(raw_state) and last_ts is not none and 
+             (now() - as_datetime(last_ts)).total_seconds() < 300 }}
         state: |
           {% set ppb = states('sensor.bo_hu_chou_yang_jian_ce_yi') | float(0) %}
           {% set temp = state_attr('climate.cnhdm_cn_2029279860_wkq01', 'current_temperature') | float(25) %}

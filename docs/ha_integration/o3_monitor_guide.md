@@ -41,6 +41,7 @@ graph TD
 
 ### 2.1 原始数据采集 (REST Collector)
 *   **博虎 REST**: 直接对接 `latest` 接口，绕过私有云 App，实现 60s 级同步。
+*   **离线监测**: 采集 JSON 中的 `ts` 属性，用于后续 stale data (陈旧数据) 的判定。
 *   **WAQI 原始 API**: 通过 Token 直连目标站点，不依赖 HA 官方组件，稳定性更高。
 
 ### 2.2 择优中介层 (Priority-based Proxy)
@@ -69,10 +70,11 @@ graph TD
 
 ### 3.2 经验总结
 1. **就近原则**: 能用物理传感器（如手机、Zigbee 气压计）就不用 API，物理压力最能反映真实环境的空气密度。
-2. **锁死大法**: 通过 `trigger-based template` 锁死最后一次有效值，是处理“偶尔抽风”的云端 API 的万能金钥匙。
+2. **超时判定**: 通过 `availability` 逻辑检查 API 返回的 `ts`。若 `(now() - ts) > 5min`，则判定为断电或离线，实体自动显示为“未知”，防止误报。
 3. **Availability 护航**: 在计算模板中加入可用性检查，能有效防止 HA 启动时的误报。
 
 ---
 
 ## 4. 相关文件
+*   [real.yaml](./real.yaml): **生产环境推荐配置** (包含离线检测)。
 *   [configuration.yaml.example](./configuration.yaml.example): 完整代码备份。
