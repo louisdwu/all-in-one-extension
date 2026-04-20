@@ -48,8 +48,23 @@ export function initHUDPanel() {
 
     function updateHUDTimestamps(data = {}) {
         const waqiEl = document.getElementById('waqi-last-success-time');
+        const waqiPubEl = document.getElementById('waqi-last-pub-time');
         const haEl = document.getElementById('ha-last-success-time');
+        
         if (waqiEl) waqiEl.textContent = formatTime(data.hudLastSuccessWaqi);
+        
+        if (waqiPubEl) {
+            const pubStr = data.hudLastWaqiPubS || '从未';
+            const lagVal = data.hudLastWaqiLag;
+            let lagText = '';
+            if (lagVal !== undefined && lagVal !== null) {
+                // Ensure we don't show negative lag, and clamp outliers
+                const displayLag = Math.max(0, lagVal);
+                lagText = ` (滞后 ${displayLag}m)`;
+            }
+            waqiPubEl.textContent = pubStr + lagText;
+        }
+
         if (haEl) haEl.textContent = formatTime(data.hudLastSuccessHa);
     }
 
@@ -205,8 +220,8 @@ export function initHUDPanel() {
         if (changes.hudState) {
             updateHUDValueLabels(changes.hudState.newValue);
         }
-        if (changes.hudLastSuccessWaqi || changes.hudLastSuccessHa) {
-            chrome.storage.local.get(['hudLastSuccessWaqi', 'hudLastSuccessHa']).then(data => {
+        if (changes.hudLastSuccessWaqi || changes.hudLastSuccessHa || changes.hudLastWaqiPubV || changes.hudLastWaqiPubS || changes.hudLastWaqiLag) {
+            chrome.storage.local.get(['hudLastSuccessWaqi', 'hudLastSuccessHa', 'hudLastWaqiPubV', 'hudLastWaqiPubS', 'hudLastWaqiLag']).then(data => {
                 updateHUDTimestamps(data);
             });
         }
@@ -247,7 +262,7 @@ export function initHUDPanel() {
         items.haEntities.forEach(e => addHARow(e.name, e.id, e.op, e.warn, e.crit));
 
         // Initial Data Fetch for Labels & Timestamps
-        chrome.storage.local.get(['hudState', 'hudLastSuccessWaqi', 'hudLastSuccessHa']).then(data => {
+        chrome.storage.local.get(['hudState', 'hudLastSuccessWaqi', 'hudLastSuccessHa', 'hudLastWaqiPubV', 'hudLastWaqiPubS', 'hudLastWaqiLag']).then(data => {
             updateHUDValueLabels(data.hudState || {});
             updateHUDTimestamps(data);
         });

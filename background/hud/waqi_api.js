@@ -19,7 +19,19 @@ async function fetchWAQIData(settings) {
         
         const results = {};
         const iaqi = data.data.iaqi || {};
-        const common = { error: false, raw: data };
+        const fetchTs = Date.now();
+        const pubTs = data.data.time?.v * 1000; // Unix timestamp to ms
+        const pubStr = data.data.time?.s || '未知';
+        const lagMinutes = Math.round((fetchTs - pubTs) / 60000);
+        
+        const common = { 
+            error: false, 
+            raw: data,
+            fetchTs: fetchTs,
+            pubTs: pubTs,
+            pubStr: pubStr,
+            lagMinutes: lagMinutes
+        };
 
         const metricsMap = {
             'aqi': { name: 'AQI', value: data.data.aqi },
@@ -40,6 +52,9 @@ async function fetchWAQIData(settings) {
                 results[`waqi_${key}`] = { ...common, ...config };
             }
         }
+        
+        // Add metadata for indexing
+        results._waqi_meta = { fetchTs, pubTs, pubStr, lagMinutes };
         
         return results;
     } catch (err) {

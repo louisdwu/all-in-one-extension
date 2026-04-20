@@ -11,6 +11,9 @@ const STORAGE_HUD_QUEUE = 'hudQueueKeys';
 const STORAGE_HUD_INDEX = 'hudCarouselIndex';
 const STORAGE_HUD_LAST_WAQI = 'hudLastSuccessWaqi';
 const STORAGE_HUD_LAST_HA = 'hudLastSuccessHa';
+const STORAGE_HUD_WAQI_PUB_V = 'hudLastWaqiPubV';
+const STORAGE_HUD_WAQI_PUB_S = 'hudLastWaqiPubS';
+const STORAGE_HUD_WAQI_LAG = 'hudLastWaqiLag';
 
 // Fetch data from specified source
 // Fetch data from specified source
@@ -34,8 +37,22 @@ async function updateHUDData(source) {
             waqiSuccess = Object.values(waqiData).some(v => v.error === false);
             newResults = { ...newResults, ...waqiData };
             
-            if (waqiSuccess) {
-                await chrome.storage.local.set({ [STORAGE_HUD_LAST_WAQI]: Date.now() });
+            if (waqiSuccess && waqiData._waqi_meta) {
+                const meta = waqiData._waqi_meta;
+                const old = await chrome.storage.local.get([STORAGE_HUD_WAQI_PUB_V]);
+                
+                if (old[STORAGE_HUD_WAQI_PUB_V] === meta.pubTs) {
+                    console.log(`[HUD] WAQI data fetched but content timestamp unchanged (${meta.pubStr}).`);
+                } else {
+                    console.log(`[HUD] WAQI content updated: ${meta.pubStr}`);
+                }
+
+                await chrome.storage.local.set({ 
+                    [STORAGE_HUD_LAST_WAQI]: Date.now(),
+                    [STORAGE_HUD_WAQI_PUB_V]: meta.pubTs,
+                    [STORAGE_HUD_WAQI_PUB_S]: meta.pubStr,
+                    [STORAGE_HUD_WAQI_LAG]: meta.lagMinutes
+                });
             }
         }
         if (source === 'HA' || source === 'FULL') {

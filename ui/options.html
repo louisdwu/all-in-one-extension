@@ -377,8 +377,9 @@
                         🌤️ 环境监控 (WAQI)
                         <span style="font-weight: normal; font-size: 0.7em; color: #999;">(数据源: aqicn.org)</span>
                     </h3>
-                    <div id="waqi-status-bar" style="font-size: 0.75em; color: #7e57c2; margin-bottom: 10px; display: flex; align-items: center; gap: 5px;">
-                        🕒 上次成功获取: <span id="waqi-last-success-time">从未</span>
+                    <div id="waqi-status-bar" style="font-size: 0.75em; color: #7e57c2; margin-bottom: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #efe7fb; padding: 8px; border-radius: 6px;">
+                        <div>📥 采集时刻: <span id="waqi-last-success-time" style="font-weight: bold;">从未</span></div>
+                        <div>📡 站点更新: <span id="waqi-last-pub-time" style="font-weight: bold;">从未</span></div>
                     </div>
                     
                     <div class="row" style="gap: 10px; margin-bottom: 10px;">
