@@ -54,15 +54,7 @@ export function initHUDPanel() {
         if (waqiEl) waqiEl.textContent = formatTime(data.hudLastSuccessWaqi);
         
         if (waqiPubEl) {
-            const pubStr = data.hudLastWaqiPubS || '从未';
-            const lagVal = data.hudLastWaqiLag;
-            let lagText = '';
-            if (lagVal !== undefined && lagVal !== null) {
-                // Ensure we don't show negative lag, and clamp outliers
-                const displayLag = Math.max(0, lagVal);
-                lagText = ` (滞后 ${displayLag}m)`;
-            }
-            waqiPubEl.textContent = pubStr + lagText;
+            waqiPubEl.textContent = data.hudLastWaqiPubS || '从未';
         }
 
         if (haEl) haEl.textContent = formatTime(data.hudLastSuccessHa);

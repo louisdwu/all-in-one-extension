@@ -40,9 +40,11 @@ graph TD
 ## 2. 核心模块详解
 
 ### 2.1 原始数据采集 (REST Collector)
-*   **博虎 REST**: 直接对接 `latest` 接口，绕过私有云 App，实现 60s 级同步。
-*   **离线监测**: 采集 JSON 中的 `ts` 属性，用于后续 stale data (陈旧数据) 的判定。
-*   **WAQI 原始 API**: 通过 Token 直连目标站点，不依赖 HA 官方组件，稳定性更高。
+*   **博虎 REST**: 直接对接 `latest` 接口，实现 60s 级同步。
+*   **离线判定机制**: 
+    *   **ts 采集**: 显式采集 API 返回的 `ts` 属性。
+    *   **去回退化**: `value_template` 仅在 API 有效时返回值，不使用 `states()` 回读旧值，确保 API 失效或断电后数据不“锁死”。
+*   **WAQI 原始 API**: 通过 Token 直连目标站点，稳定性更高。
 
 ### 2.2 择优中介层 (Priority-based Proxy)
 **作用**: 整合本地物理传感器与远程 API 数据。

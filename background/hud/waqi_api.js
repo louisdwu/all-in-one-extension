@@ -1,6 +1,11 @@
 async function fetchWAQIData(settings) {
     if (!settings.waqiToken) return {};
     
+    // Check if any metrics are enabled before fetching (Robust check)
+    const metrics = settings.waqiMetrics || {};
+    const hasEnabledMetrics = Object.values(metrics).some(v => v === true || v === 'true');
+    if (!hasEnabledMetrics) return {};
+
     const token = settings.waqiToken.trim();
     const city = (settings.waqiCity || 'here').trim() || 'here';
     
@@ -20,9 +25,20 @@ async function fetchWAQIData(settings) {
         const results = {};
         const iaqi = data.data.iaqi || {};
         const fetchTs = Date.now();
-        const pubTs = data.data.time?.v * 1000; // Unix timestamp to ms
+        
+        let pubTs = data.data.time?.v * 1000; // API usually returns Unix seconds
         const pubStr = data.data.time?.s || '未知';
-        const lagMinutes = Math.round((fetchTs - pubTs) / 60000);
+        
+        // Defensive check: if pubTs is in the future (due to timezone mismatch), 
+        // or abnormally small, try to re-anchor it using ISO string if available.
+        // WAQI 'v' is local station time as unix seconds, which can be tricky.
+        if (pubTs > fetchTs + 3600000) {
+            // If it's more than 1 hour in the future, it might be a weird timezone issue from API
+            console.warn('[HUD] WAQI published time is in the future, ignoring lag.');
+            pubTs = fetchTs;
+        }
+
+        const lagMinutes = Math.max(0, Math.round((fetchTs - pubTs) / 60000));
         
         const common = { 
             error: false, 

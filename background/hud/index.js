@@ -32,12 +32,17 @@ async function updateHUDData(source) {
         let haSuccess = false;
 
         if (source === 'WAQI' || source === 'FULL') {
-            const waqiData = await fetchWAQIData(settings);
-            // Check if any waqi result is NOT an error
-            waqiSuccess = Object.values(waqiData).some(v => v.error === false);
-            newResults = { ...newResults, ...waqiData };
+            // More robust check: handle null/undefined and stringified booleans
+            const metrics = settings.waqiMetrics || {};
+            const hasWaqiMetrics = Object.values(metrics).some(v => v === true || v === 'true');
             
-            if (waqiSuccess && waqiData._waqi_meta) {
+            if (hasWaqiMetrics) {
+                const waqiData = await fetchWAQIData(settings);
+                // Check if any waqi result is NOT an error
+                waqiSuccess = Object.values(waqiData).some(v => v.error === false);
+                newResults = { ...newResults, ...waqiData };
+                
+                if (waqiSuccess && waqiData._waqi_meta) {
                 const meta = waqiData._waqi_meta;
                 const old = await chrome.storage.local.get([STORAGE_HUD_WAQI_PUB_V]);
                 
@@ -54,7 +59,9 @@ async function updateHUDData(source) {
                     [STORAGE_HUD_WAQI_LAG]: meta.lagMinutes
                 });
             }
+            }
         }
+        
         if (source === 'HA' || source === 'FULL') {
             const haData = await fetchHAEntities(settings);
             haSuccess = Object.values(haData).some(v => v.error === false);
