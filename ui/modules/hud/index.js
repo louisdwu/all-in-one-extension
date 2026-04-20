@@ -68,6 +68,17 @@ export function initHUDPanel() {
         if (haEl) haEl.textContent = formatTime(data.hudLastSuccessHa);
     }
 
+    function formatIconValue(val) {
+        if (!val || isNaN(parseFloat(val))) return val || '--';
+        const num = parseFloat(val);
+        if (num >= 1000) {
+            let s = (num / 1000).toFixed(1);
+            if (s.endsWith('.0')) s = s.slice(0, -2);
+            return s + 'K';
+        }
+        return Math.round(num).toString();
+    }
+
     function updateHUDValueLabels(state = {}) {
         // 1. Update WAQI values
         const waqiKeys = ['aqi', 'o3', 'pm25', 'pm10', 'no2', 'so2', 'co', 't', 'h', 'p', 'w'];
@@ -75,7 +86,7 @@ export function initHUDPanel() {
             const el = document.getElementById(`val-waqi-${key}`);
             const data = state[`waqi_${key}`];
             if (el) {
-                el.textContent = (data && data.value !== undefined) ? data.value : '--';
+                el.textContent = (data && data.value !== undefined) ? formatIconValue(data.value) : '--';
                 if (data?.error) el.style.color = 'var(--danger)';
                 else el.style.color = '';
             }
@@ -88,7 +99,7 @@ export function initHUDPanel() {
             if (idInput && valEl) {
                 const id = idInput.value.trim().replace(/[\s\r\n]/g, '');
                 const data = state[`ha_${id}`];
-                valEl.textContent = (data && data.value !== undefined) ? data.value : '--';
+                valEl.textContent = (data && data.value !== undefined) ? formatIconValue(data.value) : '--';
                 if (data?.error) valEl.style.color = 'var(--danger)';
                 else valEl.style.color = '';
             }

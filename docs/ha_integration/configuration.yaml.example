@@ -1,0 +1,99 @@
+# ---------------------------------------------------------
+# 系统基础配置 (核心命脉)
+# ---------------------------------------------------------
+default_config:
+
+frontend:
+  themes: !include_dir_merge_named themes
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+# ---------------------------------------------------------
+# 1. 采集平台 (博虎 + WAQI 原始 API)
+# ---------------------------------------------------------
+sensor:
+  # --- [博虎] 原始臭氧采集 ---
+  - platform: rest
+    name: "博虎臭氧监测仪"
+    unique_id: "bohu_o3_collector_raw"
+    resource: https://www.bohu-tech.com/iot/api/latest?device_id=YOUR_DEVICE_ID_HERE
+    method: GET
+    headers:
+      Cookie: "uid=YOUR_UID"
+      User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    value_template: "{{ value_json.o3 if value_json is defined else states('sensor.bo_hu_chou_yang_jian_ce_yi') }}"
+    unit_of_measurement: "ppb"
+    icon: mdi:air-filter
+    scan_interval: 60
+
+  # --- [WAQI] 原始气压采集 (备用源) ---
+  - platform: rest
+    name: "WAQI原始气压"
+    unique_id: "waqi_raw_pressure_api"
+    resource: "https://api.waqi.info/feed/@YOUR_STATION_ID/?token=YOUR_WAQI_TOKEN_HERE"
+    method: GET
+    value_template: >
+      {% if value_json is defined and value_json.status == 'ok' %}
+        {{ value_json.data.iaqi.p.v }}
+      {% else %}
+        {{ states('sensor.waqi_yuan_shi_qi_ya') }}
+      {% endif %}
+    unit_of_measurement: "hPa"
+    icon: mdi gauge
+    scan_interval: 600
+
+# ---------------------------------------------------------
+# 2. 数据中介与科学计算
+# ---------------------------------------------------------
+template:
+  # 择优气压中介：首选手机物理计，次选WAQI API，最后保底
+  - trigger:
+      - platform: state
+        entity_id: 
+          - sensor.xiaomi_15s_pro_pressure_sensor
+          - sensor.waqi_yuan_shi_qi_ya
+    sensor:
+      - name: "博虎监控-中介气压"
+        unique_id: "bohu_proxy_pressure"
+        unit_of_measurement: "hPa"
+        state: >
+          {% set p_mobile = states('sensor.xiaomi_15s_pro_pressure_sensor') %}
+          {% set p_station = states('sensor.waqi_yuan_shi_qi_ya') %}
+          
+          {% if is_number(p_mobile) %}
+            {{ p_mobile }}
+          {% elif is_number(p_station) %}
+            {{ p_station }}
+          {% else %}
+            {{ states('sensor.bo_hu_jian_kong_zhong_jie_qi_ya') | default(1013) }}
+          {% endif %}
+
+  # 最终换算实体 (μg/m³)
+  - sensor:
+      - name: "博虎臭氧浓度 (标准制)"
+        unique_id: "bohu_o3_ugm3"
+        device_class: gas
+        availability: >
+          {{ is_number(states('sensor.bo_hu_chou_yang_jian_ce_yi')) and
+             state_attr('climate.cnhdm_cn_2029279860_wkq01', 'current_temperature') is not none }}
+        state: |
+          {% set ppb = states('sensor.bo_hu_chou_yang_jian_ce_yi') | float(0) %}
+          {% set temp = state_attr('climate.cnhdm_cn_2029279860_wkq01', 'current_temperature') | float(25) %}
+          {% set press_raw = states('sensor.bo_hu_jian_kong_zhong_jie_qi_ya') | float(1013) %}
+          
+          {% set press_kpa = press_raw / 10 if press_raw > 500 else press_raw %}
+          {% set factor = (48 * 273.15 * press_kpa) / (22.4 * (temp + 273.15) * 101.325) %}
+          {{ (ppb * factor) | round(1) }}
+        unit_of_measurement: "μg/m³"
+        icon: mdi:blur
+        attributes:
+          source_info: |
+            {% if is_number(states('sensor.xiaomi_15s_pro_pressure_sensor')) %}
+              使用手机物理传感器 (Your Phone Model)
+            {% else %}
+              使用测站 API 数据 (WAQI)
+            {% endif %}
+          last_used_temp: "{{ state_attr('climate.your_ac_entity_id', 'current_temperature') }} ℃"
+          last_used_press: "{{ states('sensor.bo_hu_jian_kong_zhong_jie_qi_ya') }} hPa"

@@ -176,9 +176,16 @@ async function showCurrentHUDCarouselItem() {
 
     let displayValue = currentData.value;
     if (settings.hudIconRound !== false && !isNaN(parseFloat(displayValue))) {
-        // If it's a number (or string number), round it for the icon
         const num = parseFloat(displayValue);
-        displayValue = Math.round(num).toString();
+        if (num >= 1000) {
+            // Display like 1.5K, 12K, etc.
+            displayValue = (num / 1000).toFixed(1);
+            if (displayValue.endsWith('.0')) displayValue = displayValue.slice(0, -2);
+            displayValue += 'K';
+        } else {
+            // Round normal small numbers
+            displayValue = Math.round(num).toString();
+        }
     }
 
     updateExtensionIcon(currentData.name, displayValue, bgColor);
