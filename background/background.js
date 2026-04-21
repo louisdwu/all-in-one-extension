@@ -7,6 +7,7 @@ try {
         "bilibili_subtitles.js",
         "bilibili_1080p.js",
         "hud/utils.js",
+        "../libs/aqi_converter.js",
         "hud/renderer.js",
         "hud/ha_api.js",
         "hud/waqi_api.js",

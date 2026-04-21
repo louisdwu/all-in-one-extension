@@ -50,13 +50,13 @@ async function fetchWAQIData(settings) {
         };
 
         const metricsMap = {
-            'aqi': { name: 'AQI', value: data.data.aqi },
-            'o3': { name: '臭氧', value: iaqi.o3?.v },
-            'pm25': { name: 'PM2.5', value: iaqi.pm25?.v },
-            'pm10': { name: 'PM10', value: iaqi.pm10?.v },
-            'no2': { name: 'NO2', value: iaqi.no2?.v },
-            'so2': { name: 'SO2', value: iaqi.so2?.v },
-            'co': { name: 'CO', value: iaqi.co?.v },
+            'aqi': { name: 'AQI指数', value: data.data.aqi },
+            'o3': { name: '臭氧(μg/m³)', value: AQI_CONVERTER.toConcentration(iaqi.o3?.v, 'o3') },
+            'pm25': { name: 'PM2.5(μg/m³)', value: AQI_CONVERTER.toConcentration(iaqi.pm25?.v, 'pm25') },
+            'pm10': { name: 'PM10(μg/m³)', value: AQI_CONVERTER.toConcentration(iaqi.pm10?.v, 'pm10') },
+            'no2': { name: 'NO2(μg/m³)', value: AQI_CONVERTER.toConcentration(iaqi.no2?.v, 'no2') },
+            'so2': { name: 'SO2(μg/m³)', value: AQI_CONVERTER.toConcentration(iaqi.so2?.v, 'so2') },
+            'co': { name: 'CO(μg/m³)', value: AQI_CONVERTER.toConcentration(iaqi.co?.v, 'co') },
             't': { name: 'T(站)', value: iaqi.t?.v },
             'h': { name: 'H(站)', value: iaqi.h ? `${iaqi.h.v}%` : undefined },
             'p': { name: 'P(站)', value: iaqi.p?.v },
@@ -84,8 +84,8 @@ function generateWAQIError(code) {
     const results = {};
     const keys = ['aqi', 'o3', 'pm25', 'pm10', 'no2', 'so2', 'co', 't', 'h', 'p', 'w'];
     const names = { 
-        aqi: 'AQI', o3: '臭氧', pm25: 'PM2.5', pm10: 'PM10',
-        no2: 'NO2', so2: 'SO2', co: 'CO', 
+        aqi: 'AQI指数', o3: '臭氧(μg/m³)', pm25: 'PM2.5(μg/m³)', pm10: 'PM10(μg/m³)',
+        no2: 'NO2(μg/m³)', so2: 'SO2(μg/m³)', co: 'CO(μg/m³)', 
         t: 'T(站)', h: 'H(站)', p: 'P(站)', w: 'W(站)'
     };
     
