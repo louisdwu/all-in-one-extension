@@ -36,5 +36,42 @@ async function fetchHAEntities(settings) {
             results[queueKey] = { name: entity.name, value: 'X', error: true };
         }
     }
+
     return results;
 }
+
+async function updateHASensor(settings, entityId, state, attributes = {}) {
+    if (!settings.haUrl || !settings.haToken) return;
+
+    const cleanUrl = settings.haUrl.replace(/[\s\r\n]/g, '').replace(/\/+$/, '');
+    const cleanToken = settings.haToken.replace(/[\s\r\n]/g, '').replace(/[^\x20-\x7E]/g, '');
+    const apiUrl = `${cleanUrl}/api/states/${entityId}`;
+
+    try {
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + cleanToken,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                state: state,
+                attributes: {
+                    ...attributes,
+                    last_updated_by: 'AIO Extension Scraper'
+                }
+            })
+        });
+
+        if (response.ok) {
+            return { success: true };
+        } else {
+            const errText = await response.text();
+            return { success: false, error: `HA Error: ${response.status} - ${errText}` };
+        }
+    } catch (err) {
+        console.error('[All in One Extension] Failed to push to HA', err);
+        return { success: false, error: err.message };
+    }
+}
+

@@ -5,6 +5,44 @@
     <meta charset="UTF-8">
     <title>All in One Settings</title>
     <link rel="stylesheet" href="options.css">
+    <style>
+        /* Accordion Styles */
+        .accordion-item {
+            border: 1px solid #e0e6ed;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+        .accordion-header {
+            background: #f8f9fa;
+            padding: 12px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+            transition: background 0.2s;
+        }
+        .accordion-header:hover { background: #f1f3f5; }
+        .accordion-header h3 { margin: 0; font-size: 1.0em; color: #333; pointer-events: none; }
+        .accordion-header .toggle-icon { transition: transform 0.3s; font-size: 0.9em; color: #adb5bd; }
+        .accordion-content {
+            padding: 15px 0;
+            display: none;
+            border-top: 1px solid #eee;
+        }
+        .accordion-item.active .accordion-content { display: block !important; }
+        .accordion-item.active .accordion-header { background: #fff; }
+        .accordion-item.active .toggle-icon { transform: rotate(180deg); }
+        .source-tag {
+            font-size: 0.7em;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+    </style>
 </head>
 
 <body>
@@ -519,6 +557,7 @@
                 </div>
             </div>
         </div>
+
 
         <!-- ================= Tab: Global Backup ================= -->
         <div id="tab-backup" class="tab-pane">
