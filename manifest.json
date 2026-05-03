@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "All in One Extension",
-    "version": "1.2026.423.2017",
+    "version": "1.2026.503.1259",
     "description": "Chrome extension for multi-functional utilities (Incognito, Hotkeys, Video Speeder, Home Assistant Monitor).",
     "permissions": [
         "tabs",
@@ -10,7 +10,8 @@
         "scripting",
         "alarms",
         "notifications",
-        "idle"
+        "idle",
+        "cookies"
     ],
     "host_permissions": [
         "*://*/*"
