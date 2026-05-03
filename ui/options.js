@@ -8,6 +8,13 @@ import { initGlobalBackup } from './modules/backup.js';
 import { initBilibiliSubtitles } from './modules/bilibili.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+    // 显示版本号
+    const versionEl = document.getElementById('sidebar-version');
+    if (versionEl) {
+        const manifest = chrome.runtime.getManifest();
+        versionEl.textContent = `v${manifest.version}`;
+    }
+
     // 侧边栏导航初始化
     setupTabs();
     
