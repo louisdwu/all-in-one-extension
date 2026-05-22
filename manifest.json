@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "All in One Extension",
-    "version": "1.2026.522.1637",
+    "version": "1.2026.522.1724",
     "description": "Chrome extension for multi-functional utilities (Incognito, Hotkeys, Video Speeder, Home Assistant Monitor).",
     "permissions": [
         "tabs",
@@ -61,10 +61,10 @@
                 "*://*.bilibili.com/list/*"
             ],
             "js": [
-                "content/bilibili_1080p_inject.js"
+                "content/bilibili_subtitles.js",
+                "content/bilibili_1080p.js"
             ],
-            "run_at": "document_start",
-            "world": "MAIN"
+            "run_at": "document_start"
         },
         {
             "matches": [
@@ -73,10 +73,10 @@
                 "*://*.bilibili.com/list/*"
             ],
             "js": [
-                "content/bilibili_subtitles.js",
-                "content/bilibili_1080p.js"
+                "content/bilibili_1080p_inject.js"
             ],
-            "run_at": "document_start"
+            "run_at": "document_start",
+            "world": "MAIN"
         }
     ],
     "action": {

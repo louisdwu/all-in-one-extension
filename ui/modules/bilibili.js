@@ -8,6 +8,7 @@ export function initBilibiliSubtitles() {
     const bypassToggle = document.getElementById('bili-1080p-enable');
     const commentToggle = document.getElementById('bili-comments-enable');
     const aiSubToggle = document.getElementById('bili-ai-subtitle-enable');
+    const playnextToggle = document.getElementById('bili-playnext-disable');
     const sessdataInput = document.getElementById('bili-sessdata');
     const dedeUserIdInput = document.getElementById('bili-dede-userid');
     const fetchCookiesBtn = document.getElementById('bili-fetch-cookies');
@@ -26,11 +27,12 @@ export function initBilibiliSubtitles() {
             hotkeyInput.value = config.subtitleHotkey;
         });
 
-        ConfigBridge.get(['biliAutoPlay', 'bilibili1080PEnabled', 'biliCommentsEnabled', 'biliAISubtitleEnabled', 'biliCookies']).then((res) => {
+        ConfigBridge.get(['biliAutoPlay', 'bilibili1080PEnabled', 'biliCommentsEnabled', 'biliAISubtitleEnabled', 'biliCookies', 'biliPlayNextDisabled']).then((res) => {
             if (autoplayToggle) autoplayToggle.checked = !!res.biliAutoPlay;
             if (bypassToggle) bypassToggle.checked = res.bilibili1080PEnabled !== false;
             if (commentToggle) commentToggle.checked = res.biliCommentsEnabled !== false;
             if (aiSubToggle) aiSubToggle.checked = res.biliAISubtitleEnabled !== false;
+            if (playnextToggle) playnextToggle.checked = !!res.biliPlayNextDisabled;
             if (res.biliCookies) {
                 if (sessdataInput) sessdataInput.value = res.biliCookies.sessdata || '';
                 if (dedeUserIdInput) dedeUserIdInput.value = res.biliCookies.dedeUserId || '';
@@ -50,11 +52,25 @@ export function initBilibiliSubtitles() {
             bilibili1080PEnabled: bypassToggle.checked,
             biliCommentsEnabled: commentToggle.checked,
             biliAISubtitleEnabled: aiSubToggle.checked,
+            biliPlayNextDisabled: playnextToggle.checked,
             biliCookies: cookies,
             biliAutoSubtitle: autoToggle.checked // 同步字幕开关到顶层
         };
 
         ConfigBridge.set(update).then(() => {
+            // 同步种 cookie 到 bilibili.com，供 MAIN 世界脚本同步读取
+            // 无痕窗口在创建时会继承普通模式的 cookie，因此此 cookie 在无痕中也可用
+            if (chrome.cookies) {
+                chrome.cookies.set({
+                    url: 'https://www.bilibili.com',
+                    name: 'aio_pnd',
+                    value: playnextToggle.checked ? '1' : '0',
+                    domain: '.bilibili.com',
+                    path: '/',
+                    expirationDate: Math.floor(Date.now() / 1000) + 365 * 86400,
+                    sameSite: 'lax'
+                });
+            }
             // 同时保存字幕专用对象
             config.autoEnableSubtitle = autoToggle.checked;
             ConfigBridge.saveBilibiliSettings(config).then(() => {

@@ -4,6 +4,16 @@
  */
 
 (function() {
+  // 同步注入无痕标识到 MAIN 世界（必须在任何 async 调用之前）
+  // 由于 manifest 中本脚本排在 MAIN 世界脚本之前，此标签会在 MAIN 脚本执行前运行
+  try {
+    const _inIncognito = chrome.extension.inIncognitoContext;
+    const flagScript = document.createElement('script');
+    flagScript.textContent = `window.__aio_incognito=${_inIncognito};`;
+    (document.head || document.documentElement).appendChild(flagScript);
+    flagScript.remove();
+  } catch(e) {}
+
   let bilibiliSettings = {
     autoEnableSubtitle: true,
     subtitleHotkey: 's'
@@ -18,7 +28,8 @@
       'biliCommentsEnabled', 
       'biliAISubtitleEnabled',
       'biliCookies',
-      'biliAutoPlay'
+      'biliAutoPlay',
+      'biliPlayNextDisabled'
     ], (res) => {
       // 1. 本地逻辑配置
       if (res.bilibiliSubtitles) {
@@ -56,6 +67,7 @@
         biliCommentsEnabled: res.biliCommentsEnabled !== false,
         biliAISubtitleEnabled: res.biliAISubtitleEnabled !== false,
         biliAutoPlay: !!res.biliAutoPlay,
+        biliPlayNextDisabled: !!res.biliPlayNextDisabled,
         inIncognito: inIncognito
       };
       document.documentElement.setAttribute('data-aio-bili-config', JSON.stringify(mainConfig));

@@ -14,39 +14,109 @@
 
     // ---- 1. 配置读取 ----
     let config = {};
-    try {
-        const configStr = document.documentElement.getAttribute('data-aio-bili-config');
-        if (configStr) config = JSON.parse(configStr);
-    } catch (e) {
-        console.error('[AIO Bili] Failed to parse config', e);
-    }
-
-    const syncAutoplay = () => {
-        if (config.biliAutoPlay === undefined) return;
+    const reloadConfig = () => {
         try {
-            const profileStr = localStorage.getItem('bpx_player_profile');
-            let profile = {};
-            if (profileStr) profile = JSON.parse(profileStr);
-            
-            if (!profile.media) profile.media = {};
-            
-            if (profile.media.autoplay !== config.biliAutoPlay) {
-                console.log(`[AIO Bili] Syncing Bilibili autoplay: ${profile.media.autoplay} -> ${config.biliAutoPlay}`);
-                profile.media.autoplay = config.biliAutoPlay;
-                localStorage.setItem('bpx_player_profile', JSON.stringify(profile));
-            }
+            const configStr = document.documentElement.getAttribute('data-aio-bili-config');
+            if (configStr) config = JSON.parse(configStr);
         } catch (e) {
-            console.warn('[AIO Bili] Autoplay sync failed', e);
+            console.error('[AIO Bili] Failed to parse config', e);
         }
     };
-
-    // 立即同步自动播放配置
-    syncAutoplay();
+    reloadConfig();
 
     // ---- 2. 判断登录状态 ----
     // 精准识别真正的 B 站登录标识（DedeUserID__ckMd5）
     // 如果已登录，我们绝不启用拦截器，完美保护原账号体验！
     const isLogin = !!document.cookie.match(/DedeUserID__ckMd5=([^;]+)/);
+
+    // 同步判定：是否锁定播完暂停
+    // 1. window.__aio_incognito 由 content script 在本脚本之前同步注入（manifest 顺序保证）
+    // 2. aio_pnd cookie 由选项页保存时种入，无痕窗口创建时继承
+    // 3. 兜底：异步加载的 config（mainLoop 中 reloadConfig 刷新）
+    const shouldLockPlayNext = () => {
+        const incognito = window.__aio_incognito === true || config.inIncognito;
+        if (!incognito) return false;
+        // 优先同步读 cookie，兜底读 config
+        const hasCookie = document.cookie.includes('aio_pnd=1');
+        return hasCookie || config.biliPlayNextDisabled;
+    };
+
+    // ---- localStorage 劫持（播完暂停核心） ----
+    // B 站播放器初始化时一次性读取 localStorage 并缓存到内存，
+    // 之后再修改值无效。必须在播放器 getItem 的那一刻注入修改值。
+    const _lsGetItem = localStorage.getItem.bind(localStorage);
+    const _lsSetItem = localStorage.setItem.bind(localStorage);
+
+    const patchProfile = (raw) => {
+        try {
+            const profile = JSON.parse(raw || '{}');
+            if (!profile.play) profile.play = {};
+            profile.play.play_mode = 2;
+            return JSON.stringify(profile);
+        } catch (e) {
+            return raw;
+        }
+    };
+
+    localStorage.getItem = function(key) {
+        const val = _lsGetItem(key);
+        if (shouldLockPlayNext()) {
+            if (key === 'recommend_auto_play') return 'close';
+            if (key === 'bpx_player_profile') return patchProfile(val);
+        }
+        return val;
+    };
+
+    localStorage.setItem = function(key, value) {
+        if (shouldLockPlayNext()) {
+            if (key === 'recommend_auto_play') {
+                return _lsSetItem(key, 'close');
+            }
+            if (key === 'bpx_player_profile') {
+                return _lsSetItem(key, patchProfile(value));
+            }
+        }
+        return _lsSetItem(key, value);
+    };
+
+    const syncPlaybackSettings = () => {
+        try {
+            const profileStr = _lsGetItem('bpx_player_profile');
+            let profile = {};
+            if (profileStr) profile = JSON.parse(profileStr);
+
+            let changed = false;
+            if (config.biliAutoPlay !== undefined) {
+                if (!profile.media) profile.media = {};
+                if (profile.media.autoplay !== config.biliAutoPlay) {
+                    console.log(`[AIO Bili] Syncing Bilibili autoplay: ${profile.media.autoplay} -> ${config.biliAutoPlay}`);
+                    profile.media.autoplay = config.biliAutoPlay;
+                    changed = true;
+                }
+            }
+
+            if (shouldLockPlayNext()) {
+                if (!profile.play) profile.play = {};
+                if (profile.play.play_mode !== 2) {
+                    profile.play.play_mode = 2;
+                    changed = true;
+                }
+                if (_lsGetItem('recommend_auto_play') !== 'close') {
+                    _lsSetItem('recommend_auto_play', 'close');
+                }
+            }
+
+            if (changed) {
+                _lsSetItem('bpx_player_profile', JSON.stringify(profile));
+            }
+        } catch (e) {
+            console.warn('[AIO Bili] Playback settings sync failed', e);
+        }
+    };
+
+    // 立即同步自动播放与切集配置
+    syncPlaybackSettings();
+
     console.log(`[AIO Bili] Login status: ${isLogin ? '🟢 Logged In (No Intercept)' : '🔴 Unlogged (Activating Privilege Decoupling)'}`);
 
     // ---- 3. 免登录特权破解核心 (仅在未登录时激活) ----
@@ -594,6 +664,12 @@
             if (btn) { btn.click(); _setTimeout(switchTo1080P, 2000); }
             switchTo1080P();
         }
+
+        // 重新加载配置（Content Script 异步写入 data attribute 后，MAIN 脚本需要刷新读取）
+        reloadConfig();
+
+        // 持续同步自动连播与画质锁死
+        syncPlaybackSettings();
     };
 
     setInterval(mainLoop, 1500);
