@@ -12,8 +12,6 @@ export function initBilibiliSubtitles() {
     const sessdataInput = document.getElementById('bili-sessdata');
     const dedeUserIdInput = document.getElementById('bili-dede-userid');
     const fetchCookiesBtn = document.getElementById('bili-fetch-cookies');
-    const saveBtn = document.getElementById('bili-saveBtn');
-
     if (!autoToggle) return;
 
     let config = { autoEnableSubtitle: true, subtitleHotkey: 's' };
@@ -41,30 +39,30 @@ export function initBilibiliSubtitles() {
     }
 
     // 统一保存逻辑（除了快捷键和字幕开关，因为它们有独立逻辑，或者也可以统一）
-    function saveAll() {
+    function saveAll(silent = false) {
         const cookies = {
-            sessdata: sessdataInput.value.trim(),
-            dedeUserId: dedeUserIdInput.value.trim()
+            sessdata: sessdataInput ? sessdataInput.value.trim() : '',
+            dedeUserId: dedeUserIdInput ? dedeUserIdInput.value.trim() : ''
         };
 
         const update = {
-            biliAutoPlay: autoplayToggle.checked,
-            bilibili1080PEnabled: bypassToggle.checked,
-            biliCommentsEnabled: commentToggle.checked,
-            biliAISubtitleEnabled: aiSubToggle.checked,
-            biliPlayNextDisabled: playnextToggle.checked,
+            biliAutoPlay: autoplayToggle ? autoplayToggle.checked : false,
+            bilibili1080PEnabled: bypassToggle ? bypassToggle.checked : true,
+            biliCommentsEnabled: commentToggle ? commentToggle.checked : true,
+            biliAISubtitleEnabled: aiSubToggle ? aiSubToggle.checked : true,
+            biliPlayNextDisabled: playnextToggle ? playnextToggle.checked : false,
             biliCookies: cookies,
-            biliAutoSubtitle: autoToggle.checked // 同步字幕开关到顶层
+            biliAutoSubtitle: autoToggle ? autoToggle.checked : true // 同步字幕开关到顶层
         };
 
-        ConfigBridge.set(update).then(() => {
+        return ConfigBridge.set(update).then(() => {
             // 同步种 cookie 到 bilibili.com，供 MAIN 世界脚本同步读取
             // 无痕窗口在创建时会继承普通模式的 cookie，因此此 cookie 在无痕中也可用
             if (chrome.cookies) {
                 chrome.cookies.set({
                     url: 'https://www.bilibili.com',
                     name: 'aio_pnd',
-                    value: playnextToggle.checked ? '1' : '0',
+                    value: playnextToggle && playnextToggle.checked ? '1' : '0',
                     domain: '.bilibili.com',
                     path: '/',
                     expirationDate: Math.floor(Date.now() / 1000) + 365 * 86400,
@@ -72,15 +70,27 @@ export function initBilibiliSubtitles() {
                 });
             }
             // 同时保存字幕专用对象
-            config.autoEnableSubtitle = autoToggle.checked;
-            ConfigBridge.saveBilibiliSettings(config).then(() => {
-                showStatus('B站所有设置已保存');
+            if (autoToggle) {
+                config.autoEnableSubtitle = autoToggle.checked;
+            }
+            return ConfigBridge.saveBilibiliSettings(config).then(() => {
+                if (!silent) {
+                    showStatus('B站所有设置已保存');
+                }
                 ConfigBridge.sendMessage({ action: 'reloadSettings' });
             });
         });
     }
 
-    saveBtn?.addEventListener('click', saveAll);
+    // 绑定自动保存事件
+    autoToggle?.addEventListener('change', () => saveAll(true));
+    autoplayToggle?.addEventListener('change', () => saveAll(true));
+    bypassToggle?.addEventListener('change', () => saveAll(true));
+    commentToggle?.addEventListener('change', () => saveAll(true));
+    aiSubToggle?.addEventListener('change', () => saveAll(true));
+    playnextToggle?.addEventListener('change', () => saveAll(true));
+    sessdataInput?.addEventListener('change', () => saveAll(true));
+    dedeUserIdInput?.addEventListener('change', () => saveAll(true));
 
     // 自动获取 Cookie 逻辑
     fetchCookiesBtn?.addEventListener('click', async () => {
@@ -160,7 +170,9 @@ export function initBilibiliSubtitles() {
                 } else {
                     if (sessdataInput) sessdataInput.value = sessdata;
                     if (dedeUserIdInput) dedeUserIdInput.value = dedeUserId;
-                    showStatus(`已成功获取最新信息${sourceText}，请记得点击保存`);
+                    saveAll(true).then(() => {
+                        showStatus(`已成功获取最新信息并自动保存${sourceText}`);
+                    });
                 }
             } else {
                 let errorMsg = '未能获取到 B 站 Cookie。';

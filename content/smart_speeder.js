@@ -18,6 +18,15 @@ let videoObserver = null;
 let customShortcuts = {};
 
 /**
+ * 与 MAIN world 注入脚本通信，锁定/解锁速度
+ */
+function sendSpeedLockCommand(action, speed) {
+    window.dispatchEvent(new CustomEvent('aio-speed-lock', {
+        detail: { action, speed }
+    }));
+}
+
+/**
  * 加载配置
  */
 function loadSettings() {
@@ -69,14 +78,20 @@ function shouldApplySpeed() {
 
 /**
  * 核心逻辑：应用倍速
+ * 同时通知 MAIN world 注入脚本锁定速度，以对抗抖音等网站的速度重置
  */
 function applySpeedToVideos() {
     if (!shouldApplySpeed()) {
+        sendSpeedLockCommand('unlock');
         document.querySelectorAll('video').forEach(v => v.playbackRate = 1.0);
         return;
     }
+    const speed = window.speederCurrentSpeed;
+    // 先通知 MAIN world 锁定速度（对抗 playbackRate 劫持）
+    sendSpeedLockCommand('lock', speed);
+    // 同时在 Content Script 侧也设置一遍（兼容未被劫持的普通网站）
     document.querySelectorAll('video').forEach(v => {
-        if (v.readyState >= 2) v.playbackRate = window.speederCurrentSpeed;
+        if (v.readyState >= 2) v.playbackRate = speed;
     });
     if (typeof updateFloatingBall === 'function') updateFloatingBall();
     if (typeof updateMenuUI === 'function') updateMenuUI();
@@ -143,14 +158,62 @@ function showSpeedIndicator(msg) {
     if (!el) {
         el = document.createElement('div');
         el.id = 'video-speed-indicator';
-        document.body.appendChild(el);
+        
+        // 设置行内样式作为保底和动画基础
+        Object.assign(el.style, {
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            background: 'rgba(0, 0, 0, 0.75)',
+            color: 'white',
+            padding: '16px 32px',
+            borderRadius: '12px',
+            fontSize: '28px',
+            fontWeight: 'bold',
+            zIndex: '100000',
+            fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            pointerEvents: 'none',
+            opacity: '0',
+            transform: 'translate(-50%, -50%) scale(0.8)',
+            transition: 'opacity 0.25s ease, transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            backdropFilter: 'blur(10px)',
+            webkitBackdropFilter: 'blur(10px)'
+        });
     }
+
+    // 确定挂载容器，适配全屏播放器
+    const fsElement = document.fullscreenElement || 
+                      document.webkitFullscreenElement || 
+                      document.mozFullScreenElement || 
+                      document.msFullscreenElement;
+    
+    let targetContainer = document.body;
+    if (fsElement) {
+        targetContainer = fsElement.tagName === 'VIDEO' ? fsElement.parentNode : fsElement;
+    }
+
+    if (el.parentNode !== targetContainer) {
+        targetContainer.appendChild(el);
+    }
+    
     el.textContent = msg || `${window.speederCurrentSpeed.toFixed(2)}x`;
     el.style.opacity = '1';
+    el.style.transform = 'translate(-50%, -50%) scale(1)';
     
     clearTimeout(window.speederIndicatorTimer);
+    clearTimeout(window.speederIndicatorRemoveTimer);
+    
     window.speederIndicatorTimer = setTimeout(() => {
         el.style.opacity = '0';
+        el.style.transform = 'translate(-50%, -50%) scale(0.8)';
+        
+        window.speederIndicatorRemoveTimer = setTimeout(() => {
+            if (el.parentNode && el.parentNode !== document.body) {
+                document.body.appendChild(el);
+            }
+        }, 300);
     }, 1500);
 }
 
