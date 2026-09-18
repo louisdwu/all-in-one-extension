@@ -19,11 +19,16 @@ let customShortcuts = {};
 
 /**
  * 与 MAIN world 注入脚本通信，锁定/解锁速度
+ * 通过 DOM 属性通信（最可靠的跨世界通信方式）
+ * - CustomEvent.detail 无法跨世界
+ * - postMessage 可能被网站拦截
+ * - DOM 属性两个世界共享同一份 DOM，保证可达
  */
 function sendSpeedLockCommand(action, speed) {
-    window.dispatchEvent(new CustomEvent('aio-speed-lock', {
-        detail: { action, speed }
-    }));
+    const el = document.documentElement;
+    if (!el) return;
+    el.setAttribute('data-aio-speed-action', action);
+    el.setAttribute('data-aio-speed-value', String(speed || 0));
 }
 
 /**
@@ -91,7 +96,7 @@ function applySpeedToVideos() {
     sendSpeedLockCommand('lock', speed);
     // 同时在 Content Script 侧也设置一遍（兼容未被劫持的普通网站）
     document.querySelectorAll('video').forEach(v => {
-        if (v.readyState >= 2) v.playbackRate = speed;
+        v.playbackRate = speed;
     });
     if (typeof updateFloatingBall === 'function') updateFloatingBall();
     if (typeof updateMenuUI === 'function') updateMenuUI();
@@ -107,10 +112,12 @@ function setupVideoObserver() {
 }
 
 function checkAndApplySpeed() {
-    setTimeout(() => {
-        applySpeedToVideos();
-        setupVideoObserver();
-    }, 100);
+    // 多次延迟重试，确保 SPA 路由切换 / 视频懒加载场景下也能锁定
+    const delays = [100, 500, 1500, 3000];
+    delays.forEach(delay => {
+        setTimeout(() => applySpeedToVideos(), delay);
+    });
+    setupVideoObserver();
 }
 
 /**
