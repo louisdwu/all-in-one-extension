@@ -171,21 +171,27 @@ function injectSpeederStyles() {
             border-radius: 0 0 8px 8px;
         }
         
-        /* Speed Indicator (Top Right) */
+        /* Speed Indicator (Centered) */
         #video-speed-indicator {
             position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.8);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.8);
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             color: white;
-            padding: 10px 15px;
-            border-radius: 5px;
-            font-size: 16px;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-size: 28px;
             font-weight: bold;
-            z-index: 10000;
-            font-family: Arial, sans-serif;
-            transition: opacity 0.3s;
+            z-index: 100000;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             pointer-events: none;
+            opacity: 0;
         }
     `;
     document.head.appendChild(style);
