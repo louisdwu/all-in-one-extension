@@ -1,2 +1,8 @@
-# Data & Sensitive Configs
+# Data & Sensitive Configs (local-only — never upload)
 docs/ha_integration/real.yaml
+
+# OS / editor junk (Samba-shared folder, Windows may browse)
+.DS_Store
+Thumbs.db
+*.swp
+*~
