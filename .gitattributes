@@ -1,0 +1,18 @@
+# Linux-dev hygiene: enforce LF in repo & working tree.
+# (Dev is Linux-only now; this guarantees consistency and auto-normalizes
+# any stray CRLF that might sneak in via copy/paste or tooling.)
+* text=auto eol=lf
+
+# Binary assets — never normalize
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+
+# Vendored minified single-line lib
+libs/protobuf.min.js -text
