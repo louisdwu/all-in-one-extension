@@ -6,7 +6,7 @@
 export const ConfigBridge = {
     /**
      * Get settings from sync storage
-     * @param {string | string[] | Object} keys 
+     * @param {string | string[] | Object} keys
      * @returns {Promise<any>}
      */
     async get(keys) {
@@ -17,7 +17,7 @@ export const ConfigBridge = {
 
     /**
      * Set settings to sync storage
-     * @param {Object} items 
+     * @param {Object} items
      * @returns {Promise<void>}
      */
     async set(items) {
@@ -27,13 +27,39 @@ export const ConfigBridge = {
     },
 
     /**
-     * Send message to background or other parts
-     * @param {Object} message 
-     * @returns {Promise<any>}
+     * Send message to background or other parts.
+     * Checks chrome.runtime.lastError to avoid "Unchecked runtime.lastError" warnings.
+     * @param {Object} message
+     * @returns {Promise<any>} Resolves to the response, or null if no response was received.
      */
     async sendMessage(message) {
         return new Promise((resolve) => {
-            chrome.runtime.sendMessage(message, resolve);
+            chrome.runtime.sendMessage(message, (response) => {
+                if (chrome.runtime.lastError) {
+                    console.warn('[ConfigBridge] sendMessage lastError:', chrome.runtime.lastError.message);
+                    resolve(null);
+                } else {
+                    resolve(response);
+                }
+            });
+        });
+    },
+
+    /**
+     * Fire-and-forget message — no response expected.
+     * Uses chrome.runtime.sendMessage without a callback so no port is held open.
+     * Safe for notifications like UPDATE_CONFIG, UPDATE_HUD_CONFIG, reloadSettings.
+     * @param {Object} message
+     * @returns {Promise<void>}
+     */
+    async send(message) {
+        return new Promise((resolve) => {
+            try {
+                chrome.runtime.sendMessage(message);
+            } catch (e) {
+                console.warn('[ConfigBridge] send failed:', e.message);
+            }
+            resolve();
         });
     },
 

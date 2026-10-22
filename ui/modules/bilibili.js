@@ -77,7 +77,7 @@ export function initBilibiliSubtitles() {
                 if (!silent) {
                     showStatus('B站所有设置已保存');
                 }
-                ConfigBridge.sendMessage({ action: 'reloadSettings' });
+                ConfigBridge.send({ action: 'reloadSettings' });
             });
         });
     }
@@ -199,7 +199,7 @@ export function initBilibiliSubtitles() {
         // 快捷键录制后自动保存该子项
         ConfigBridge.saveBilibiliSettings(config).then(() => {
             showStatus('快捷键已更新');
-            ConfigBridge.sendMessage({ action: 'reloadSettings' });
+            ConfigBridge.send({ action: 'reloadSettings' });
         });
     });
 

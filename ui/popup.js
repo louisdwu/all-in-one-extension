@@ -102,6 +102,7 @@ function initSmartSpeeder() {
     let settings = { globalEnabled: true, presetSpeed: 2.0 };
 
     chrome.runtime.sendMessage({ action: 'getSpeederSettings' }, (response) => {
+        if (chrome.runtime.lastError) return;
         if (response) {
             settings.globalEnabled = response.globalEnabled !== false;
             settings.presetSpeed = response.presetSpeed !== undefined ? String(response.presetSpeed) : "2.0";
@@ -127,6 +128,7 @@ function initSmartSpeeder() {
     globalToggle.addEventListener('change', (e) => {
         settings.globalEnabled = e.target.checked;
         chrome.runtime.sendMessage({ action: 'saveSpeederSettings', settings }, () => {
+            if (chrome.runtime.lastError) return;
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                 if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'reloadSettings' });
             });

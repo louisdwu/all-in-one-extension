@@ -196,7 +196,7 @@ export function initHUDPanel() {
         };
 
         ConfigBridge.set(config).then(() => {
-            ConfigBridge.sendMessage({ type: "UPDATE_HUD_CONFIG" });
+            ConfigBridge.send({ type: "UPDATE_HUD_CONFIG" });
             const dbHud = document.getElementById('db-hud-enable');
             if (dbHud) dbHud.checked = enableToggle.checked;
         });

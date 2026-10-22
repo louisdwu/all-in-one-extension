@@ -119,6 +119,7 @@ function setupMenuEventListeners(menu) {
         const settings = window.speederSettings;
         settings.globalEnabled = !settings.globalEnabled;
         chrome.runtime.sendMessage({ action: 'saveSpeederSettings', settings }, () => {
+            if (chrome.runtime.lastError) return;
             updateMenuUI();
             chrome.runtime.sendMessage({ action: 'reloadSettings' });
         });
