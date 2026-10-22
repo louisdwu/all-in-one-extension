@@ -36,6 +36,7 @@ function sendSpeedLockCommand(action, speed) {
  */
 function loadSettings() {
     chrome.runtime.sendMessage({ action: 'getSpeederSettings' }, (response) => {
+        if (chrome.runtime.lastError) return;
         if (response) {
             window.speederSettings = {
                 globalEnabled: response.globalEnabled !== false,
@@ -229,6 +230,7 @@ function showSpeedIndicator(msg) {
  */
 function loadCustomShortcuts() {
     chrome.runtime.sendMessage({ action: 'getSpeederShortcuts' }, (res) => {
+        if (chrome.runtime.lastError) return;
         if (res) {
             customShortcuts = res;
             document.removeEventListener('keydown', handleKey);

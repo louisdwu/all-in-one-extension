@@ -46,8 +46,8 @@ export function initGlobalBackup() {
                     chrome.storage.sync.clear(() => {
                         ConfigBridge.set(backup.data).then(() => {
                             showStatus('备份数据已导入，正在自动重载...', 'success');
-                            ConfigBridge.sendMessage({ action: 'reloadSettings' });
-                            ConfigBridge.sendMessage({ type: "UPDATE_CONFIG" });
+                            ConfigBridge.send({ action: 'reloadSettings' });
+                            ConfigBridge.send({ type: "UPDATE_CONFIG" });
                             setTimeout(() => window.location.reload(), 1000);
                         });
                     });
@@ -65,8 +65,8 @@ export function initGlobalBackup() {
             chrome.storage.sync.clear(() => {
                 chrome.storage.local.clear(() => {
                     showStatus('已成功恢复出厂默认设置', 'success');
-                    ConfigBridge.sendMessage({ action: 'reloadSettings' });
-                    ConfigBridge.sendMessage({ type: "UPDATE_CONFIG" });
+                    ConfigBridge.send({ action: 'reloadSettings' });
+                    ConfigBridge.send({ type: "UPDATE_CONFIG" });
                     setTimeout(() => window.location.reload(), 1500);
                 });
             });

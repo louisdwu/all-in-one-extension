@@ -35,7 +35,7 @@ export function initDashboard() {
                 const update = {};
                 update[key] = e.target.checked;
                 ConfigBridge.set(update);
-                if (key === 'hudEnabled') ConfigBridge.sendMessage({ type: "UPDATE_HUD_CONFIG" });
+                if (key === 'hudEnabled') ConfigBridge.send({ type: "UPDATE_HUD_CONFIG" });
             });
         }
     }

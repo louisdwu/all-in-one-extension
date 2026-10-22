@@ -120,6 +120,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     updateShortcutReferenceDocument(request.shortcuts);
     sendResponse({ success: true });
   }
+
+  if (request.action === 'reloadSettings') {
+    // 重新加载快捷键配置并通知所有标签页
+    loadShortcuts();
+    chrome.tabs.query({}, (tabs) => {
+      tabs.forEach(tab => {
+        chrome.tabs.sendMessage(tab.id, { action: 'reloadSettings' }).catch(() => {});
+      });
+    });
+    sendResponse({ success: true });
+  }
+
+  if (request.type === 'UPDATE_CONFIG') {
+    // 全局配置更新通知
+    sendResponse({ success: true });
+  }
 });
 
 // 更新快捷键参考文档
