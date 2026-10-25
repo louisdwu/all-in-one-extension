@@ -29,7 +29,6 @@
 
 - **无需构建**：原生 Chrome MV3 扩展，改完代码后在 `chrome://extensions` 点「刷新」即生效。
 - **即时验证**：AI 改完代码 + 版本号后，用户即可刷新加载，无需编译。
-- **提交前**：`git diff` 自查 → `git add -A` → `git commit` → `git push origin main`。
 
 ---
 
@@ -125,21 +124,3 @@ manifest 中部分脚本声明 `"world": "MAIN"`，直接运行在网页主世�
 - 防 XSS：渲染用户/存储数据到 HTML 前用 `libs/utils.js` 的 `escapeHtml()`
 - 行尾 LF（`.gitattributes` 已强制）
 
----
-
-## 7. Git 约定
-
-- 主分支 `main`，直接提交推送
-- Commit message：`type: 简述`（type ∈ fix/feat/chore/docs/refactor）
-- 敏感配置不入库：`docs/ha_integration/real.yaml` 已在 `.gitignore`
-
----
-
-## 8. 远端与镜像
-
-主线在 **GitHub**（`origin` → `louisdwu/all-in-one-extension`），NAS 上的 Gitea 只做**只读镜像**，每 8 小时自动从 GitHub 拉一次。
-
-- 只往 GitHub 推：`git push origin main`；改完照常 commit + push 就是备份
-- **不要**往 Gitea 推：镜像是单向的，两边会分叉
-- 本地不推 GitHub，Gitea 那份永远看不到
-- 镜像地址：<http://192.168.1.3:3000/louis/all-in-one-extension>
