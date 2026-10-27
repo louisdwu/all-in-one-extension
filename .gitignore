@@ -6,3 +6,8 @@ docs/ha_integration/real.yaml
 Thumbs.db
 *.swp
 *~
+
+# Local dev scratch (smoke-test logs, chromium profiles, bisect variants)
+.tmp/
+*.log
+node_modules/

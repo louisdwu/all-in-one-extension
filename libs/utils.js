@@ -1,48 +1,30 @@
 /**
- * All-in-One Extension Utilities
+ * Page-level UI helpers (ES module — extension pages only).
+ * Content scripts use `AIO.dom` / `AIO.log` from libs/core.js instead.
  */
+import './core.js';
+
+const { escapeHtml, log } = globalThis.AIO.core;
+const uiLog = log('ui');
 
 /**
- * Escapes HTML special characters to prevent XSS
- * @param {string} str 
- * @returns {string}
- */
-export function escapeHtml(str) {
-    if (typeof str !== 'string') return '';
-    const d = document.createElement('div');
-    d.textContent = str;
-    return d.innerHTML;
-}
-
-/**
- * Shows a toast notification message
- * @param {string} message 
- * @param {'success' | 'error'} type 
+ * Show a toast in the shared #statusMessage element.
+ * @param {string} message
+ * @param {'success'|'error'|'info'} [type]
  */
 export function showStatus(message, type = 'success') {
     const el = document.getElementById('statusMessage');
     if (!el) {
-        console.log(`[${type.toUpperCase()}] ${message}`);
+        uiLog.info(message);
         return;
     }
     el.textContent = message;
-    el.className = `status-msg show ${type}`;
-    setTimeout(() => el.classList.remove('show'), 3000);
+    el.className = 'status-msg show ' + type;
+    clearTimeout(showStatus._timer);
+    showStatus._timer = setTimeout(() => el.classList.remove('show'), 3200);
 }
 
-/**
- * Debounce a function
- * @param {Function} func 
- * @param {number} wait 
- */
-export function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
+export { escapeHtml };
+
+export const debounce = globalThis.AIO.core.debounce;
+export const throttle = globalThis.AIO.core.throttle;
