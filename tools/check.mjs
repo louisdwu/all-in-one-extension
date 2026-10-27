@@ -51,9 +51,12 @@ addRef(manifest.background && manifest.background.service_worker);
 for (const script of manifest.content_scripts || []) {
   for (const file of script.js || []) addRef(file);
   for (const file of script.css || []) addRef(file);
+  // libs/core.js is explicitly written to be safe in a MAIN world: every
+  // `chrome` access is behind a `hasChrome()` guard (see the file header).
+  const MAIN_WORLD_SAFE = new Set(['libs/core.js']);
   if (script.world === 'MAIN') {
     for (const file of script.js || []) {
-      if (!exists(file)) continue;
+      if (!exists(file) || MAIN_WORLD_SAFE.has(file)) continue;
       const source = read(file);
       const match = source.match(/chrome\s*\.\s*(runtime|storage|tabs|cookies|alarms|action)/);
       if (match) fail('MAIN-world script uses chrome.* API: ' + file + ' (' + match[0] + ')');
@@ -95,6 +98,28 @@ for (const file of jsFiles) {
   }
 }
 
+/* ---------------- 2b. relative import resolution ---------------- */
+for (const file of jsFiles) {
+  if (file.includes('.tmp/')) continue;
+  const source = read(file);
+  const specifiers = [];
+  for (const match of source.matchAll(/(?:import|export)[^'"\n]*from\s*['"]([^'"]+)['"]/g)) specifiers.push(match[1]);
+  for (const match of source.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)) specifiers.push(match[1]);
+  for (const match of source.matchAll(/import\(\s*['"]([^'"]+)['"]\s*\)/g)) specifiers.push(match[1]);
+  for (const specifier of specifiers) {
+    if (!specifier.startsWith('.')) continue;
+    const target = resolve(dirname(join(ROOT, file)), specifier);
+    const candidate = exists(specifier) && specifier.startsWith('/') ? specifier : target;
+    let ok = false;
+    try {
+      ok = statSync(candidate).isFile();
+    } catch (e) {
+      ok = false;
+    }
+    if (!ok) fail(file + ' imports a missing module: ' + specifier);
+  }
+}
+
 /* ---------------- 3. DOM ids ---------------- */
 function checkHtml(htmlPath, scriptPaths) {
   const html = read(htmlPath);
@@ -120,7 +145,6 @@ checkHtml('ui/options.html', ['ui/options.js', ...allFiles.filter((f) => f.start
 checkHtml('ui/popup.html', ['ui/popup.js']);
 
 /* ---------------- 4. content-script load order ---------------- */
-const LIB_PREFIX = 'libs/';
 for (const script of manifest.content_scripts || []) {
   const files = script.js || [];
   files.forEach((file, index) => {

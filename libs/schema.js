@@ -275,21 +275,17 @@
         return normalize(raw);
     }
 
-    /** Persist a partial (or full) settings object. Returns the normalized result. */
+    /**
+     * Persist a partial (or full) settings object. Returns the normalized result.
+     *
+     * Writes every persisted key in one `storage.set` call: one write operation
+     * against the sync quota, and it guarantees `aioSchemaVersion` is recorded.
+     */
     async function save(patch) {
         const c = core();
         const current = await load();
-        const merged = Object.assign({}, current, patch || {});
-        const settings = normalize(merged);
-        if (c) {
-            await c.storage.setSync(toStorage(settings));
-            if ((patch || {}).aioSchemaVersion === undefined) {
-                // schema version is part of DEFAULTS; make sure it is recorded
-                if (merged.aioSchemaVersion !== SCHEMA_VERSION) {
-                    await c.storage.setSync({ aioSchemaVersion: SCHEMA_VERSION });
-                }
-            }
-        }
+        const settings = normalize(Object.assign({}, current, patch || {}));
+        if (c) await c.storage.setSync(toStorage(settings));
         return settings;
     }
 
