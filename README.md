@@ -27,8 +27,10 @@
 
 ```bash
 npm run verify   # 静态检查 + 单元测试（零依赖，仅需 Node ≥ 20）
-npm run smoke    # 用本机 Chromium 真正加载扩展，采集后台/页面运行时错误
-npm run check    # 只跑静态检查
+npm run smoke      # 用本机 Chromium 真正加载扩展，采集后台/页面运行时错误
+npm run regression # 行为回归：标签切换 / 倍速开关 / 快捷键映射（10 项断言）
+npm run verify:all # 以上全部
+npm run check      # 只跑静态检查
 npm test         # 只跑单元测试
 npm run bump     # 更新 manifest.json / package.json 版本号
 ```

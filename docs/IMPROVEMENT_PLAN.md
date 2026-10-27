@@ -16,7 +16,7 @@
 |------|--------|--------|
 | 测试 | 0 用例 | 49 个 `node:test` 用例（含后台模块图启动测试） |
 | 静态检查 | 无 | `tools/check.mjs`：语法 / import 解析 / DOM id / MAIN 世界越界 / 密钥扫描 |
-| 真机验证 | 手工 | `tools/smoke.mjs`：Chromium + CDP 加载扩展，采集 SW 与页面异常 |
+| 真机验证 | 手工 | `tools/smoke.mjs`（异常采集）+ `tools/regression.mjs`（10 项行为断言） |
 | 后台消息监听 | 7 个 `onMessage` 各自猜归属 | 1 个路由 + 显式 handler 注册表 |
 | 配置真相源 | 散落 10+ 文件，默认值各不相同 | `libs/schema.js` 单点，含旧数据迁移 |
 | 权限 | 9 个（3 个从未使用） | 6 个，全部有代码对应 |
@@ -90,7 +90,7 @@ Chrome 只会打一行 "An unknown error occurred when fetching the script." 然
 | 位置 | 问题 | 处理 |
 |------|------|------|
 | `content/speeder_inject.js` | 每个页面无条件起 200ms 定时器 | 仅在锁速时启动，无视频 10 秒后自停 |
-| `content/hotkey_inject.js` | 即使没有任何映射也重写 `addEventListener` | 无配置时**完全不 patch** |
+| `content/hotkey_inject.js` | 即使没有任何映射也对每个键盘事件做完整处理 | document_start 一次性 patch + 每事件一次布尔短路（不分配 Proxy） |
 | `content/hotkey_inject.js` | `once`/`AbortSignal`/`EventListener` 对象漏处理 | 已补齐 |
 | `background/hud/index.js` | 轮播用 `chrome.alarms` 最小 30s，但选项提供 2s/3s/5s | 改为定时器驱动 + alarm 保活 |
 | `background/hud/index.js` | 任意设置变化都重建 alarm 并立刻全量抓取 | 配置指纹比对 + 抓取串行化 |
@@ -186,9 +186,15 @@ MV3 的 content script **不能**用 ES module，而 service worker / 扩展页 
 ### 验收口径
 
 ```bash
-npm run verify   # 静态检查 + 49 个单测
-npm run smoke    # Chromium 真机：SW 0 异常、options/popup 0 异常、页面可交互
+npm run verify      # 静态检查 + 49 个单测
+npm run smoke       # Chromium 真机：SW 0 异常、options/popup 0 异常、页面可交互
+npm run regression  # 10 项行为断言（标签切换 / 倍速开关 / 快捷键映射）
 ```
+
+`regression` 覆盖最容易回归的三条路径：
+1. 右键+滚轮 → 浮层出现、行数=标签数、松开即关闭；
+2. 关闭倍速 → 页面自己的 1.75x 不再被改写且 UI 移除；再开启 → 重新锁定；
+3. 配置 F→H 后：按 H 页面收到 `f`，按 F 被吞掉。
 
 `smoke` 的关键断言（改造后应稳定通过）：
 

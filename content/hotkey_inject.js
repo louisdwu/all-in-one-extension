@@ -5,9 +5,12 @@
  * We cannot re-bind the site's own handlers, so we intercept the events they
  * receive: pressing H is delivered as F, pressing F is swallowed.
  *
- * Performance contract (the old version got this wrong): NOTHING is patched
- * until a mapping actually exists. Pages therefore pay zero cost by default,
- * and turning the feature off at runtime restores pass-through behaviour.
+ * Performance contract: the two prototype methods are patched once at
+ * document_start (O(1), no per-event work), because a site registers its own
+ * keydown listeners during page load — patching later would miss them. When no
+ * mapping is configured, `processEvent` short-circuits on a single boolean and
+ * allocates nothing (no Proxy, no event clone). Disabling the feature at runtime
+ * also short-circuits, so the page behaves exactly as stock.
  */
 (function () {
     'use strict';
@@ -21,6 +24,7 @@
     let config = { enabled: false, mappings: {} };
     /** reverse: pressed new key → original key to emulate */
     let reverse = {};
+    let hasMappings = false;
     let installed = false;
     const wrappers = new WeakMap(); // listener → Map<key, wrappedListener>
 
@@ -107,7 +111,8 @@
 
     /** @returns {{event: Event, blocked: boolean}} */
     function processEvent(event) {
-        if (!config.enabled || !Object.keys(config.mappings).length) return { event, blocked: false };
+        // Fast path: one boolean check, no allocation.
+        if (!config.enabled || !hasMappings) return { event, blocked: false };
         if (isEditable(event.target)) return { event, blocked: false };
 
         const identifier = identifierFor(event);
@@ -183,7 +188,7 @@
         config = { enabled: !!next.enabled, mappings: next.mappings || {} };
         reverse = {};
         for (const [from, to] of Object.entries(config.mappings)) reverse[to] = from;
-        if (config.enabled && Object.keys(config.mappings).length) install();
+        hasMappings = Object.keys(config.mappings).length > 0;
     }
 
     function readAttribute() {
@@ -194,6 +199,8 @@
         } catch (err) { /* malformed payload: keep the previous config */ }
     }
 
+    // Patch immediately: the site's own listeners are registered right after us.
+    install();
     readAttribute();
     const observer = new MutationObserver(() => readAttribute());
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-aio-hotkeys'] });

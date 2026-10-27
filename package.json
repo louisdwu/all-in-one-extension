@@ -1,6 +1,6 @@
 {
     "name": "all-in-one-extension",
-    "version": "1.2026.1028.0113",
+    "version": "1.2026.1028.0116",
     "private": true,
     "description": "Multi-purpose Chrome MV3 extension (tabs switcher, video speeder, incognito opener, hotkey remapper, HUD monitor, bilibili enhancer). No build step.",
     "type": "module",
@@ -11,7 +11,9 @@
         "test": "node --test --test-force-exit tests/*.test.js",
         "check": "node tools/check.mjs",
         "smoke": "node tools/smoke.mjs",
+        "regression": "node tools/regression.mjs",
         "verify": "node tools/check.mjs && node --test --test-force-exit tests/*.test.js",
+        "verify:all": "node tools/check.mjs && node --test --test-force-exit tests/*.test.js && node tools/smoke.mjs && node tools/regression.mjs",
         "bump": "node tools/bump-version.mjs"
     }
 }
