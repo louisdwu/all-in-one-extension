@@ -1,126 +1,156 @@
 # AGENTS — All in One Extension (AIO)
 
-> 本文件是本仓库的**唯一开发规则真相源**。DSH (GLM) 与 Google Antigravity CLI 均会自动读取它。任何 AI 助手在此项目工作前**必须先读全文**。
+> 本文件是本仓库的**唯一开发规则真相源**。任何 AI 助手在此项目工作前**必须先读全文**。
 
 ---
 
 ## 1. 版本号管理（强制）
 
-每次修改项目中的任何源代码（`.js` / `.css` / `.html` / `.json` / `.md`）后，**必须**同步更新 `manifest.json` 中的 `version` 字段，否则视为未完成。
+每次修改项目中的任何源代码（`.js` / `.css` / `.html` / `.json` / `.md`）后，**必须**更新
+`manifest.json` 的 `version` 字段，否则视为未完成。
+
+**用工具改，不要手改：**
+
+```bash
+npm run bump          # 同时更新 manifest.json 与 package.json
+```
 
 ### 格式
 
-`${major}.${YYYY}.${MMDD}.${HHMM}`（Asia/Shanghai 时区）
+`1.YYYY.MMDD.HHMM`（Asia/Shanghai 时区）
 
-- `major`：保持 `1`
-- `YYYY`：四位年份
-- `MMDD`：两位月 + 两位日（如 `1022`）
-- `HHMM`：两位时 + 两位分（如 `1030`）
-
-> 注意：Chrome 把 version 各段当整数解析，会剥离前导零（`1.2026.0612.2031` 显示为 `1.2026.612.2031`），属正常行为，写入时仍按四位零填充。
-
-### 示例
-
-当前时间 2026-10-22 10:30 → 新版本号 `1.2026.1022.1030`。
+- `major`：当前为 `1`
+- Chrome 显示时会剥掉前导零（`1.2026.612.2031`），属正常，写入仍按四位补零。
 
 ---
 
-## 2. 开发流程
+## 2. 开发流程（强制）
 
-- **无需构建**：原生 Chrome MV3 扩展，改完代码后在 `chrome://extensions` 点「刷新」即生效。
-- **即时验证**：AI 改完代码 + 版本号后，用户即可刷新加载，无需编译。
+```bash
+npm run verify   # 静态检查 + 单测，提交前必须全绿
+npm run smoke    # 涉及后台/内容脚本/UI 的改动，必须跑一次（本机 Chromium）
+npm run bump     # 版本号
+```
+
+- **无需构建**：原生 MV3，改完在 `chrome://extensions` 点刷新。
+- **不要引入打包器**：共享代码通过 `globalThis.AIO` 复用（原因见 `docs/ARCHITECTURE.md` §2）。
+- 内容脚本改动后，需要刷新目标网页才生效。
+- 新增/修改源码文件后，确认 `npm run check` 仍然通过（校验 manifest 引用、import 解析、DOM id、权限使用、密钥）。
 
 ---
 
 ## 3. 架构地图
 
 ```
-manifest.json              MV3 清单，声明权限/脚本注入/commands
-background/                Service Worker（后台逻辑，ISOLATED 世界）
-├─ background.js           入口，importScripts 汇聚所有后台模块
-├─ aio_tabs.js             标签切换：onMessage getTabs/switchToTab
-├─ ezincognito.js          无痕打开：URL 净化 + openIncognito
-├─ hotkey_changer.js       快捷键映射：存储 + 标签内通知
-├─ smart_speeder.js        倍速：commands 监听 + 设置读写 + 标签广播
-├─ bilibili_subtitles.js   字幕设置读写
-├─ bilibili_1080p.js       无痕 1080P：cookie 同步到所有 store
-└─ hud/                    HUD 监控：alarms 轮询 WAQI/HA，渲染到扩展图标
-content/                   Content Scripts（注入网页）
-├─ aio_tabs.js            右键+滚轮标签切换 UI（ISOLATED）
-├─ ezincognito.js         修饰键+点击 → 无痕打开（ISOLATED）
-├─ hotkey_changer.js      按键映射拦截（ISOLATED）
-├─ hotkey_inject.js       按键注入（MAIN 世界，all_frames）
-├─ smart_speeder.js       倍速主逻辑（ISOLATED，document_end）
-├─ speeder_inject.js      速度控制注入（MAIN 世界）
-├─ modules/speeder_*.js   浮球/菜单/样式
-├─ bilibili_subtitles.js  B站字幕增强
-├─ bilibili_1080p.js      免登录 1080P
-└─ bilibili_1080p_inject.js  1080P 注入（MAIN 世界）
-ui/                        扩展自身页面
-├─ options.html / .js / .css   统一设置页（模块化 ES Modules）
-├─ popup.html / .js            弹窗
-└─ modules/                    各功能设置面板（dashboard/bilibili/...）
-libs/                      共享库
-├─ config_bridge.js       ★ 存储与消息的统一桥接 API
-├─ utils.js               escapeHtml / showStatus / debounce
-├── aqi_converter.js      AQI 数值转换
-└─ protobuf.min.js        第三方库（-text，不 diff）
-docs/                     功能文档与示例配置
+manifest.json               MV3 清单（background: module worker）
+package.json                零依赖脚本：verify / test / check / smoke / bump
+libs/                       ★ 共享层（无 import/export，挂 globalThis.AIO，Node 可 import）
+├─ core.js                  日志/存储/消息/定时/DOM/Shadow DOM/环境
+├─ schema.js                默认值 + 归一化 + 迁移 + load/save/subscribe
+├─ keys.js                  快捷键序列化/解析/匹配
+├─ rules.js                 include/exclude 正则匹配（缓存 + 兜底）
+├─ aqi.js                   IAQI → 浓度（HJ 633-2012）
+├─ md5.js / wbi.js          B站 WBI 签名
+└─ bili.js                  URL 净化 / 视频页判定
+background/
+├─ index.js                 组装入口（显式顺序）
+├─ router.js                唯一 onMessage 路由 + handle() + broadcast()
+└─ features/                tabs / incognito / hotkeys / speeder / bilibili /
+                            commands / lifecycle / hud/*
+content/
+├─ lib/content.js           内容脚本运行时（缓存配置 + toast + 顶层帧判定）
+├─ aio_tabs.js              右键+滚轮标签切换（Shadow DOM UI）
+├─ ezincognito.js           修饰键+点击 → 无痕打开
+├─ hotkey_gate.js           ISOLATED：把映射写入 data-aio-hotkeys 属性
+├─ hotkey_inject.js         MAIN：按需 patch addEventListener
+├─ speeder.js               ISOLATED：倍速控制 + Shadow DOM 悬浮球/面板
+├─ speeder_inject.js        MAIN：锁速（prototype + 播放器内核）
+└─ bilibili/
+   ├─ guard.js              ISOLATED：弹窗屏蔽 + 配置发布 + 无痕标记
+   ├─ ui.js                 ISOLATED：字幕自动开启 + 字幕热键
+   └─ inject.js             MAIN：未登录 1080P / 评论区 / WBI 重签
+ui/                         options（hash 路由/深色/诊断）+ popup（ES module）
+tests/                      node:test
+tools/                      check.mjs / smoke.mjs / bump-version.mjs
+docs/                       ARCHITECTURE / PERMISSIONS / IMPROVEMENT_PLAN
 ```
 
 ---
 
-## 4. 消息与存储约定（★ 重点）
+## 4. 共享层约束（★ 容易踩）
 
-### 4.1 ConfigBridge 桥接 API（`libs/config_bridge.js`）
+`libs/*.js` 同时被 content script（经典脚本）、module service worker、扩展页、Node 单测加载，因此：
 
-所有 UI/content 与后台通信**必须**走 ConfigBridge，禁止散落裸 `chrome.runtime.sendMessage`（除非回调式场景已加 `lastError` 检查）。
-
-| 方法 | 用途 | 何时用 |
-|------|------|--------|
-| `ConfigBridge.get(keys)` | 读 sync 存储 | 取配置 |
-| `ConfigBridge.set(items)` | 写 sync 存储 | 存配置 |
-| `ConfigBridge.sendMessage(msg)` | 发消息**且等响应** | 需要后台返回数据（getSpeederSettings 等）。回调内已检查 `runtime.lastError`，出错时 resolve(null) |
-| `ConfigBridge.send(msg)` | 发消息**不等响应** | 纯通知（reloadSettings / UPDATE_CONFIG / UPDATE_HUD_CONFIG）。不传回调，不持有端口 |
-
-### 4.2 runtime.lastError 防御
-
-- **回调式** `chrome.runtime.sendMessage(msg, cb)`：cb 第一行必须 `if (chrome.runtime.lastError) return;`
-- **Promise 式**（经 ConfigBridge）：已在 bridge 内处理，调用方拿 null 即可
-- **裸调用**：禁止；如必须，参照上述防御
-
-> 历史教训：曾因 `sendMessage` 回调未检查 lastError，导致 `Unchecked runtime.lastError: The message port closed before a response was received` 控制台报错。
-
-### 4.3 后台 onMessage 监听
-
-后台每个 `chrome.runtime.onMessage.addListener` 对收到的消息：
-- 需异步响应 → `return true` 并在异步完成时调 `sendResponse`
-- 同步响应 → 直接 `sendResponse` 后 `return false`
-- **不认识的 action** → 必须 `return false`（或 undefined），不要静默吞掉导致端口悬挂
-
-### 4.4 存储
-
-| 区域 | 用途 | 示例键 |
-|------|------|--------|
-| `chrome.storage.sync` | 用户配置（跨设备同步） | `aioTabsEnabled`, `hudEnabled`, `hotkeyMappings`, `biliCookies` |
-| `chrome.storage.local` | 运行态/缓存 | `hudState`, `hudQueueKeys`, `hudLastSuccessWaqi` |
+1. **禁止 `import` / `export`** —— content script 只能是经典脚本。
+2. **禁止顶层访问 `chrome`** —— 否则 Node 单测无法 import；需要时用 `hasChrome()` 包一层。
+3. **必须幂等**：`if (AIO.xxx) return;`（同一文件可能进多个 content bundle）。
+4. **不要新增全局名**：只挂 `globalThis.AIO.<领域>`。
+5. 纯逻辑（可单测的）放 `libs/`，带 DOM/chrome 副作用的放 `content/` 或 `background/`。
 
 ---
 
-## 5. 世界隔离（Content Scripts）
+## 5. 消息与存储约定
 
-manifest 中部分脚本声明 `"world": "MAIN"`，直接运行在网页主世界，可操作页面原生对象（如 `HTMLVideoElement.playbackRate`）。
-- MAIN 世界脚本**无法**直接调 `chrome.runtime.*`，需经 `window.postMessage` 与 ISOLATED 世界通信。
-- ISOLATED 世界脚本可调 Chrome API，但访问不到页面 JS 变量。
+### 5.1 消息
 
-改 content 脚本时先确认它属于哪个世界，通信方式不同。
+- 后台**只有一个** `chrome.runtime.onMessage` 监听（`background/router.js`），
+  新功能在 `features/*` 里 `handle('domain:action', handler)`。
+- 消息类型用 `域:动作`（`speeder:getSettings`、`bili:captureCookies`）。
+- handler 可为 async；成功返回 `{ ok: true, ... }`，失败抛错即可（路由统一转 `{ ok:false, error }`）。
+- 页面侧收发一律走 `AIO.core.sendMessage / post / onMessage`（已处理 `lastError` 与超时）。
+- 未注册的类型必须 `return false`，不要吞掉消息让端口悬挂。
+
+### 5.2 存储
+
+- **读写只走 `AIO.schema`**：`load()` / `save(patch)` / `subscribe(cb)`。
+  不要直接 `chrome.storage.sync.get({someDefault: ...})`——默认值散落正是历史 bug 来源。
+- 新增配置项：先加到 `libs/schema.js` 的 `DEFAULTS` + `normalize()`，再改 UI。
+- 保留扁平旧键名（用户已有数据 + sync 配额）；需要改名时在 `migrate()` 里做一次性迁移。
+- 高频写入用 `AIO.core.storage.createWriter(area, ms)` 合并，避免 sync 写入配额（120 次/分钟）。
+- `sync` 放配置，`local` 放运行态（HUD 状态、缓存）。
+
+### 5.3 跨世界通信
+
+用 **DOM 属性**（`data-aio-*`），不要用 `CustomEvent.detail`（跨世界拿不到），
+不要注入内联 `<script>`（受页面 CSP 限制）。约定见 `docs/ARCHITECTURE.md` §1。
 
 ---
 
-## 6. 编码规范
+## 6. 世界隔离
 
-- JS：ES2020+，ES Module（`import/export`），4 空格缩进
-- 中文注释与 UI 文案为主，代码标识符用英文
-- 防 XSS：渲染用户/存储数据到 HTML 前用 `libs/utils.js` 的 `escapeHtml()`
-- 行尾 LF（`.gitattributes` 已强制）
+- `world: "MAIN"` 的脚本**没有** `chrome.*`（`tools/check.mjs` 会拦截，`libs/core.js` 例外：
+  它每处 `chrome` 访问都在 `hasChrome()` 之后）。
+- MAIN 世界可以改页面原型，但**禁止**全局劫持平台级 API（`Object.defineProperty`、
+  `window.setTimeout`）；`window.fetch` / `XMLHttpRequest` 的补丁必须保持原语义
+  （保留 `Response.url/type`、不修改调用方参数）。历史教训见 `docs/IMPROVEMENT_PLAN.md` §2.5。
+- ISOLATED 世界可以读 `chrome.storage`，但看不到页面 JS 变量。
 
+---
+
+## 7. 性能红线
+
+- **禁止**在 `MutationObserver` 回调里写会再次触发该观察器的 DOM（`textContent` 也算）——
+  这正是"页面卡死"历史 bug 的成因。UI 一律放 Shadow DOM，观察器只做扫描。
+- 全站注入的脚本默认**零开销**：功能关闭时不注册监听；定时器按需启动、空闲自停。
+- 避免高频全量查询（`querySelectorAll('video')`），用 rAF/防抖合并。
+
+---
+
+## 8. 编码规范
+
+- JS：ES2020+，4 空格缩进；扩展页与后台用 ES module，content script 用 IIFE + `globalThis.AIO`。
+- **禁止 `console.log`**：用 `AIO.core.log('tag').debug/info/warn/error`（默认只输出 warn 以上，
+  设置页「关于与诊断」可开调试日志）。
+- 中文注释与 UI 文案；标识符英文。
+- 渲染用户数据到 HTML 前用 `AIO.dom.escapeHtml()` 或 `textContent`。
+- 不要静默 `catch {}`：要么记 `debug` 日志，要么在注释说明为何可忽略。
+- 行尾 LF（`.gitattributes` 已强制）。
+
+---
+
+## 9. 测试要求
+
+- 纯逻辑改动：在 `tests/` 加或改用例（`node:test` + `node:assert/strict`）。
+- 后台/内容脚本/UI 改动：跑 `npm run smoke`，确认后台 0 异常、设置页与弹窗 0 异常、
+  测试页面可交互且倍速被接管。
+- 新增 `manifest` 资源/权限：`tests/manifest.test.js` 会自动校验文件存在与权限被使用。

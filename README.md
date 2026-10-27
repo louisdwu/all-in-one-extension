@@ -1,86 +1,70 @@
 # All in One Extension (AIO)
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
-![Chrome](https://img.shields.io/badge/browser-Chrome-orange.svg)
-![Manifest](https://img.shields.io/badge/manifest-v3-green.svg)
+多合一 Chrome 增强扩展（Manifest V3，**零构建**：改完代码在 `chrome://extensions` 点刷新即可）。
 
-**All in One Extension (AIO)** 是一款功能强大的多合一 Chrome 浏览器增强插件，集成了视频调速、标签快速切换、无痕开启链接以及 Home Assistant 状态监控等多项实用工具，旨在提升您的浏览效率。
+> 版本号规则：`1.YYYY.MMDD.HHMM`（Asia/Shanghai），由 `npm run bump` 自动写入。
 
 ---
 
-## 🚀 核心功能特性
+## 功能
 
-### 1. 🎬 Smart Speeder (视频调速器)
-为网页中的所有 `<video>` 元素提供精准的速度控制。
-- **快捷键控制**：
-  - `Ctrl + Shift + →`：提高播放速度
-  - `Ctrl + Shift + ←`：降低播放速度
-  - `Ctrl + Shift + Space`：在预设倍数（默认 2.0x）与正常速度之间快速切换
-- **悬浮菜单**：页面右下角设有半透明浮标，点击可展开完整的控制面板。
-- **智能规则**：支持通过正则表达式设置排除或仅包含的域名。
+| 模块 | 说明 |
+|------|------|
+| 🖱️ 标签页切换 | 按住鼠标右键 + 滚轮呼出标签列表，滚轮切换、松开确认、Esc 取消 |
+| 🕵️ 无痕按键 | 修饰键 + 左键点击链接 → 无痕窗口打开，并自动清理 `utm_*`/`spm_id_from` 等跟踪参数 |
+| 🎬 视频倍速 | 接管页面 `<video>` 倍速（含对抗站点重置），悬浮球 + 页面内快捷键 + 站点规则 |
+| 🎹 快捷键映射 | 按站点把某个按键的行为迁移到另一个键（例如 F → H） |
+| 📺 B站增强 | 自动中文字幕、字幕热键、未登录 1080P、评论区加载、AI 字幕解锁、播完暂停 |
+| 🖥️ HUD 监控 | 在扩展图标上轮播 WAQI 空气质量与 Home Assistant 实体数值，支持阈值变色 |
 
-### 2. 📑 Tab Switcher (标签切换器)
-模仿系统级的窗口切换体验，无需在顶栏费力寻找标签。
-- **操作方式**：**按住鼠标右键**并**滚动滚轮**。
-- **核心体验**：在页面中心弹出一个模糊背景的标签列表，当前选中的标签会高亮显示，松开右键即刻跳转。
+## 安装
 
-### 3. 🕶️ EZ Incognito (极速无痕)
-一键在无痕窗口（Incognito Mode）中打开特定链接。
-- **操作方式**：按住修饰键（默认为 `Ctrl`）并**点击链接**。
-- **自定义**：可在设置中根据习惯更换修饰键。
+1. 打开 `chrome://extensions`，开启右上角 **开发者模式**。
+2. **加载已解压的扩展程序** → 选择本仓库根目录。
+3. （可选）扩展详情里开启 **在无痕模式下启用**，无痕相关功能才可用。
 
-### 4. 🏠 Home Assistant Monitor (HA 监控)
-在浏览器工具栏（Action Button）直接查看智能家居状态。
-- **实时显示**：将 HA 中指定的实体数值（如电量、温度、功率）渲染到插件图标上。
-- **多实体轮控**：支持添加多个实体，插件会自动轮播显示各传感器状态。
-- **配置同步**：仅需配置一次 API Token 和 URL。
+## 开发
 
-### 5. 📺 Bilibili Subtitles (B站字幕增强)
-针对 Bilibili 视频播放器的深度定制。
-- **自动开启**：进入视频播放页自动打开中文字幕（优先官方，次选 AI 生成）。
-- **单按键切换**：支持通过快捷键（默认 `s`）一键切换字幕显隐。
-- **登录状态支持**：智能处理未登录时的字幕列表挂载。
+```bash
+npm run verify   # 静态检查 + 单元测试（零依赖，仅需 Node ≥ 20）
+npm run smoke    # 用本机 Chromium 真正加载扩展，采集后台/页面运行时错误
+npm run check    # 只跑静态检查
+npm test         # 只跑单元测试
+npm run bump     # 更新 manifest.json / package.json 版本号
+```
 
----
+- **无构建**：所有文件直接由浏览器加载；共享代码通过 `globalThis.AIO` 命名空间复用。
+- **改完即生效**：内容脚本需要刷新目标页面；后台与设置页改动在扩展刷新后生效。
+- 详细设计与决策记录见 [`docs/IMPROVEMENT_PLAN.md`](docs/IMPROVEMENT_PLAN.md)，
+  目录结构与消息契约见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
 
-## 🛠️ 安装说明
+## 权限与隐私
 
-由于本项目目前处于开发/私有部署阶段，请按照以下步骤手动安装：
+扩展只申请 6 项权限，全部有对应代码，逐条说明见 [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md)。
 
-1. 下载或克隆本仓库到本地。
-2. 打开 Chrome 浏览器，进入 `chrome://extensions/` 页面。
-3. 开启页面右上角的 **“开发者模式” (Developer mode)**。
-4. 点击左上角的 **“加载已解压的扩展程序” (Load unpacked)**。
-5. 选择本项目所在的根目录。
+- 不采集、不上传任何数据；配置只存在本机 `chrome.storage`。
+- 网络请求只发生在你自己配置的地址（WAQI、Home Assistant）与你访问的 bilibili 页面内。
 
----
+## 已知限制
 
-## ⚙️ 设置与配置
+- 只支持 Chromium 系浏览器（Chrome / Edge / Brave）。
+- `chrome://`、扩展商店、PDF 阅读器等页面无法注入内容脚本，相关功能不生效。
+- HUD 轮播间隔最小 3 秒（后台定时器），数据轮询间隔最小 30 秒（Chromium 对扩展定时器的限制）。
+- B站增强属于"未登录态行为修正"，页面结构变化时可能失效；检测到真实登录会自动让位。
 
-本项目拥有一个统一的**高级设置页面**，您可以通过以下方式进入：
-- 右键点击插件图标 -> “选项”。
-- 在插件 Popup 窗口中点击齿轮图标。
+## 目录
 
-**高级功能：**
-- **独立配置页**：各模块在设置中心拥有独立的操作面板。
-- **统一导出/导入**：支持将所有功能的配置（包括 B站字幕快捷键、HA 实体配置、视频名单等）导出为 JSON 文件，实现全量备份恢复。
-
----
-
-## 📝 开发与限制
-
-- **Manifest V3**：本项目基于 Chrome Extension Manifest V3 标准开发。
-- **隔离性**：UI 元素使用 Shadow DOM 技术，确保不会干扰原网页的样式。
-- **权限说明**：
-  - `tabs`: 获取标签信息用于切换。
-  - `storage`: 跨设备同步设置。
-  - `scripting`: 在视频页面注入调速逻辑。
-  - `alarms`: 定时更新 Home Assistant 数据。
+```
+manifest.json
+libs/          共享运行时（core/schema/keys/rules/aqi/md5/wbi/bili）
+background/    模块化 Service Worker（router + features/*）
+content/       内容脚本（含 Shadow DOM UI 与 MAIN 世界注入）
+ui/            设置页与弹窗
+tests/         node:test 单元测试
+tools/         check / smoke / bump-version
+docs/          架构、权限、改善方案
+```
 
 ---
 
-## 🤝 贡献与反馈
-
-如果您在使用过程中遇到任何问题或有新的功能建议，欢迎提交 Issue。
-
-*Designed with ❤️ for Productivity.*
+*Designed for Productivity.*
