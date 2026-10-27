@@ -2,94 +2,88 @@
 <html lang="zh-CN">
 
 <head>
-  <meta charset="UTF-8">
-  <title>All in One Extension</title>
-  <link rel="stylesheet" href="popup.css">
+    <meta charset="UTF-8">
+    <title>AIO</title>
+    <link rel="stylesheet" href="popup.css">
 </head>
 
 <body>
-  <div class="header" style="display: flex; justify-content: space-between; align-items: center;">
-    <span class="title">🌟 All in One Extension</span>
-    <span id="open-options-icon" style="cursor: pointer; font-size: 18px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));" title="综合设置">⚙️</span>
-  </div>
+    <header class="header">
+        <span class="title">🌟 All in One</span>
+        <button type="button" id="open-options" class="icon-btn" title="打开设置" aria-label="打开设置">⚙️</button>
+    </header>
 
-  <div class="dashboard">
-    <!-- HUD 监控 -->
-    <div class="card" id="card-hud">
-      <div class="card-title">🖥️ HUD 监控</div>
-      <div id="hud-list" class="ha-list">加载中...</div>
-    </div>
+    <main class="dashboard">
+        <section class="card" id="card-hud">
+            <div class="card-title">
+                <span>🖥️ HUD 监控</span>
+                <label class="toggle" title="HUD 总开关">
+                    <input type="checkbox" id="hud-toggle" aria-label="HUD 总开关">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div id="hud-list" class="hud-list">加载中…</div>
+        </section>
 
-    <!-- AIO Tabs 标签页切换 -->
-    <div class="card" id="card-aio-tabs">
-      <div class="card-title">
-        🗂️ 标签页切换
-        <label class="toggle" title="鼠标右键+滚轮切换标签页">
-          <input type="checkbox" id="aio-tabs-toggle">
-          <span class="slider"></span>
-        </label>
-      </div>
-      <div class="card-info" style="font-size: 12px; color: #999; margin-top: 4px;">
-        在页面任意处按住<span class="highlight">鼠标右键</span>并<span class="highlight">滚动轮</span>即可快速切换。
-      </div>
-    </div>
+        <section class="card">
+            <div class="card-title">
+                <span>🖱️ 标签页切换</span>
+                <label class="toggle" title="右键 + 滚轮切换标签页">
+                    <input type="checkbox" id="aio-tabs-toggle" aria-label="标签页切换">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <p class="hint">按住<strong>鼠标右键</strong>并<strong>滚动滚轮</strong>呼出标签列表。</p>
+        </section>
 
-    <!-- Smart Speeder 视频加速 -->
-    <div class="card" id="card-speeder">
-      <div class="card-title">
-        🎬 视频倍速
-        <label class="toggle" title="全局启用/禁用倍速插件">
-          <input type="checkbox" id="speeder-global-toggle">
-          <span class="slider"></span>
-        </label>
-      </div>
-      <div class="speeder-controls">
-        <div id="speeder-display" class="speed-value">1.00x</div>
-        <div class="btn-group">
-          <button id="speeder-decrease">- 降低 (0.25x)</button>
-          <button id="speeder-increase">+ 提高 (0.25x)</button>
-          <button id="speeder-preset" title="切换到预设速度">预设切换</button>
-        </div>
-      </div>
-    </div>
+        <section class="card">
+            <div class="card-title">
+                <span>🎬 视频倍速</span>
+                <label class="toggle" title="全局启用倍速">
+                    <input type="checkbox" id="speeder-toggle" aria-label="视频倍速">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="speed-row">
+                <span class="speed-value" id="speed-value">1.00x</span>
+                <span class="speed-state" id="speed-state">当前标签页</span>
+            </div>
+            <div class="btn-row">
+                <button type="button" id="speed-down">− 减速</button>
+                <button type="button" id="speed-up">+ 加速</button>
+                <button type="button" id="speed-preset" class="primary">预设</button>
+            </div>
+            <p class="hint" id="speed-hint"></p>
+        </section>
 
-    <!-- Hotkey Changer 页面快捷键重映射 -->
-    <div class="card" id="card-hotkey">
-      <div class="card-title">
-        🎹 快捷键映射
-        <label class="toggle" title="在此网站启用映射">
-          <input type="checkbox" id="hotkey-enable-toggle" checked>
-          <span class="slider"></span>
-        </label>
-      </div>
-      <div class="hotkey-info">
-        <span class="label">当前网站:</span>
-        <span id="hotkey-current-site" class="highlight">加载中...</span>
-      </div>
-      <div class="input-group">
-        <input type="text" id="hotkey-original" placeholder="点击后按原键" readonly>
-        <span class="arrow">→</span>
-        <input type="text" id="hotkey-new" placeholder="点击后按新键" readonly>
-      </div>
-      <div class="btn-group">
-        <button id="hotkey-add" class="primary">添加映射</button>
-        <button id="hotkey-clear-all" class="danger">清空本站</button>
-      </div>
-      <div id="hotkey-mappings-list" class="mappings-container"></div>
-    </div>
+        <section class="card">
+            <div class="card-title">
+                <span>🎹 本站快捷键映射</span>
+                <label class="toggle" title="在本站启用映射">
+                    <input type="checkbox" id="hotkey-toggle" aria-label="本站快捷键映射">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="site-row"><span id="hotkey-site">读取中…</span></div>
+            <div class="recorder">
+                <input type="text" id="hotkey-original" readonly placeholder="原键" aria-label="原按键">
+                <span class="arrow">→</span>
+                <input type="text" id="hotkey-new" readonly placeholder="新键" aria-label="新按键">
+            </div>
+            <div class="btn-row">
+                <button type="button" id="hotkey-add" class="primary">添加映射</button>
+                <button type="button" id="hotkey-clear" class="danger">清空本站</button>
+            </div>
+            <div id="hotkey-list" class="mapping-list"></div>
+        </section>
 
-    <!-- EZ Incognito 无痕快捷键 -->
-    <div class="card" id="card-ez">
-      <div class="card-title">🕵️ 无痕快捷键</div>
-      <div class="ez-info">
-        唤醒组合键: <span id="ez-current-key" class="highlight" style="margin: 0 4px;">...</span> + 鼠标左键
-      </div>
-    </div>
-  </div>
+        <section class="card">
+            <div class="card-title"><span>🕵️ 无痕按键</span></div>
+            <p class="hint">按住 <strong id="ez-key">Ctrl</strong> 并左键点击链接，即可在无痕窗口打开。</p>
+        </section>
+    </main>
 
-
-
-  <script src="popup.js"></script>
+    <script type="module" src="popup.js"></script>
 </body>
 
 </html>

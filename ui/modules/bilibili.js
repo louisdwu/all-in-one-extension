@@ -1,207 +1,88 @@
-import { ConfigBridge } from '../../libs/config_bridge.js';
-import { showStatus } from '../../libs/utils.js';
+/**
+ * Bilibili panel.
+ */
+import './shared.js';
+import { schema, core, toast } from './shared.js';
 
-export function initBilibiliSubtitles() {
-    const autoToggle = document.getElementById('bili-autoSubtitle');
+export async function initBilibili() {
+    const settings = await schema.load();
+
+    const set = (id, value) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.type === 'checkbox') el.checked = !!value;
+        else el.value = value;
+    };
+
+    set('bili-enabled', settings.biliEnabled);
+    set('bili-autoplay-enable', settings.biliAutoPlay);
+    set('bili-autoSubtitle', settings.biliAutoSubtitle);
+    set('bili-subtitleHotkey', settings.bilibiliSubtitles.subtitleHotkey);
+    set('bili-1080p-enable', settings.bilibili1080PEnabled);
+    set('bili-comments-enable', settings.biliCommentsEnabled);
+    set('bili-ai-subtitle-enable', settings.biliAISubtitleEnabled);
+    set('bili-playnext-disable', settings.biliPlayNextDisabled);
+    set('bili-sessdata', settings.biliCookies.sessdata);
+    set('bili-dede-userid', settings.biliCookies.dedeUserId);
+
+    const bind = (id, key, transform = (value) => value) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('change', async () => {
+            await schema.save({ [key]: transform(el.type === 'checkbox' ? el.checked : el.value) });
+        });
+    };
+
+    bind('bili-enabled', 'biliEnabled');
+    bind('bili-autoplay-enable', 'biliAutoPlay');
+    bind('bili-1080p-enable', 'bilibili1080PEnabled');
+    bind('bili-comments-enable', 'biliCommentsEnabled');
+    bind('bili-ai-subtitle-enable', 'biliAISubtitleEnabled');
+    bind('bili-playnext-disable', 'biliPlayNextDisabled');
+
+    // Subtitle switch has one canonical key; the schema keeps the legacy nested
+    // object in sync for older builds.
+    document.getElementById('bili-autoSubtitle')?.addEventListener('change', async (event) => {
+        await schema.save({ biliAutoSubtitle: event.target.checked });
+        toast(event.target.checked ? '已开启自动字幕' : '已关闭自动字幕');
+    });
+
+    // Single-key subtitle hotkey recorder.
     const hotkeyInput = document.getElementById('bili-subtitleHotkey');
-    const autoplayToggle = document.getElementById('bili-autoplay-enable');
-    const bypassToggle = document.getElementById('bili-1080p-enable');
-    const commentToggle = document.getElementById('bili-comments-enable');
-    const aiSubToggle = document.getElementById('bili-ai-subtitle-enable');
-    const playnextToggle = document.getElementById('bili-playnext-disable');
-    const sessdataInput = document.getElementById('bili-sessdata');
-    const dedeUserIdInput = document.getElementById('bili-dede-userid');
-    const fetchCookiesBtn = document.getElementById('bili-fetch-cookies');
-    if (!autoToggle) return;
-
-    let config = { autoEnableSubtitle: true, subtitleHotkey: 's' };
-
-    function load() {
-        ConfigBridge.getBilibiliSettings().then((res) => {
-            if (res && res.bilibiliSubtitles) {
-                config = res.bilibiliSubtitles;
-            }
-            autoToggle.checked = config.autoEnableSubtitle;
-            hotkeyInput.value = config.subtitleHotkey;
-        });
-
-        ConfigBridge.get(['biliAutoPlay', 'bilibili1080PEnabled', 'biliCommentsEnabled', 'biliAISubtitleEnabled', 'biliCookies', 'biliPlayNextDisabled']).then((res) => {
-            if (autoplayToggle) autoplayToggle.checked = !!res.biliAutoPlay;
-            if (bypassToggle) bypassToggle.checked = res.bilibili1080PEnabled !== false;
-            if (commentToggle) commentToggle.checked = res.biliCommentsEnabled !== false;
-            if (aiSubToggle) aiSubToggle.checked = res.biliAISubtitleEnabled !== false;
-            if (playnextToggle) playnextToggle.checked = !!res.biliPlayNextDisabled;
-            if (res.biliCookies) {
-                if (sessdataInput) sessdataInput.value = res.biliCookies.sessdata || '';
-                if (dedeUserIdInput) dedeUserIdInput.value = res.biliCookies.dedeUserId || '';
-            }
-        });
-    }
-
-    // 统一保存逻辑（除了快捷键和字幕开关，因为它们有独立逻辑，或者也可以统一）
-    function saveAll(silent = false) {
-        const cookies = {
-            sessdata: sessdataInput ? sessdataInput.value.trim() : '',
-            dedeUserId: dedeUserIdInput ? dedeUserIdInput.value.trim() : ''
-        };
-
-        const update = {
-            biliAutoPlay: autoplayToggle ? autoplayToggle.checked : false,
-            bilibili1080PEnabled: bypassToggle ? bypassToggle.checked : true,
-            biliCommentsEnabled: commentToggle ? commentToggle.checked : true,
-            biliAISubtitleEnabled: aiSubToggle ? aiSubToggle.checked : true,
-            biliPlayNextDisabled: playnextToggle ? playnextToggle.checked : false,
-            biliCookies: cookies,
-            biliAutoSubtitle: autoToggle ? autoToggle.checked : true // 同步字幕开关到顶层
-        };
-
-        return ConfigBridge.set(update).then(() => {
-            // 同步种 cookie 到 bilibili.com，供 MAIN 世界脚本同步读取
-            // 无痕窗口在创建时会继承普通模式的 cookie，因此此 cookie 在无痕中也可用
-            if (chrome.cookies) {
-                chrome.cookies.set({
-                    url: 'https://www.bilibili.com',
-                    name: 'aio_pnd',
-                    value: playnextToggle && playnextToggle.checked ? '1' : '0',
-                    domain: '.bilibili.com',
-                    path: '/',
-                    expirationDate: Math.floor(Date.now() / 1000) + 365 * 86400,
-                    sameSite: 'lax'
-                });
-            }
-            // 同时保存字幕专用对象
-            if (autoToggle) {
-                config.autoEnableSubtitle = autoToggle.checked;
-            }
-            return ConfigBridge.saveBilibiliSettings(config).then(() => {
-                if (!silent) {
-                    showStatus('B站所有设置已保存');
-                }
-                ConfigBridge.send({ action: 'reloadSettings' });
-            });
-        });
-    }
-
-    // 绑定自动保存事件
-    autoToggle?.addEventListener('change', () => saveAll(true));
-    autoplayToggle?.addEventListener('change', () => saveAll(true));
-    bypassToggle?.addEventListener('change', () => saveAll(true));
-    commentToggle?.addEventListener('change', () => saveAll(true));
-    aiSubToggle?.addEventListener('change', () => saveAll(true));
-    playnextToggle?.addEventListener('change', () => saveAll(true));
-    sessdataInput?.addEventListener('change', () => saveAll(true));
-    dedeUserIdInput?.addEventListener('change', () => saveAll(true));
-
-    // 自动获取 Cookie 逻辑
-    fetchCookiesBtn?.addEventListener('click', async () => {
-        console.log('[AIO] 开始获取 B 站 Cookie...');
-        const domains = ['.bilibili.com', 'www.bilibili.com'];
-        let sessdata = '';
-        let dedeUserId = '';
-        let fromIncognito = false;
-
-        try {
-            // 获取所有 Cookie Stores
-            const stores = await chrome.cookies.getAllCookieStores();
-            console.log('[AIO] 发现 Cookie Stores:', stores);
-            
-            // 查找无痕 Store (incognito: true)
-            const incognitoStore = stores.find(s => s.incognito);
-            
-            // 定义查找函数
-            const findInStore = async (storeId) => {
-                let s = '', d = '';
-                // 优先使用 URL 查询，这在权限匹配上更可靠
-                const url = 'https://www.bilibili.com';
-                const params = { url };
-                if (storeId) params.storeId = storeId;
-                
-                console.log(`[AIO] 正在查询 Store [${storeId || 'default'}]，目标 URL: ${url}`);
-                const cookies = await chrome.cookies.getAll(params);
-                console.log(`[AIO] Store [${storeId || 'default'}] 返回了 ${cookies.length} 个 Cookie`);
-                
-                cookies.forEach(c => {
-                    if (c.name === 'SESSDATA') s = c.value;
-                    if (c.name === 'DedeUserID') d = c.value;
-                });
-
-                // 如果按 URL 没找到，再按 Domain 兜底
-                if (!s || !d) {
-                    for (const domain of domains) {
-                        const dParams = { domain };
-                        if (storeId) dParams.storeId = storeId;
-                        const dCookies = await chrome.cookies.getAll(dParams);
-                        dCookies.forEach(c => {
-                            if (c.name === 'SESSDATA' && !s) s = c.value;
-                            if (c.name === 'DedeUserID' && !d) d = c.value;
-                        });
-                    }
-                }
-                return { sessdata: s, dedeUserId: d };
-            };
-
-            // 1. 优先尝试无痕模式（用户明确需求）
-            if (incognitoStore) {
-                console.log('[AIO] 检测到无痕 Store:', incognitoStore.id);
-                const res = await findInStore(incognitoStore.id);
-                if (res.sessdata || res.dedeUserId) {
-                    sessdata = res.sessdata;
-                    dedeUserId = res.dedeUserId;
-                    fromIncognito = true;
-                }
-            } else {
-                console.warn('[AIO] 未发现无痕 Store。请确认：1. 已开启“在无痕模式下启用” 2. 当前已打开至少一个无痕窗口');
-            }
-
-            // 2. 如果无痕没找到或不存在，再尝试常规模式
-            if (!sessdata && !dedeUserId) {
-                console.log('[AIO] 尝试从常规窗口获取...');
-                const res = await findInStore(); 
-                sessdata = res.sessdata;
-                dedeUserId = res.dedeUserId;
-            }
-
-            if (sessdata || dedeUserId) {
-                const isSame = sessdataInput.value === sessdata && dedeUserIdInput.value === dedeUserId;
-                const sourceText = fromIncognito ? ' (来自无痕窗口)' : ' (来自常规窗口)';
-                
-                if (isSame) {
-                    showStatus(`获取到的信息与当前一致，无需更新${sourceText}`);
-                } else {
-                    if (sessdataInput) sessdataInput.value = sessdata;
-                    if (dedeUserIdInput) dedeUserIdInput.value = dedeUserId;
-                    saveAll(true).then(() => {
-                        showStatus(`已成功获取最新信息并自动保存${sourceText}`);
-                    });
-                }
-            } else {
-                let errorMsg = '未能获取到 B 站 Cookie。';
-                if (!incognitoStore) {
-                    errorMsg += '检测到无痕环境未就绪（请确保已在扩展管理中勾选“在无痕模式下启用”并打开了无痕窗口）。';
-                } else {
-                    errorMsg += '请确保已在浏览器中登录 B 站。';
-                }
-                showStatus(errorMsg, 'error');
-            }
-        } catch (e) {
-            console.error('[AIO] Fetch cookies failed:', e);
-            showStatus('获取失败: ' + e.message, 'error');
-        }
-    });
-
-    // 快捷键录制逻辑
-    hotkeyInput?.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') return;
-        e.preventDefault();
-        const key = e.key.toLowerCase();
+    hotkeyInput?.addEventListener('keydown', async (event) => {
+        if (event.key === 'Escape') return;
+        if (['Control', 'Alt', 'Shift', 'Meta'].includes(event.key)) return;
+        event.preventDefault();
+        const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
         hotkeyInput.value = key;
-        config.subtitleHotkey = key;
-        // 快捷键录制后自动保存该子项
-        ConfigBridge.saveBilibiliSettings(config).then(() => {
-            showStatus('快捷键已更新');
-            ConfigBridge.send({ action: 'reloadSettings' });
-        });
+        const current = await schema.load();
+        await schema.save({ bilibiliSubtitles: Object.assign({}, current.bilibiliSubtitles, { subtitleHotkey: key }) });
+        toast('字幕快捷键已更新为 ' + key);
     });
 
-    load();
+    const saveCookies = core.debounce(async () => {
+        await schema.save({
+            biliCookies: {
+                sessdata: (document.getElementById('bili-sessdata')?.value || '').trim(),
+                dedeUserId: (document.getElementById('bili-dede-userid')?.value || '').trim()
+            }
+        });
+    }, 500);
+    document.getElementById('bili-sessdata')?.addEventListener('input', saveCookies);
+    document.getElementById('bili-dede-userid')?.addEventListener('input', saveCookies);
+
+    document.getElementById('bili-fetch-cookies')?.addEventListener('click', async (event) => {
+        const button = event.currentTarget;
+        button.disabled = true;
+        const result = await core.sendMessage({ type: 'bili:captureCookies' });
+        button.disabled = false;
+        if (!result || !result.ok) {
+            toast('未读取到 B站 Cookie：请先在浏览器中登录 bilibili.com（无痕窗口需已允许扩展运行）', 'error');
+            return;
+        }
+        document.getElementById('bili-sessdata').value = result.sessdata || '';
+        document.getElementById('bili-dede-userid').value = result.dedeUserId || '';
+        await saveCookies();
+        toast('已读取并保存 Cookie' + (result.incognito ? '（来自无痕窗口）' : '（来自常规窗口）'));
+    });
 }

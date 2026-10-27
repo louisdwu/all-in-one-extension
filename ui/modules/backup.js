@@ -1,75 +1,59 @@
-import { ConfigBridge } from '../../libs/config_bridge.js';
-import { showStatus } from '../../libs/utils.js';
+/**
+ * Backup / restore / factory reset.
+ *
+ * Uses the schema so the exported file is versioned and normalized, and an
+ * import cannot inject unknown or ill-typed keys.
+ */
+import './shared.js';
+import { schema, core, toast } from './shared.js';
 
-export function initGlobalBackup() {
-    const exportBtn = document.getElementById('backup-export-btn');
-    const importBtn = document.getElementById('backup-import-btn');
-    const importFile = document.getElementById('backup-import-file');
-    const resetBtn = document.getElementById('backup-reset-btn');
-
-    if (!exportBtn) return;
-
-    // 导出逻辑
-    exportBtn.addEventListener('click', () => {
-        ConfigBridge.get(null).then((items) => {
-            const backupData = {
-                version: '1.0',
-                timestamp: new Date().toISOString(),
-                client: 'AIO All-in-One Settings',
-                data: items
-            };
-
-            const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `aio-full-backup-${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            showStatus('全量配置文件已导出！');
-        });
-    });
-
-    importBtn?.addEventListener('click', () => importFile.click());
-
-    importFile?.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            try {
-                const backup = JSON.parse(event.target.result);
-                if (!backup.data || typeof backup.data !== 'object') throw new Error('找不到 data 节点');
-
-                if (confirm('确定要导入此备份吗？这将覆盖所有现有的插件配置！')) {
-                    chrome.storage.sync.clear(() => {
-                        ConfigBridge.set(backup.data).then(() => {
-                            showStatus('备份数据已导入，正在自动重载...', 'success');
-                            ConfigBridge.send({ action: 'reloadSettings' });
-                            ConfigBridge.send({ type: "UPDATE_CONFIG" });
-                            setTimeout(() => window.location.reload(), 1000);
-                        });
-                    });
-                }
-            } catch (err) {
-                showStatus('导入失败: ' + err.message, 'error');
-            }
-            e.target.value = '';
+export async function initBackup() {
+    document.getElementById('backup-export-btn')?.addEventListener('click', async () => {
+        const settings = await schema.load();
+        const payload = {
+            format: 'aio-settings',
+            schemaVersion: schema.SCHEMA_VERSION,
+            exportedAt: new Date().toISOString(),
+            extensionVersion: chrome.runtime.getManifest().version,
+            data: settings
         };
-        reader.readAsText(file);
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = 'aio-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+        anchor.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        toast('配置已导出');
     });
 
-    resetBtn?.addEventListener('click', () => {
-        if (confirm('🚨 确定要恢复出厂设置吗？这将清空所有配置！')) {
-            chrome.storage.sync.clear(() => {
-                chrome.storage.local.clear(() => {
-                    showStatus('已成功恢复出厂默认设置', 'success');
-                    ConfigBridge.send({ action: 'reloadSettings' });
-                    ConfigBridge.send({ type: "UPDATE_CONFIG" });
-                    setTimeout(() => window.location.reload(), 1500);
-                });
-            });
+    const fileInput = document.getElementById('backup-import-file');
+    document.getElementById('backup-import-btn')?.addEventListener('click', () => fileInput?.click());
+
+    fileInput?.addEventListener('change', async () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        try {
+            const text = await file.text();
+            const parsed = JSON.parse(text);
+            const data = parsed && parsed.data ? parsed.data : parsed;
+            if (!data || typeof data !== 'object') throw new Error('文件中没有可用的配置数据');
+            if (!confirm('导入将覆盖当前全部设置，确定继续？')) return;
+            await schema.save(schema.normalize(data));
+            toast('配置已导入，正在刷新…');
+            setTimeout(() => location.reload(), 600);
+        } catch (err) {
+            toast('导入失败：' + err.message, 'error');
+        } finally {
+            fileInput.value = '';
         }
+    });
+
+    document.getElementById('backup-reset-btn')?.addEventListener('click', async () => {
+        if (!confirm('确定恢复出厂设置？所有配置（含 B站 Cookie 与 HUD 实体）都会被清空。')) return;
+        await core.storage.removeSync(null);
+        await core.storage.removeLocal(null);
+        toast('已恢复出厂设置，正在刷新…');
+        setTimeout(() => location.reload(), 600);
     });
 }

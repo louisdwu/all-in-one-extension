@@ -1,24 +1,17 @@
-import { ConfigBridge } from '../../libs/config_bridge.js';
-import { showStatus } from '../../libs/utils.js';
+/**
+ * Incognito link opener panel.
+ */
+import './shared.js';
+import { schema, bindToggle, bindSelect, renderIncognitoState } from './shared.js';
 
-export function initEZIncognito() {
-    const enableToggle = document.getElementById('ez-enable');
-    const select = document.getElementById('ez-modifier-key');
+export async function initIncognito() {
+    const settings = await schema.load();
+    const enable = document.getElementById('ez-enable');
+    const modifier = document.getElementById('ez-modifier-key');
+    if (enable) enable.checked = settings.ezEnabled !== false;
+    if (modifier) modifier.value = settings.modifierKey;
 
-    ConfigBridge.get({ ezEnabled: true, modifierKey: 'ctrlKey' }).then((res) => {
-        enableToggle.checked = res.ezEnabled;
-        select.value = res.modifierKey;
-    });
-
-    enableToggle.addEventListener('change', () => {
-        ConfigBridge.set({ ezEnabled: enableToggle.checked }).then(() => {
-            showStatus('无痕按键主开关已更新！');
-        });
-    });
-
-    select.addEventListener('change', () => {
-        ConfigBridge.set({ modifierKey: select.value }).then(() => {
-            showStatus('无痕按键修饰键已保存！');
-        });
-    });
+    bindToggle('ez-enable', 'ezEnabled');
+    bindSelect('ez-modifier-key', 'modifierKey', { numeric: false });
+    renderIncognitoState();
 }

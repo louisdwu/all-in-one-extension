@@ -1,303 +1,259 @@
-document.addEventListener('DOMContentLoaded', () => {
-    initEZIncognito();
-    initAioTabs();
-    initHUDMonitor();
-    initSmartSpeeder();
-    initHotkeyChanger();
-    initSync(); // 新增同步逻辑
+/**
+ * Toolbar popup (ES module).
+ *
+ * The old popup was a 300-line callback tangle that re-ran its whole
+ * initialisation every time a `reloadSettings` message arrived, stacking
+ * duplicate click handlers (one click = N speed changes). This version
+ * initialises once and keeps a single render path.
+ */
+import '../libs/core.js';
+import '../libs/schema.js';
+import '../libs/keys.js';
+import '../libs/rules.js';
 
-    document.getElementById('open-options-icon').addEventListener('click', () => {
-        chrome.runtime.openOptionsPage();
-    });
-});
+const AIO = globalThis.AIO;
+const { log } = AIO.core;
+const popupLog = log('popup');
 
-// ==== Sync Logic ====
-function initSync() {
-    chrome.storage.onChanged.addListener((changes, namespace) => {
-        if (namespace !== 'sync') return;
-        
-        // 映射存储键名到 DOM ID
-        const syncMap = {
-            aioTabsEnabled: 'aio-tabs-toggle',
-            globalEnabled: 'speeder-global-toggle'
-        };
+/* ------------------------------ helpers ------------------------------ */
+async function activeTab() {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    return tabs[0] || null;
+}
 
-        for (const [key, id] of Object.entries(syncMap)) {
-            if (changes[key]) {
-                const el = document.getElementById(id);
-                if (el) el.checked = changes[key].newValue !== false;
-            }
+function sendToTab(tabId, message, timeoutMs = 3000) {
+    return new Promise((resolve) => {
+        if (tabId === undefined || tabId < 0) return resolve(null);
+        const timer = setTimeout(() => resolve(null), timeoutMs);
+        try {
+            chrome.tabs.sendMessage(tabId, message, (response) => {
+                clearTimeout(timer);
+                void chrome.runtime.lastError;
+                resolve(response === undefined ? null : response);
+            });
+        } catch (err) {
+            clearTimeout(timer);
+            resolve(null);
         }
     });
-
-    // 监听重载消息（例如 Smart Speeder 复杂配置更新）
-    chrome.runtime.onMessage.addListener((msg) => {
-        if (msg.action === 'reloadSettings') {
-            initSmartSpeeder();
-        }
-    });
 }
 
-// === EZ Incognito ===
-function initEZIncognito() {
-    const keyNames = {
-        'ctrlKey': 'Ctrl',
-        'altKey': 'Alt',
-        'shiftKey': 'Shift',
-        'metaKey': 'Meta(Win)'
-    };
-    const currentKeyElement = document.getElementById('ez-current-key');
-    chrome.storage.sync.get(['modifierKey'], (result) => {
-        const key = result.modifierKey || 'ctrlKey';
-        currentKeyElement.textContent = keyNames[key] || keyNames['ctrlKey'];
-    });
+function el(tag, props = {}, text) {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(props)) {
+        if (key === 'className') node.className = value;
+        else if (key === 'dataset') Object.assign(node.dataset, value);
+        else node.setAttribute(key, value);
+    }
+    if (text !== undefined) node.textContent = text;
+    return node;
 }
 
-// === AIO Tabs ===
-function initAioTabs() {
-    const toggle = document.getElementById('aio-tabs-toggle');
-    chrome.storage.sync.get(['aioTabsEnabled'], (result) => {
-        toggle.checked = result.aioTabsEnabled !== false;
-    });
-
-    toggle.addEventListener('change', (e) => {
-        chrome.storage.sync.set({ aioTabsEnabled: e.target.checked });
-    });
-}
-
-// === HUD Monitor ===
-async function initHUDMonitor() {
-    const listEl = document.getElementById('hud-list');
-    const data = await chrome.storage.local.get(['hudState', 'hudQueueKeys']);
-    const results = data.hudState || {};
+/* -------------------------------- HUD -------------------------------- */
+async function renderHud() {
+    const list = document.getElementById('hud-list');
+    const data = await AIO.core.storage.getLocal(['hudState', 'hudQueueKeys']);
+    const state = data.hudState || {};
     const queue = data.hudQueueKeys || [];
 
-    if (queue.length === 0) {
-        listEl.innerHTML = '<div class="ha-empty">未配置监控项或暂无数据</div>';
+    list.replaceChildren();
+    if (!queue.length) {
+        list.appendChild(el('div', { className: 'empty' }, '未配置监控项，去设置页添加'));
         return;
     }
-
-    listEl.innerHTML = queue.map(key => {
-        const item = results[key];
-        if (!item) return '';
-        
-        // 根据错误状态变更颜色
-        const colorStyle = item.error ? 'color: var(--danger-color);' : '';
-        return `<div class="entity-row">
-          <span class="entity-name">${escapeHtml(item.name)}</span>
-          <span class="entity-value" style="${colorStyle}">${escapeHtml(item.value)}</span>
-      </div>`;
-    }).join('');
+    for (const key of queue) {
+        const item = state[key];
+        if (!item) continue;
+        const row = el('div', { className: 'hud-row' });
+        row.append(el('span', { className: 'hud-name' }, item.name || key));
+        row.append(el('span', { className: 'hud-value' + (item.error ? ' error' : '') }, String(item.value)));
+        list.appendChild(row);
+    }
 }
 
-// === Smart Speeder ===
-function initSmartSpeeder() {
-    const globalToggle = document.getElementById('speeder-global-toggle');
-    const speedDisplay = document.getElementById('speeder-display');
-    const decreaseBtn = document.getElementById('speeder-decrease');
-    const increaseBtn = document.getElementById('speeder-increase');
-    const presetBtn = document.getElementById('speeder-preset');
+/* ------------------------------ speeder ------------------------------ */
+function presetCycle(currentSpeed, settings) {
+    const presets = AIO.schema.presetList(settings);
+    if (!presets.length) return currentSpeed;
+    if (presets.length === 1) {
+        return Math.abs(currentSpeed - presets[0]) < 0.01 ? settings.defaultSpeed : presets[0];
+    }
+    const index = presets.findIndex((value) => Math.abs(currentSpeed - value) < 0.01);
+    return presets[(index + 1) % presets.length];
+}
 
-    let currentSpeed = 1.0;
-    let settings = { globalEnabled: true, presetSpeed: 2.0 };
+async function initSpeeder(settings) {
+    const toggle = document.getElementById('speeder-toggle');
+    const value = document.getElementById('speed-value');
+    const stateLabel = document.getElementById('speed-state');
+    const hint = document.getElementById('speed-hint');
+    toggle.checked = settings.globalEnabled !== false;
 
-    chrome.runtime.sendMessage({ action: 'getSpeederSettings' }, (response) => {
-        if (chrome.runtime.lastError) return;
-        if (response) {
-            settings.globalEnabled = response.globalEnabled !== false;
-            settings.presetSpeed = response.presetSpeed !== undefined ? String(response.presetSpeed) : "2.0";
-            settings.defaultSpeed = response.defaultSpeed || 1.0; // 需要默认速度用于单速度切回
-            globalToggle.checked = settings.globalEnabled;
+    const tab = await activeTab();
+    const response = await sendToTab(tab && tab.id, { type: 'speeder:getSpeed' });
+    let currentSpeed = response && typeof response.speed === 'number' ? response.speed : settings.defaultSpeed;
+
+    const render = () => {
+        value.textContent = currentSpeed.toFixed(2) + 'x';
+        const active = response ? response.active !== false : AIO.rules.matches(tab ? tab.url : '', settings);
+        stateLabel.textContent = active ? '已接管' : '未启用（规则/开关）';
+        stateLabel.classList.toggle('off', !active);
+        hint.textContent = '快捷键：' + Object.entries(settings.shortcuts)
+            .map(([action2, combo]) => ({ increaseSpeed: '加速', decreaseSpeed: '减速', presetSpeed: '预设' }[action2] + ' ' + AIO.keys.display(combo)))
+            .join(' · ');
+    };
+    render();
+
+    const command = async (action) => {
+        const tabInfo = await activeTab();
+        const result = await sendToTab(tabInfo && tabInfo.id, { type: 'speeder:command', action });
+        if (result && typeof result.speed === 'number') currentSpeed = result.speed;
+        else {
+            // No content script (chrome:// page, PDF, just-installed): compute locally for display only.
+            if (action === 'increase') currentSpeed = Math.min(settings.speederMaxRate, currentSpeed + settings.speederStep);
+            else if (action === 'decrease') currentSpeed = Math.max(settings.speederMinRate, currentSpeed - settings.speederStep);
+            else if (action === 'preset') currentSpeed = presetCycle(currentSpeed, settings);
         }
-    });
-
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-            chrome.tabs.sendMessage(tabs[0].id, { action: 'getSpeed' }, (response) => {
-                if (chrome.runtime.lastError) {
-                    // 容错处理
-                }
-                if (response && response.speed !== undefined) {
-                    currentSpeed = response.speed;
-                }
-                speedDisplay.textContent = `${currentSpeed.toFixed(2)}x`;
-            });
-        }
-    });
-
-    globalToggle.addEventListener('change', (e) => {
-        settings.globalEnabled = e.target.checked;
-        chrome.runtime.sendMessage({ action: 'saveSpeederSettings', settings }, () => {
-            if (chrome.runtime.lastError) return;
-            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'reloadSettings' });
-            });
-        });
-    });
-
-    const updateSpeed = (actionStr) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (tabs[0]) {
-                chrome.tabs.sendMessage(tabs[0].id, { action: actionStr }, (response) => {
-                    if (chrome.runtime.lastError) return;
-                    if (response) {
-                        if (actionStr === 'decreaseSpeed') currentSpeed = Math.max(currentSpeed - 0.25, 0.25);
-                        else if (actionStr === 'increaseSpeed') currentSpeed = Math.min(currentSpeed + 0.25, 16.0);
-                        else if (actionStr === 'presetSpeed') {
-                            const speedStr = String(settings.presetSpeed || "2.0");
-                            const pSpeeds = speedStr.split(/[,，]/).map(s => parseFloat(s.trim())).filter(s => !isNaN(s));
-                            
-                            if (pSpeeds.length === 1) {
-                                // 单个速度：在预设和默认之间切换
-                                if (Math.abs(currentSpeed - pSpeeds[0]) < 0.01) currentSpeed = settings.defaultSpeed || 1.0;
-                                else currentSpeed = pSpeeds[0];
-                            } else if (pSpeeds.length > 1) {
-                                // 多个速度：轮流循环
-                                let idx = pSpeeds.findIndex(s => Math.abs(currentSpeed - s) < 0.01);
-                                currentSpeed = pSpeeds[(idx + 1) % pSpeeds.length];
-                            }
-                        }
-                        speedDisplay.textContent = `${currentSpeed.toFixed(2)}x`;
-                    }
-                });
-            }
-        });
+        render();
     };
 
-    decreaseBtn.addEventListener('click', () => updateSpeed('decreaseSpeed'));
-    increaseBtn.addEventListener('click', () => updateSpeed('increaseSpeed'));
-    presetBtn.addEventListener('click', () => updateSpeed('presetSpeed'));
+    document.getElementById('speed-up').addEventListener('click', () => command('increase'));
+    document.getElementById('speed-down').addEventListener('click', () => command('decrease'));
+    document.getElementById('speed-preset').addEventListener('click', () => command('preset'));
+
+    toggle.addEventListener('change', async () => {
+        await AIO.schema.save({ globalEnabled: toggle.checked });
+        await AIO.core.sendMessage({ type: 'speeder:saveSettings', settings: { globalEnabled: toggle.checked } });
+        const tabInfo = await activeTab();
+        await sendToTab(tabInfo && tabInfo.id, { type: 'aio:settingsChanged' });
+    });
 }
 
-// === Hotkey Changer ===
-function initHotkeyChanger() {
-    const currentSiteEl = document.getElementById('hotkey-current-site');
-    const enableToggle = document.getElementById('hotkey-enable-toggle');
-    const originalInput = document.getElementById('hotkey-original');
-    const newInput = document.getElementById('hotkey-new');
-    const addBtn = document.getElementById('hotkey-add');
-    const clearAllBtn = document.getElementById('hotkey-clear-all');
-    const mappingsListEl = document.getElementById('hotkey-mappings-list');
+/* ------------------------------ hotkeys ------------------------------ */
+async function initHotkeys(settings) {
+    const siteEl = document.getElementById('hotkey-site');
+    const toggle = document.getElementById('hotkey-toggle');
+    const original = document.getElementById('hotkey-original');
+    const replacement = document.getElementById('hotkey-new');
+    const list = document.getElementById('hotkey-list');
 
-    let currentHostname = '';
-    let currentMappings = {};
-
-    chrome.runtime.sendMessage({ type: 'GET_CURRENT_HOSTNAME' }, async (response) => {
-        if (chrome.runtime.lastError || !response || !response.hostname) return;
-        currentHostname = response.hostname;
-        currentSiteEl.textContent = currentHostname;
-
-        const enabledRes = await chrome.runtime.sendMessage({ type: 'GET_SITE_ENABLED', hostname: currentHostname });
-        enableToggle.checked = enabledRes ? enabledRes.enabled : true;
-
-        loadMappings();
-    });
-
-    async function loadMappings() {
-        const res = await chrome.runtime.sendMessage({ type: 'GET_MAPPINGS', hostname: currentHostname });
-        currentMappings = res ? (res.mappings || {}) : {};
-        renderMappings();
+    const context = await AIO.core.sendMessage({ type: 'hotkeys:context' });
+    const hostname = (context && context.hostname) || '';
+    if (!hostname) {
+        siteEl.textContent = '当前页面不支持（chrome:// 或扩展页）';
+        document.getElementById('hotkey-add').disabled = true;
+        return;
     }
+    siteEl.textContent = hostname;
 
-    function renderMappings() {
-        const keys = Object.keys(currentMappings);
-        if (keys.length === 0) {
-            mappingsListEl.innerHTML = '<div style="color:#999;font-size:12px;text-align:center;padding:10px;">暂无快捷键映射</div>';
+    let mappings = (context && context.mappings) || {};
+    const enabledSites = settings.enabledSites || {};
+    toggle.checked = enabledSites[hostname] !== false;
+
+    const render = () => {
+        list.replaceChildren();
+        const entries = Object.entries(mappings);
+        if (!entries.length) {
+            list.appendChild(el('div', { className: 'empty' }, '暂无映射'));
             return;
         }
-        mappingsListEl.innerHTML = keys.map(orig => {
-            const nw = currentMappings[orig];
-            return `
-        <div class="mapping-item" data-key="${escapeHtml(orig)}">
-          <div class="mapping-keys">
-            <span class="key-badge">${escapeHtml(orig)}</span>
-            <span style="color:#999;font-size:10px;">→</span>
-            <span class="key-badge">${escapeHtml(nw)}</span>
-          </div>
-          <button class="delete-btn" title="删除">x</button>
-        </div>
-      `;
-        }).join('');
-
-        mappingsListEl.querySelectorAll('.delete-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                const key = e.target.closest('.mapping-item').dataset.key;
-                await chrome.runtime.sendMessage({ type: 'DELETE_MAPPING', hostname: currentHostname, key });
-                delete currentMappings[key];
-                renderMappings();
+        for (const [from, to] of entries) {
+            const row = el('div', { className: 'mapping-row' });
+            const keys = el('div', { className: 'mapping-keys' });
+            keys.append(el('span', { className: 'key-badge' }, from), el('span', { className: 'arrow' }, '→'), el('span', { className: 'key-badge' }, to));
+            const remove = el('button', { type: 'button', className: 'link-btn', title: '删除' }, '✕');
+            remove.addEventListener('click', async () => {
+                const result = await AIO.core.sendMessage({ type: 'hotkeys:deleteMapping', hostname, key: from });
+                mappings = (result && result.mappings) || {};
+                render();
             });
-        });
-    }
+            row.append(keys, remove);
+            list.appendChild(row);
+        }
+    };
+    render();
 
-    enableToggle.addEventListener('change', async (e) => {
-        await chrome.runtime.sendMessage({
-            type: 'SET_SITE_ENABLED',
-            hostname: currentHostname,
-            enabled: e.target.checked
-        });
-    });
-
-    function setupInput(input, nextInput) {
+    const record = (input, then) => {
         input.addEventListener('focus', () => {
-            input.classList.add('recording');
-            input.placeholder = '请按键...';
             input.value = '';
+            input.classList.add('recording');
         });
-        input.addEventListener('blur', () => {
+        input.addEventListener('blur', () => input.classList.remove('recording'));
+        input.addEventListener('keydown', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.key === 'Escape') return;
+            if (AIO.keys.MODIFIER_KEYS.includes(event.key)) return;
+            input.value = AIO.keys.serialize(event);
             input.classList.remove('recording');
-            input.placeholder = '点击后按键';
+            input.blur();
+            if (then) then();
         });
-        input.addEventListener('keydown', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
+    };
+    record(original, () => replacement.focus());
+    record(replacement);
 
-            const parts = [];
-            if (e.ctrlKey) parts.push('Ctrl');
-            if (e.altKey) parts.push('Alt');
-            if (e.shiftKey) parts.push('Shift');
-            if (e.metaKey) parts.push('Meta');
-
-            let key = e.key;
-            if (key === ' ') key = 'Space';
-            if (key.length === 1) key = key.toUpperCase();
-            parts.push(key);
-
-            input.value = parts.join('+');
-            if (nextInput) nextInput.focus();
-        });
-    }
-
-    setupInput(originalInput, newInput);
-    setupInput(newInput, addBtn);
-
-    addBtn.addEventListener('click', async () => {
-        const orig = originalInput.value;
-        const nw = newInput.value;
-        if (!orig || !nw) return;
-        if (orig === nw) return;
-
-        currentMappings[orig] = nw;
-        await chrome.runtime.sendMessage({
-            type: 'SAVE_MAPPINGS',
-            hostname: currentHostname,
-            mappings: currentMappings
-        });
-        originalInput.value = '';
-        newInput.value = '';
-        renderMappings();
+    toggle.addEventListener('change', async () => {
+        await AIO.core.sendMessage({ type: 'hotkeys:setSiteEnabled', hostname, enabled: toggle.checked });
     });
 
-    clearAllBtn.addEventListener('click', async () => {
-        if (Object.keys(currentMappings).length === 0) return;
-        await chrome.runtime.sendMessage({ type: 'CLEAR_ALL_MAPPINGS', hostname: currentHostname });
-        currentMappings = {};
-        renderMappings();
+    document.getElementById('hotkey-add').addEventListener('click', async () => {
+        const from = original.value.trim();
+        const to = replacement.value.trim();
+        if (!from || !to) return;
+        if (from === to) {
+            original.value = '';
+            replacement.value = '';
+            return;
+        }
+        mappings[from] = to;
+        const result = await AIO.core.sendMessage({ type: 'hotkeys:setMappings', hostname, mappings });
+        mappings = (result && result.mappings) || mappings;
+        original.value = '';
+        replacement.value = '';
+        render();
+    });
+
+    document.getElementById('hotkey-clear').addEventListener('click', async () => {
+        if (!Object.keys(mappings).length) return;
+        const result = await AIO.core.sendMessage({ type: 'hotkeys:clearSite', hostname });
+        mappings = (result && result.mappings) || {};
+        render();
     });
 }
 
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+/* -------------------------------- boot -------------------------------- */
+async function boot() {
+    document.getElementById('open-options').addEventListener('click', () => chrome.runtime.openOptionsPage());
+
+    const settings = await AIO.schema.load();
+
+    const tabsToggle = document.getElementById('aio-tabs-toggle');
+    tabsToggle.checked = settings.aioTabsEnabled !== false;
+    tabsToggle.addEventListener('change', () => AIO.schema.save({ aioTabsEnabled: tabsToggle.checked }));
+
+    const hudToggle = document.getElementById('hud-toggle');
+    hudToggle.checked = settings.hudEnabled !== false;
+    hudToggle.addEventListener('change', async () => {
+        await AIO.schema.save({ hudEnabled: hudToggle.checked });
+        await AIO.core.sendMessage({ type: 'hud:updateConfig' });
+    });
+
+    const ezKey = document.getElementById('ez-key');
+    ezKey.textContent = { ctrlKey: 'Ctrl', altKey: 'Alt', shiftKey: 'Shift', metaKey: 'Meta' }[settings.modifierKey] || 'Ctrl';
+
+    await Promise.all([renderHud(), initSpeeder(settings), initHotkeys(settings)]);
+
+    // Live updates while the popup is open.
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'local' && (changes.hudState || changes.hudQueueKeys)) renderHud();
+        if (area === 'sync' && changes.globalEnabled) {
+            document.getElementById('speeder-toggle').checked = changes.globalEnabled.newValue !== false;
+        }
+    });
+    popupLog.debug('ready');
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    boot().catch((err) => popupLog.error('popup init failed', err));
+});
