@@ -3,609 +3,431 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>All in One Settings</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AIO 设置</title>
     <link rel="stylesheet" href="options.css">
-    <style>
-        /* Accordion Styles */
-        .accordion-item {
-            border: 1px solid #e0e6ed;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            overflow: hidden;
-        }
-        .accordion-header {
-            background: #f8f9fa;
-            padding: 12px 15px;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            user-select: none;
-            transition: background 0.2s;
-        }
-        .accordion-header:hover { background: #f1f3f5; }
-        .accordion-header h3 { margin: 0; font-size: 1.0em; color: #333; pointer-events: none; }
-        .accordion-header .toggle-icon { transition: transform 0.3s; font-size: 0.9em; color: #adb5bd; }
-        .accordion-content {
-            padding: 15px 0;
-            display: none;
-            border-top: 1px solid #eee;
-        }
-        .accordion-item.active .accordion-content { display: block !important; }
-        .accordion-item.active .accordion-header { background: #fff; }
-        .accordion-item.active .toggle-icon { transform: rotate(180deg); }
-        .source-tag {
-            font-size: 0.7em;
-            padding: 2px 6px;
-            border-radius: 4px;
-            text-transform: uppercase;
-            font-weight: bold;
-            margin-left: 8px;
-        }
-    </style>
 </head>
 
 <body>
-    <div class="sidebar">
+    <aside class="sidebar">
         <div class="sidebar-header">🌟 AIO 配置中心</div>
-        <div id="sidebar-version" style="text-align: left; font-size: 0.75em; color: #999; margin: -8px 0 12px 0; padding-left: 20px; letter-spacing: 0.5px;">v--</div>
-        <ul class="nav">
-            <li class="active" data-target="tab-dashboard">🚀 概览与开关</li>
-            <li data-target="tab-aiotabs">🖱️ 标签页切换</li>
-            <li data-target="tab-general">🕵️ 无痕按键</li>
-            <li data-target="tab-speeder">🎬 视频倍速</li>
-            <li data-target="tab-bilibili">📺 B站增强</li>
-            <li data-target="tab-hotkey">🎹 快捷键映射</li>
-            <li data-target="tab-hud">🖥️ HUD 监控</li>
-            <li data-target="tab-backup" class="nav-backup">💾 全局备份</li>
+        <div id="sidebar-version">v--</div>
+        <ul class="nav" role="tablist" aria-label="设置分区">
+            <li><button type="button" role="tab" class="active" data-target="tab-dashboard">🚀 概览与开关</button></li>
+            <li><button type="button" role="tab" data-target="tab-aiotabs">🖱️ 标签页切换</button></li>
+            <li><button type="button" role="tab" data-target="tab-general">🕵️ 无痕按键</button></li>
+            <li><button type="button" role="tab" data-target="tab-speeder">🎬 视频倍速</button></li>
+            <li><button type="button" role="tab" data-target="tab-bilibili">📺 B站增强</button></li>
+            <li><button type="button" role="tab" data-target="tab-hotkey">🎹 快捷键映射</button></li>
+            <li><button type="button" role="tab" data-target="tab-hud">🖥️ HUD 监控</button></li>
+            <li><button type="button" role="tab" data-target="tab-backup">💾 备份与恢复</button></li>
+            <li><button type="button" role="tab" data-target="tab-about">ℹ️ 关于与诊断</button></li>
         </ul>
-    </div>
+        <div class="sidebar-footer">
+            浏览器级快捷键在 <kbd>chrome://extensions/shortcuts</kbd> 中配置。
+        </div>
+    </aside>
 
-    <div class="content">
-        <div id="statusMessage" class="status-msg"></div>
+    <main class="content">
+        <div id="statusMessage" class="status-msg" role="status" aria-live="polite"></div>
 
-        <!-- ================= Tab: Dashboard ================= -->
-        <div id="tab-dashboard" class="tab-pane active">
+        <!-- ============================ Dashboard ============================ -->
+        <section id="tab-dashboard" class="tab-pane active" role="tabpanel" aria-labelledby="tab-dashboard">
             <div class="section">
-                <h2>🚀 功能概览与快速开关</h2>
-                <div class="help-text" style="margin-bottom: 25px;">在此处一键开启或关闭 AIO 插件的所有核心功能模块。</div>
+                <h2>🚀 功能概览</h2>
+                <p class="lede">一键开启或关闭各功能模块。改动即时生效，无需重启浏览器。</p>
                 <div class="dashboard-grid">
-                    <div class="dash-card" data-nav-target="tab-aiotabs">
+                    <div class="dash-card" data-nav-target="tab-aiotabs" tabindex="0">
                         <div class="dash-info">
                             <h3>🖱️ 标签页切换</h3>
-                            <p>右键+滚轮快速穿梭</p>
+                            <p>按住右键 + 滚轮穿梭标签</p>
                         </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="db-aiotabs-enable">
-                            <span class="slider"></span>
-                        </label>
+                        <label class="toggle"><input type="checkbox" id="db-aiotabs-enable" aria-label="标签页切换"><span class="slider"></span></label>
                     </div>
-                    <div class="dash-card" data-nav-target="tab-general">
+                    <div class="dash-card" data-nav-target="tab-general" tabindex="0">
                         <div class="dash-info">
                             <h3>🕵️ 无痕按键</h3>
-                            <p>从无痕模式打开链接</p>
+                            <p>修饰键 + 点击，用无痕窗口打开链接</p>
                         </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="db-ez-enable">
-                            <span class="slider"></span>
-                        </label>
+                        <label class="toggle"><input type="checkbox" id="db-ez-enable" aria-label="无痕按键"><span class="slider"></span></label>
                     </div>
-                    <div class="dash-card" data-nav-target="tab-speeder">
+                    <div class="dash-card" data-nav-target="tab-speeder" tabindex="0">
                         <div class="dash-info">
                             <h3>🎬 视频倍速</h3>
-                            <p>视频倍速控制拦截</p>
+                            <p>接管页面播放速度，支持快捷键</p>
                         </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="db-speed-enable">
-                            <span class="slider"></span>
-                        </label>
+                        <label class="toggle"><input type="checkbox" id="db-speed-enable" aria-label="视频倍速"><span class="slider"></span></label>
                     </div>
-                    <div class="dash-card" data-nav-target="tab-hotkey">
+                    <div class="dash-card" data-nav-target="tab-hotkey" tabindex="0">
                         <div class="dash-info">
                             <h3>🎹 快捷键映射</h3>
-                            <p>网页内按键行为替换</p>
+                            <p>按站点替换网页内的按键行为</p>
                         </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="db-hotkey-enable">
-                            <span class="slider"></span>
-                        </label>
+                        <label class="toggle"><input type="checkbox" id="db-hotkey-enable" aria-label="快捷键映射"><span class="slider"></span></label>
                     </div>
-                    <div class="dash-card" data-nav-target="tab-bilibili">
+                    <div class="dash-card" data-nav-target="tab-bilibili" tabindex="0">
                         <div class="dash-info">
                             <h3>📺 B站增强</h3>
-                            <p>字幕增强与免登录1080P</p>
+                            <p>字幕自动化、免登 1080P、评论区</p>
                         </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="db-bili-enable">
-                            <span class="slider"></span>
-                        </label>
+                        <label class="toggle"><input type="checkbox" id="db-bili-enable" aria-label="B站增强"><span class="slider"></span></label>
                     </div>
-                    <div class="dash-card" data-nav-target="tab-hud">
+                    <div class="dash-card" data-nav-target="tab-hud" tabindex="0">
                         <div class="dash-info">
                             <h3>🖥️ HUD 监控</h3>
-                            <p>天气与智能家居状态</p>
+                            <p>在扩展图标上轮播天气与智能家居</p>
                         </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="db-hud-enable">
-                            <span class="slider"></span>
-                        </label>
+                        <label class="toggle"><input type="checkbox" id="db-hud-enable" aria-label="HUD 监控"><span class="slider"></span></label>
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <!-- ================= Tab: AIO Tabs ================= -->
-        <div id="tab-aiotabs" class="tab-pane">
+        <!-- ============================ Tab switcher ============================ -->
+        <section id="tab-aiotabs" class="tab-pane" role="tabpanel">
             <div class="section">
                 <h2>🖱️ 标签页切换</h2>
-                <div class="toggle-container" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <span class="label" style="font-size: 16px;">启用功能</span>
-                    <label class="toggle">
-                        <input type="checkbox" id="aiotabs-enable">
-                        <span class="slider"></span>
-                    </label>
+                <p class="lede">在任意网页按住鼠标右键，滚动滚轮即可呼出标签列表；松开右键确认，Esc 取消。</p>
+                <div class="toggle-container">
+                    <span class="label">启用功能</span>
+                    <label class="toggle"><input type="checkbox" id="aiotabs-enable" aria-label="启用标签页切换"><span class="slider"></span></label>
                 </div>
-                <h3>交互说明</h3>
-                <div class="help-text" style="margin-top:10px;">
-                    说明：开启后，在任意网页按住 <kbd>鼠标右键</kbd> 不放，同时滚动 <kbd>鼠标滚轮</kbd>，即可快速呼出浮窗并在打开的标签页之间切换。
+                <div class="toggle-container">
+                    <span class="label">列表首尾循环</span>
+                    <label class="toggle"><input type="checkbox" id="aiotabs-wrap" aria-label="首尾循环"><span class="slider"></span></label>
                 </div>
-                <div class="form-group" style="margin-top: 20px;">
-                    <label for="aiotabs-delay">右键判定延迟 (毫秒)</label>
-                    <input type="number" id="aiotabs-delay" min="0" step="100" value="1000">
-                    <div class="help-text">设置按住右键多久后唤起列表。设为 0 则立即唤起（可能会干扰右键菜单）。</div>
+                <div class="form-group" style="margin-top:16px">
+                    <label for="aiotabs-delay">右键判定延迟（毫秒）</label>
+                    <input type="number" id="aiotabs-delay" min="0" max="5000" step="100" value="1000">
+                    <div class="help-text">按住右键多久后唤起列表。设为 0 会立即唤起，但可能干扰正常的右键菜单。</div>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <!-- ================= Tab: General ================= -->
-        <div id="tab-general" class="tab-pane">
+        <!-- ============================ Incognito ============================ -->
+        <section id="tab-general" class="tab-pane" role="tabpanel">
             <div class="section">
                 <h2>🕵️ 无痕按键</h2>
-                <div class="toggle-container" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <span class="label" style="font-size: 16px;">启用功能</span>
-                    <label class="toggle">
-                        <input type="checkbox" id="ez-enable">
-                        <span class="slider"></span>
-                    </label>
+                <p class="lede">按住修饰键并左键点击链接，将在无痕窗口中打开（并自动清理跟踪参数）。</p>
+                <div class="toggle-container">
+                    <span class="label">启用功能</span>
+                    <label class="toggle"><input type="checkbox" id="ez-enable" aria-label="启用无痕按键"><span class="slider"></span></label>
                 </div>
-                <h3>唤醒快捷键配置</h3>
                 <div class="form-group">
-                    <label for="ez-modifier-key">配置键盘修饰键</label>
+                    <label for="ez-modifier-key">修饰键</label>
                     <select id="ez-modifier-key">
                         <option value="ctrlKey">Ctrl</option>
                         <option value="altKey">Alt</option>
                         <option value="shiftKey">Shift</option>
-                        <option value="metaKey">Meta (Win/Cmd)</option>
+                        <option value="metaKey">Meta (Win / Cmd)</option>
                     </select>
-                    <div class="help-text">说明：当您按住此键并鼠标左键点击任意链接时，将在新的无痕窗口中打开该链接。</div>
+                    <div class="help-text">若选择 Ctrl，与浏览器自带的「新标签页打开」冲突时以本扩展为准。</div>
                 </div>
-                <button id="ez-save-btn" class="primary" style="display:none;">保存配置</button>
+                <div class="help-text" id="ez-incognito-state"></div>
             </div>
+        </section>
 
-        </div>
-
-        <!-- ================= Tab: Hotkey Changer ================= -->
-        <div id="tab-hotkey" class="tab-pane">
-            <div class="section">
-                <h2>🎹 快捷键映射</h2>
-                <div class="toggle-container" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <span class="label" style="font-size: 16px;">启用功能</span>
-                    <label class="toggle">
-                        <input type="checkbox" id="hotkey-enable">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                <h3>已添加的快捷键规则</h3>
-                <div class="help-text" style="margin-bottom: 20px;">
-                    此处管理您在各网站上添加的快捷键行为替换规则。
-                </div>
-                <!-- 挂载容器 -->
-                <div id="hotkey-options-container">加载中...</div>
-            </div>
-        </div>
-
-        <!-- ================= Tab: Smart Speeder ================= -->
-        <div id="tab-speeder" class="tab-pane">
+        <!-- ============================ Speeder ============================ -->
+        <section id="tab-speeder" class="tab-pane" role="tabpanel">
             <div class="section">
                 <h2>🎬 视频倍速</h2>
-                <div class="toggle-container" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <span class="label" style="font-size: 16px;">启用功能</span>
-                    <label class="toggle">
-                        <input type="checkbox" id="speed-globalToggle" checked>
-                        <span class="slider"></span>
-                    </label>
+                <div class="toggle-container">
+                    <span class="label">启用倍速接管</span>
+                    <label class="toggle"><input type="checkbox" id="speed-globalToggle" aria-label="启用倍速接管"><span class="slider"></span></label>
+                </div>
+                <div class="toggle-container">
+                    <span class="label">隐藏页面右下角悬浮球</span>
+                    <label class="toggle"><input type="checkbox" id="speed-hideBallToggle" aria-label="隐藏悬浮球"><span class="slider"></span></label>
+                </div>
+                <div class="toggle-container">
+                    <span class="label">记住上次使用的速度</span>
+                    <label class="toggle"><input type="checkbox" id="speed-remember" aria-label="记住上次速度"><span class="slider"></span></label>
                 </div>
 
-                <h3>基础界面设置</h3>
-                <div class="toggle-container" style="margin-top: 10px;">
-                    <span class="label">隐藏页面右下角的悬浮球</span>
-                    <label class="toggle">
-                        <input type="checkbox" id="speed-hideBallToggle">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-
-                <div class="row" style="margin-top: 20px;">
+                <div class="row" style="margin-top:16px">
                     <div class="form-group">
-                        <label>默认播放速度 (0.25 - 16.0)</label>
-                        <input type="number" id="speed-defaultSpeed" min="0.25" max="16.0" step="0.25" value="1.0">
-                        <div class="help-text">首次打开视频页面时的倍速</div>
+                        <label for="speed-defaultSpeed">默认速度（0.25 – 16）</label>
+                        <input type="number" id="speed-defaultSpeed" min="0.25" max="16" step="0.25" value="1">
                     </div>
                     <div class="form-group">
-                        <label>预设冲刺速度 (如 1.0, 3.0)</label>
-                        <input type="text" id="speed-presetSpeed" value="2.0">
-                        <div class="help-text">按快捷键时激活的倍速，多速度用逗号分隔</div>
+                        <label for="speed-presetSpeed">预设速度（逗号分隔，可多个）</label>
+                        <input type="text" id="speed-presetSpeed" value="2.0" placeholder="1.5, 2.0, 3.0">
                     </div>
                 </div>
-
-                <div class="btn-group" style="margin-top:20px;">
-                    <button id="speed-saveBtn" class="primary">保存倍速基础设置</button>
-                </div>
-
-                <hr style="margin: 30px 0; border: none; border-top: 1px solid #e0e6ed;">
-
-                <h3>自定义拦截快捷键设置</h3>
-                <div class="help-text"
-                    style="background:#fff3cd; color:#856404; border:1px solid #ffeaa7; padding:12px; margin-bottom:15px; border-radius:4px;">
-                    <strong>💡 使用说明：</strong><br>
-                    • 点击下方输入框，然后按下想要的快捷键组合<br>
-                    • 支持 Ctrl、Alt、Shift、Meta (Windows/Command) 键<br>
-                    • 必须包含至少一个修饰键（Ctrl/Alt/Shift/Meta）<br>
-                    • 修改后点击"保存快捷键设置"生效
-                </div>
-
-                <div class="current-shortcuts" id="currentShortcuts">当前快捷键：加载中...</div>
-
-                <div id="shortcutsContainer"></div>
-
-                <div class="btn-group" style="margin-top: 20px;">
-                    <button id="shortcuts-saveBtn" class="primary">💾 保存快捷键设置</button>
-                    <button id="shortcuts-resetBtn" class="danger">🔄 重置为默认快捷键</button>
-                </div>
-
-                <hr style="margin: 30px 0; border: none; border-top: 1px solid #e0e6ed;">
-
-                <h3>规则管理 (网址级控制)</h3>
-
                 <div class="row">
-                    <!-- Include Rules -->
-                    <div class="form-group" style="background:#f8f9fa; padding:15px; border-radius:8px;">
-                        <label>生效规则 (仅匹配的网站生效)</label>
+                    <div class="form-group">
+                        <label for="speed-step">每次调节步长</label>
+                        <input type="number" id="speed-step" min="0.05" max="4" step="0.05" value="0.25">
+                    </div>
+                    <div class="form-group">
+                        <label for="speed-minRate">最低速度</label>
+                        <input type="number" id="speed-minRate" min="0.1" max="16" step="0.05" value="0.25">
+                    </div>
+                    <div class="form-group">
+                        <label for="speed-maxRate">最高速度</label>
+                        <input type="number" id="speed-maxRate" min="0.25" max="16" step="0.25" value="16">
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <button type="button" id="speed-saveBtn" class="primary">保存基础设置</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>⌨️ 页面内快捷键</h2>
+                <p class="lede">这些组合键由页面脚本拦截，只在启用倍速的网站上生效。浏览器级快捷键请在 <kbd>chrome://extensions/shortcuts</kbd> 设置。</p>
+                <div class="current-shortcuts" id="currentShortcuts">加载中…</div>
+                <div id="shortcutsContainer"></div>
+                <div class="btn-group">
+                    <button type="button" id="shortcuts-saveBtn" class="primary">💾 保存快捷键</button>
+                    <button type="button" id="shortcuts-resetBtn" class="secondary">🔄 恢复默认</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>🎯 生效规则</h2>
+                <p class="lede">使用正则表达式限定生效范围。填写「生效规则」后，「排除规则」将被忽略。</p>
+                <div class="row">
+                    <div class="form-group">
+                        <label for="speed-includeRuleInput">仅在这些网站生效</label>
                         <div class="rule-input">
-                            <input type="text" id="speed-includeRuleInput" placeholder="正则, 如 youtube\.com">
-                            <button id="speed-addInclude" class="secondary">添加</button>
+                            <input type="text" id="speed-includeRuleInput" placeholder="例如 youtube\\.com">
+                            <button type="button" id="speed-addInclude" class="secondary">添加</button>
                         </div>
                         <div class="rules-list" id="speed-includeList"></div>
                     </div>
-
-                    <!-- Exclude Rules -->
-                    <div class="form-group" style="background:#f8f9fa; padding:15px; border-radius:8px;">
-                        <label>排除规则 (匹配的网站永远不生效)</label>
+                    <div class="form-group">
+                        <label for="speed-excludeRuleInput">在这些网站永不生效</label>
                         <div class="rule-input">
-                            <input type="text" id="speed-excludeRuleInput" placeholder="正则, 如 github\.com">
-                            <button id="speed-addExclude" class="secondary">添加</button>
+                            <input type="text" id="speed-excludeRuleInput" placeholder="例如 github\\.com">
+                            <button type="button" id="speed-addExclude" class="secondary">添加</button>
                         </div>
                         <div class="rules-list" id="speed-excludeList"></div>
                     </div>
                 </div>
-
-                <div class="help-text" style="color: var(--text-muted); margin-top: 15px;">
-                    温馨提示：倍速规则和快捷键已支持自动保存。如需备份，请前往“💾 全局备份”页面。
-                </div>
-                <input type="file" id="speed-importFile" accept=".json" style="display:none;">
             </div>
-        </div>
+        </section>
 
-        <!-- ================= Tab: Bilibili ================= -->
-        <div id="tab-bilibili" class="tab-pane">
+        <!-- ============================ Bilibili ============================ -->
+        <section id="tab-bilibili" class="tab-pane" role="tabpanel">
             <div class="section">
-                <h2>📺 哔哩哔哩功能增强</h2>
-                
-                <div class="section-group" style="margin-top: 20px;">
-                    <h3 style="border-left: 4px solid var(--primary); padding-left: 10px; margin-bottom: 20px;">🎬 播放增强</h3>
-                    
-                    <div class="toggle-container" style="margin-bottom: 15px;">
-                        <span class="label">自动播放视频 (覆盖 B 站原生设置)</span>
-                        <label class="toggle">
-                            <input type="checkbox" id="bili-autoplay-enable">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-
-                    <div class="toggle-container" style="margin-bottom: 15px;">
-                        <span class="label">自动开启中文字幕 (优先官方字幕)</span>
-                        <label class="toggle">
-                            <input type="checkbox" id="bili-autoSubtitle" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-
-
-                    <div class="form-group" style="margin-top: 15px;">
-                        <label>字幕切换快捷键 (点击并录入，支持单字母)</label>
-                        <div class="shortcut-input-group">
-                            <input type="text" id="bili-subtitleHotkey" placeholder="按键盘录入，如 s" readonly style="cursor: pointer; background: #f8f9fa;">
-                        </div>
-                    </div>
-                </div>
-
-                <hr style="margin: 25px 0; border: none; border-top: 1px dashed #e0e6ed;">
-
-                <div class="section-group">
-                    <h3 style="border-left: 4px solid #6f42c1; padding-left: 10px; margin-bottom: 5px;">🕵️ 无痕模式增强</h3>
-                    <div class="help-text" style="color: #6f42c1; font-weight: bold; margin-bottom: 15px;">⚠️ 以下功能仅在浏览器无痕窗口中激活</div>
-
-                    <div class="toggle-container" style="margin-bottom: 15px;">
-                        <span class="label">免登录 1080P 畅享 (自动防打断)</span>
-                        <label class="toggle">
-                            <input type="checkbox" id="bili-1080p-enable" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-
-                    <div class="toggle-container" style="margin-bottom: 15px;">
-                        <span class="label">免登录查看评论区</span>
-                        <label class="toggle">
-                            <input type="checkbox" id="bili-comments-enable" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-
-                    <div class="toggle-container" style="margin-bottom: 15px;">
-                        <span class="label">AI 字幕注入 (解除登录可见限制)</span>
-                        <label class="toggle">
-                            <input type="checkbox" id="bili-ai-subtitle-enable" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-
-                    <div class="toggle-container" style="margin-bottom: 15px;">
-                        <span class="label">播完当前视频后自动暂停 (禁止自动连播与切集)</span>
-                        <label class="toggle">
-                            <input type="checkbox" id="bili-playnext-disable">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-
-                    <h4 style="margin-top: 20px;">🔑 B站 Cookie 配置（可选）</h4>
-                    <div class="help-text" style="margin-bottom: 10px;">
-                        填入专用账号的 SESSDATA 后，可在无痕模式解锁完整评论区和 AI 字幕。
-                    </div>
-                    <div class="form-group">
-                        <label>SESSDATA</label>
-                        <input type="text" id="bili-sessdata" placeholder="粘贴 SESSDATA 值" style="font-family: monospace; font-size: 13px;">
-                    </div>
-                    <div class="form-group">
-                        <label>DedeUserID</label>
-                        <input type="text" id="bili-dede-userid" placeholder="粘贴 DedeUserID 值" style="font-family: monospace; font-size: 13px;">
-                    </div>
-                    <button id="bili-fetch-cookies" class="secondary" style="margin-top: 5px; width: 100%; background: #00a1d6; color: white; border: none;">从浏览器自动获取当前登录账号</button>
-                </div>
-
-
-
-                <div class="help-text" style="color: var(--text-muted); margin-top: 20px;">
-                    温馨提示：B站增强配置已纳入全局备份。
+                <h2>📺 哔哩哔哩增强</h2>
+                <div class="toggle-container">
+                    <span class="label">启用 B站增强（总开关）</span>
+                    <label class="toggle"><input type="checkbox" id="bili-enabled" aria-label="启用B站增强"><span class="slider"></span></label>
                 </div>
             </div>
-        </div>
 
-        <!-- ================= Tab: HUD Monitor ================= -->
-        <div id="tab-hud" class="tab-pane">
+            <div class="section">
+                <h3 style="margin-top:0">🎬 播放增强</h3>
+                <div class="toggle-container">
+                    <span class="label">自动播放视频</span>
+                    <label class="toggle"><input type="checkbox" id="bili-autoplay-enable" aria-label="自动播放"><span class="slider"></span></label>
+                </div>
+                <div class="toggle-container">
+                    <span class="label">自动开启中文字幕（优先官方字幕）</span>
+                    <label class="toggle"><input type="checkbox" id="bili-autoSubtitle" aria-label="自动开启字幕"><span class="slider"></span></label>
+                </div>
+                <div class="form-group" style="margin-top:12px">
+                    <label for="bili-subtitleHotkey">字幕切换快捷键（单键）</label>
+                    <input type="text" id="bili-subtitleHotkey" readonly placeholder="点击后按一个键" style="cursor:pointer">
+                </div>
+            </div>
+
+            <div class="section">
+                <h3 style="margin-top:0">🕵️ 未登录增强</h3>
+                <p class="help-text">以下功能只在未登录时生效；检测到真实登录后会自动让位，不影响账号体验。</p>
+                <div class="toggle-container">
+                    <span class="label">1080P 畅享（自动防打断）</span>
+                    <label class="toggle"><input type="checkbox" id="bili-1080p-enable" aria-label="1080P"><span class="slider"></span></label>
+                </div>
+                <div class="toggle-container">
+                    <span class="label">查看评论区</span>
+                    <label class="toggle"><input type="checkbox" id="bili-comments-enable" aria-label="评论区"><span class="slider"></span></label>
+                </div>
+                <div class="toggle-container">
+                    <span class="label">AI 字幕解锁（解除登录可见限制）</span>
+                    <label class="toggle"><input type="checkbox" id="bili-ai-subtitle-enable" aria-label="AI字幕"><span class="slider"></span></label>
+                </div>
+                <div class="toggle-container">
+                    <span class="label">播完自动暂停（禁止连播/切集，仅无痕窗口）</span>
+                    <label class="toggle"><input type="checkbox" id="bili-playnext-disable" aria-label="播完暂停"><span class="slider"></span></label>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3 style="margin-top:0">🔑 账号 Cookie（可选）</h3>
+                <p class="help-text">填入专用账号的 SESSDATA 后，可在无痕窗口解锁完整评论区与字幕。Cookie 只保存在本机同步存储中，不会上传。</p>
+                <div class="form-group">
+                    <label for="bili-sessdata">SESSDATA</label>
+                    <input type="password" id="bili-sessdata" placeholder="粘贴 SESSDATA" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="bili-dede-userid">DedeUserID</label>
+                    <input type="text" id="bili-dede-userid" placeholder="粘贴 DedeUserID" autocomplete="off">
+                </div>
+                <div class="btn-group">
+                    <button type="button" id="bili-fetch-cookies" class="secondary">从浏览器读取当前登录账号</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================ Hotkeys ============================ -->
+        <section id="tab-hotkey" class="tab-pane" role="tabpanel">
+            <div class="section">
+                <h2>🎹 快捷键映射</h2>
+                <p class="lede">把某个网站的按键行为迁移到另一个键。例如把 <kbd>F</kbd> 映射到 <kbd>H</kbd> 后，按 H 触发原本的 F 功能，F 被屏蔽。新增映射请在扩展弹窗中操作。</p>
+                <div class="toggle-container">
+                    <span class="label">启用功能</span>
+                    <label class="toggle"><input type="checkbox" id="hotkey-enable" aria-label="启用快捷键映射"><span class="slider"></span></label>
+                </div>
+                <h3>已添加的规则</h3>
+                <div id="hotkey-options-container">加载中…</div>
+            </div>
+        </section>
+
+        <!-- ============================ HUD ============================ -->
+        <section id="tab-hud" class="tab-pane" role="tabpanel">
             <div class="section">
                 <h2>🖥️ HUD 监控</h2>
-                <!-- HUD Main Control Bar -->
-                <div style="background: #f8f9fa; padding: 12px 15px; border-radius: 10px; border: 1px dashed #d1d9e0; display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
-                    <div style="display: flex; align-items: center; gap: 15px;">
-                        <span style="font-weight: bold; color: #444;">HUD 全局主控</span>
-                        <label class="toggle" style="margin: 0;">
-                            <input type="checkbox" id="hud-enable">
-                            <span class="slider"></span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.9em; cursor: pointer; color: #666; margin-left: 10px;">
+                <div class="hud-bar">
+                    <div class="hud-bar-group">
+                        <strong>总开关</strong>
+                        <label class="toggle"><input type="checkbox" id="hud-enable" aria-label="HUD 总开关"><span class="slider"></span></label>
+                        <label class="hud-bar-group" style="gap:6px">
                             <input type="checkbox" id="hud-icon-round" checked>
-                            Icon 数值取整 (不显示小数点)
+                            <span>图标数值取整</span>
                         </label>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 0.9em; color: #666;">轮播展示间隔:</span>
-                        <select id="hud-carousel-interval" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd; width: 80px;">
-                            <option value="2">2s</option>
-                            <option value="3" selected>3s</option>
-                            <option value="5">5s</option>
-                            <option value="10">10s</option>
+                    <div class="hud-bar-group">
+                        <span>轮播间隔</span>
+                        <select id="hud-carousel-interval" style="width:96px">
+                            <option value="3">3 秒</option>
+                            <option value="5">5 秒</option>
+                            <option value="10">10 秒</option>
+                            <option value="30">30 秒</option>
                         </select>
                     </div>
                 </div>
 
-                <!-- WAQI Section -->
-                <div style="margin-bottom: 15px;">
-                    <h3 style="color: #673ab7; margin-bottom: 2px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
-                        🌤️ 环境监控 (WAQI)
-                        <span style="font-weight: normal; font-size: 0.7em; color: #999;">(数据源: aqicn.org)</span>
-                    </h3>
-                    <div id="waqi-status-bar" style="font-size: 0.75em; color: #7e57c2; margin-bottom: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #efe7fb; padding: 8px; border-radius: 6px;">
-                        <div>📥 采集时刻: <span id="waqi-last-success-time" style="font-weight: bold;">从未</span></div>
-                        <div>📡 站点更新: <span id="waqi-last-pub-time" style="font-weight: bold;">从未</span></div>
+                <h3>🌤️ 环境监测（WAQI）</h3>
+                <div class="status-bar">
+                    <span>📥 采集时刻：<strong id="waqi-last-success-time">从未</strong></span>
+                    <span>📡 站点更新：<strong id="waqi-last-pub-time">从未</strong></span>
+                </div>
+                <div class="row">
+                    <div class="form-group">
+                        <label for="waqi-token">API Token</label>
+                        <input type="text" id="waqi-token" placeholder="在 aqicn.org 申请" autocomplete="off">
                     </div>
-                    
-                    <div class="row" style="gap: 10px; margin-bottom: 10px;">
-                        <div class="form-group" style="flex: 2;">
-                            <label style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">API Token</label>
-                            <input type="text" id="waqi-token" placeholder="填入您的 Token">
-                        </div>
-                        <div class="form-group" style="flex: 2;">
-                            <label style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">监测城市/站点 ID</label>
-                            <input type="text" id="waqi-city" placeholder="guangzhou 或 @9847">
-                        </div>
-                        <div class="form-group" style="flex: 1.2;">
-                            <label style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">刷新频率</label>
-                            <select id="waqi-refresh-rate" style="padding: 8px;">
-                                <option value="10">10 分钟</option>
-                                <option value="30">30 分钟</option>
-                                <option value="60" selected>1 小时</option>
-                                <option value="120">2 小时</option>
-                                <option value="240">4 小时</option>
-                            </select>
-                        </div>
+                    <div class="form-group">
+                        <label for="waqi-city">城市 / 站点</label>
+                        <input type="text" id="waqi-city" placeholder="例如 guangzhou 或 @9847">
                     </div>
-
-                    <style>
-                        .waqi-grid {
-                            display: grid;
-                            grid-template-columns: repeat(4, 1fr);
-                            gap: 8px;
-                            background: #f3e5f5;
-                            padding: 10px;
-                            border-radius: 8px;
-                        }
-                        .waqi-item {
-                            background: white;
-                            padding: 6px 10px;
-                            border-radius: 6px;
-                            display: flex;
-                            align-items: center;
-                            justify-content: space-between;
-                            font-size: 0.85em;
-                            border: 1px solid #e1bee7;
-                            cursor: pointer;
-                        }
-                        .waqi-item:hover { border-color: #9c27b0; }
-                        .waqi-item input[type="checkbox"] { 
-                            margin: 0 !important; 
-                            order: 3; /* Always last */
-                        }
-                        .waqi-item .val-tag {
-                            order: 2;
-                            flex: 1;
-                            text-align: center;
-                            font-family: monospace;
-                            font-weight: bold;
-                            color: #673ab7;
-                        }
-                        .waqi-item span:first-child {
-                            order: 1;
-                            color: #444;
-                        }
-                    </style>
-
-                    <div class="waqi-grid">
-                        <label class="waqi-item">
-                            <span>AQI</span><span class="val-tag" id="val-waqi-aqi">--</span><input type="checkbox" id="waqi-metric-aqi">
-                        </label>
-                        <label class="waqi-item">
-                            <span>O3(μg/m³)</span><span class="val-tag" id="val-waqi-o3">--</span><input type="checkbox" id="waqi-metric-o3" checked>
-                        </label>
-                        <label class="waqi-item">
-                            <span>PM2.5(μg/m³)</span><span class="val-tag" id="val-waqi-pm25">--</span><input type="checkbox" id="waqi-metric-pm25">
-                        </label>
-                        <label class="waqi-item">
-                            <span>PM10(μg/m³)</span><span class="val-tag" id="val-waqi-pm10">--</span><input type="checkbox" id="waqi-metric-pm10">
-                        </label>
-                        <label class="waqi-item">
-                            <span>NO2(μg/m³)</span><span class="val-tag" id="val-waqi-no2">--</span><input type="checkbox" id="waqi-metric-no2">
-                        </label>
-                        <label class="waqi-item">
-                            <span>SO2(μg/m³)</span><span class="val-tag" id="val-waqi-so2">--</span><input type="checkbox" id="waqi-metric-so2">
-                        </label>
-                        <label class="waqi-item">
-                            <span>CO(μg/m³)</span><span class="val-tag" id="val-waqi-co">--</span><input type="checkbox" id="waqi-metric-co">
-                        </label>
-                        <label class="waqi-item">
-                            <span>温度</span><span class="val-tag" id="val-waqi-t">--</span><input type="checkbox" id="waqi-metric-t">
-                        </label>
-                        <label class="waqi-item">
-                            <span>湿度</span><span class="val-tag" id="val-waqi-h">--</span><input type="checkbox" id="waqi-metric-h">
-                        </label>
-                        <label class="waqi-item">
-                            <span>气压</span><span class="val-tag" id="val-waqi-p">--</span><input type="checkbox" id="waqi-metric-p">
-                        </label>
-                        <label class="waqi-item">
-                            <span>风速</span><span class="val-tag" id="val-waqi-w">--</span><input type="checkbox" id="waqi-metric-w">
-                        </label>
+                    <div class="form-group">
+                        <label for="waqi-refresh-rate">刷新频率</label>
+                        <select id="waqi-refresh-rate">
+                            <option value="10">10 分钟</option>
+                            <option value="30">30 分钟</option>
+                            <option value="60">1 小时</option>
+                            <option value="120">2 小时</option>
+                            <option value="240">4 小时</option>
+                        </select>
                     </div>
                 </div>
-
-                <!-- HA Section -->
-                <div style="margin-top: 20px;">
-                    <h3 style="color: #03a9f4; margin-bottom: 2px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
-                        🏠 智能家居 (Home Assistant)
-                        <span style="font-weight: normal; font-size: 0.7em; color: #999;">(本地实体联动)</span>
-                    </h3>
-                    <div id="ha-status-bar" style="font-size: 0.75em; color: #039be5; margin-bottom: 10px; display: flex; align-items: center; gap: 5px;">
-                        🕒 上次成功获取: <span id="ha-last-success-time">从未</span>
-                    </div>
-                    <div class="row" style="gap: 10px; margin-bottom: 8px;">
-                        <div class="form-group" style="flex: 2;">
-                            <label style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">HA 服务地址</label>
-                            <input type="url" id="ha-url" placeholder="http://...:8123">
-                        </div>
-                        <div class="form-group" style="flex: 2;">
-                            <label style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">访问令牌 (Token)</label>
-                            <input type="password" id="ha-token" placeholder="填入长期令牌">
-                        </div>
-                        <div class="form-group" style="flex: 1.2;">
-                            <label style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">刷新频率</label>
-                            <select id="ha-refresh-rate" style="padding: 8px;">
-                                <option value="0.25">15 秒</option>
-                                <option value="0.5">30 秒</option>
-                                <option value="1" selected>1 分钟</option>
-                                <option value="5">5 分钟</option>
-                                <option value="10">10 分钟</option>
-                            </select>
-                        </div>
-                    </div>
-    
-                    <div id="ha-entity-list" style="background:#f8f9fa; padding:10px; border-radius:8px; display: flex; flex-direction: column; gap: 6px;"></div>
-                    <button id="ha-add-entity" class="secondary" style="margin-top: 10px; padding: 6px 15px; font-size: 0.9em;">+ 添加传感器</button>
+                <label class="field-label">图标显示的指标</label>
+                <div class="waqi-grid">
+                    <label class="waqi-item"><span>AQI</span><span class="val-tag" id="val-waqi-aqi">--</span><input type="checkbox" id="waqi-metric-aqi"></label>
+                    <label class="waqi-item"><span>O3</span><span class="val-tag" id="val-waqi-o3">--</span><input type="checkbox" id="waqi-metric-o3"></label>
+                    <label class="waqi-item"><span>PM2.5</span><span class="val-tag" id="val-waqi-pm25">--</span><input type="checkbox" id="waqi-metric-pm25"></label>
+                    <label class="waqi-item"><span>PM10</span><span class="val-tag" id="val-waqi-pm10">--</span><input type="checkbox" id="waqi-metric-pm10"></label>
+                    <label class="waqi-item"><span>NO2</span><span class="val-tag" id="val-waqi-no2">--</span><input type="checkbox" id="waqi-metric-no2"></label>
+                    <label class="waqi-item"><span>SO2</span><span class="val-tag" id="val-waqi-so2">--</span><input type="checkbox" id="waqi-metric-so2"></label>
+                    <label class="waqi-item"><span>CO</span><span class="val-tag" id="val-waqi-co">--</span><input type="checkbox" id="waqi-metric-co"></label>
+                    <label class="waqi-item"><span>温度</span><span class="val-tag" id="val-waqi-t">--</span><input type="checkbox" id="waqi-metric-t"></label>
+                    <label class="waqi-item"><span>湿度</span><span class="val-tag" id="val-waqi-h">--</span><input type="checkbox" id="waqi-metric-h"></label>
+                    <label class="waqi-item"><span>气压</span><span class="val-tag" id="val-waqi-p">--</span><input type="checkbox" id="waqi-metric-p"></label>
+                    <label class="waqi-item"><span>风速</span><span class="val-tag" id="val-waqi-w">--</span><input type="checkbox" id="waqi-metric-w"></label>
                 </div>
-    
-                <div class="btn-group" style="margin-top:30px;">
-                    <button id="hud-save" class="primary">💾 保存 HUD 配置</button>
-                    <button id="hud-test" class="success" style="background:#4CAF50;color:#fff;">🔄 立即抓取数据测试</button>
+
+                <h3>🏠 智能家居（Home Assistant）</h3>
+                <div class="status-bar">
+                    <span>🕒 上次成功：<strong id="ha-last-success-time">从未</strong></span>
+                </div>
+                <div class="row">
+                    <div class="form-group">
+                        <label for="ha-url">服务地址</label>
+                        <input type="url" id="ha-url" placeholder="http://192.168.1.10:8123" autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label for="ha-token">长期访问令牌</label>
+                        <input type="password" id="ha-token" placeholder="Long-Lived Access Token" autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label for="ha-refresh-rate">刷新频率</label>
+                        <select id="ha-refresh-rate">
+                            <option value="0.25">15 秒</option>
+                            <option value="0.5">30 秒</option>
+                            <option value="1">1 分钟</option>
+                            <option value="5">5 分钟</option>
+                            <option value="10">10 分钟</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="ha-entity-list"></div>
+                <div class="btn-group">
+                    <button type="button" id="ha-add-entity" class="secondary">+ 添加传感器</button>
+                </div>
+
+                <div class="btn-group">
+                    <button type="button" id="hud-save" class="primary">💾 保存 HUD 配置</button>
+                    <button type="button" id="hud-test" class="success">🔄 立即抓取测试</button>
                 </div>
             </div>
-        </div>
+        </section>
 
-
-        <!-- ================= Tab: Global Backup ================= -->
-        <div id="tab-backup" class="tab-pane">
+        <!-- ============================ Backup ============================ -->
+        <section id="tab-backup" class="tab-pane" role="tabpanel">
             <div class="section">
-                <h2>💾 全局配置备份与恢复</h2>
-                <div class="help-text" style="margin-bottom: 20px;">
-                    此处支持统一导出或导入 AIO 插件的所有功能配置。建议在更换设备或重装系统前进行备份。
+                <h2>💾 备份与恢复</h2>
+                <p class="lede">导出包含全部功能配置的 JSON 文件，便于换机迁移。</p>
+                <div class="btn-group">
+                    <button type="button" id="backup-export-btn" class="primary">📤 导出全部配置</button>
+                    <button type="button" id="backup-import-btn" class="secondary">📥 导入配置</button>
+                    <input type="file" id="backup-import-file" accept=".json" style="display:none">
                 </div>
-
-                <div class="backup-actions">
-                    <div class="backup-item">
-                        <h3>导出备份</h3>
-                        <p>将当前所有功能的设置项保存为 JSON 文件到您的本地电脑。</p>
-                        <button id="backup-export-btn" class="primary" style="background: #007bff;">📤 导出全量配置文件</button>
-                    </div>
-
-                    <hr style="margin: 25px 0; border: none; border-top: 1px dashed #e0e6ed;">
-
-                    <div class="backup-item">
-                        <h3>从备份恢复</h3>
-                        <p>选择之前导出的 JSON 文件以恢复配置。<strong>注意：这将覆盖所有当前设置！</strong></p>
-                        <div class="btn-group">
-                            <button id="backup-import-btn" class="secondary" style="background: #6f42c1; color: #fff;">📥 导入配置文件</button>
-                            <input type="file" id="backup-import-file" accept=".json" style="display:none;">
-                        </div>
-                    </div>
-
-                    <hr style="margin: 25px 0; border: none; border-top: 1px dashed #e0e6ed;">
-
-                    <div class="backup-item">
-                        <h3 style="color: var(--danger);">危险操作</h3>
-                        <p>将所有设置恢复为出厂默认状态。<strong>此操作不可逆！</strong></p>
-                        <button id="backup-reset-btn" class="danger" style="background: #dc3545;">🚨 恢复出厂设置</button>
-                    </div>
+                <hr class="divider">
+                <h3>危险操作</h3>
+                <p class="help-text">恢复出厂设置会清空所有配置（包括 B站 Cookie、HUD 实体），且不可撤销。</p>
+                <div class="btn-group">
+                    <button type="button" id="backup-reset-btn" class="danger">🚨 恢复出厂设置</button>
                 </div>
             </div>
-        </div>
+        </section>
 
-    </div> <!-- End Content -->
+        <!-- ============================ About ============================ -->
+        <section id="tab-about" class="tab-pane" role="tabpanel">
+            <div class="section">
+                <h2>ℹ️ 关于与诊断</h2>
+                <dl class="about-grid">
+                    <dt>版本</dt><dd id="about-version">--</dd>
+                    <dt>运行环境</dt><dd id="about-ua">--</dd>
+                    <dt>无痕权限</dt><dd id="about-incognito">--</dd>
+                    <dt>同步存储</dt><dd id="about-storage">--</dd>
+                </dl>
+                <div class="toggle-container" style="margin-top:16px">
+                    <span class="label">详细调试日志（控制台）</span>
+                    <label class="toggle"><input type="checkbox" id="about-debug" aria-label="调试日志"><span class="slider"></span></label>
+                </div>
+                <div class="btn-group">
+                    <button type="button" id="about-copy" class="secondary">📋 复制诊断信息</button>
+                    <button type="button" id="about-sync-check" class="secondary">🔍 校验配置完整性</button>
+                </div>
+                <h3>当前配置快照</h3>
+                <pre class="code-block" id="about-snapshot">加载中…</pre>
+            </div>
+        </section>
+    </main>
 
     <script type="module" src="options.js"></script>
 </body>

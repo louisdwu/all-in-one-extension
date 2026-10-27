@@ -1,29 +1,20 @@
-import { ConfigBridge } from '../../libs/config_bridge.js';
-import { showStatus } from '../../libs/utils.js';
+/**
+ * Tab switcher panel.
+ */
+import './shared.js';
+import { schema, bindToggle, bindInput } from './shared.js';
 
-export function initAioTabs() {
-    const toggle = document.getElementById('aiotabs-enable');
-    const delayInput = document.getElementById('aiotabs-delay');
+export async function initAioTabs() {
+    const settings = await schema.load();
 
-    ConfigBridge.get(['aioTabsEnabled', 'aioTabsDelay']).then((res) => {
-        toggle.checked = res.aioTabsEnabled !== false;
-        delayInput.value = res.aioTabsDelay !== undefined ? res.aioTabsDelay : 1000;
-    });
+    const enable = document.getElementById('aiotabs-enable');
+    const wrap = document.getElementById('aiotabs-wrap');
+    const delay = document.getElementById('aiotabs-delay');
+    if (enable) enable.checked = settings.aioTabsEnabled !== false;
+    if (wrap) wrap.checked = settings.aioTabsWrap !== false;
+    if (delay) delay.value = settings.aioTabsDelay;
 
-    toggle.addEventListener('change', (e) => {
-        ConfigBridge.set({ aioTabsEnabled: e.target.checked }).then(() => {
-            showStatus('右键切换功能状态已保存！');
-        });
-    });
-
-    delayInput.addEventListener('change', (e) => {
-        const val = parseInt(e.target.value);
-        if (isNaN(val) || val < 0) {
-            showStatus('延迟时间无效', 'error');
-            return;
-        }
-        ConfigBridge.set({ aioTabsDelay: val }).then(() => {
-            showStatus('切换延迟已保存！');
-        });
-    });
+    bindToggle('aiotabs-enable', 'aioTabsEnabled');
+    bindToggle('aiotabs-wrap', 'aioTabsWrap');
+    bindInput('aiotabs-delay', 'aioTabsDelay', { numeric: true, debounceMs: 500 });
 }
