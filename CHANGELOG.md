@@ -31,7 +31,8 @@
   可开关的调试日志。
 - 弹窗改为 ES module，倍速支持步长/上下限/记忆上次速度。
 - 内容脚本：UI 全部 Shadow DOM 化（悬浮球、面板、标签切换器、toast）。
-- 工具链：`tools/check.mjs`、`tools/smoke.mjs`（Chromium + CDP 真机）、`tools/bump-version.mjs`。
+- 工具链：`tools/check.mjs`、`tools/smoke.mjs`（Chromium + CDP 真机）、
+  `tools/regression.mjs`（10 项行为断言）、`tools/bump-version.mjs`。
 - 49 个 `node:test` 用例，含"后台模块图能否启动"的冒烟测试。
 
 ### 移除

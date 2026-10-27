@@ -27,9 +27,10 @@ npm run bump          # 同时更新 manifest.json 与 package.json
 ## 2. 开发流程（强制）
 
 ```bash
-npm run verify   # 静态检查 + 单测，提交前必须全绿
-npm run smoke    # 涉及后台/内容脚本/UI 的改动，必须跑一次（本机 Chromium）
-npm run bump     # 版本号
+npm run verify      # 静态检查 + 单测，提交前必须全绿
+npm run smoke       # 采集 SW/页面运行时异常（本机 Chromium）
+npm run regression  # 10 项行为断言（标签切换/倍速开关/快捷键映射）
+npm run bump        # 版本号
 ```
 
 - **无需构建**：原生 MV3，改完在 `chrome://extensions` 点刷新。
@@ -71,7 +72,7 @@ content/
    └─ inject.js             MAIN：未登录 1080P / 评论区 / WBI 重签
 ui/                         options（hash 路由/深色/诊断）+ popup（ES module）
 tests/                      node:test
-tools/                      check.mjs / smoke.mjs / bump-version.mjs
+tools/                      check.mjs / smoke.mjs / regression.mjs / bump-version.mjs
 docs/                       ARCHITECTURE / PERMISSIONS / IMPROVEMENT_PLAN
 ```
 
@@ -151,6 +152,6 @@ docs/                       ARCHITECTURE / PERMISSIONS / IMPROVEMENT_PLAN
 ## 9. 测试要求
 
 - 纯逻辑改动：在 `tests/` 加或改用例（`node:test` + `node:assert/strict`）。
-- 后台/内容脚本/UI 改动：跑 `npm run smoke`，确认后台 0 异常、设置页与弹窗 0 异常、
-  测试页面可交互且倍速被接管。
+- 后台/内容脚本/UI 改动：跑 `npm run smoke`（0 异常）与 `npm run regression`（全绿）。
+  新增交互功能时，优先往 `tools/regression.mjs` 加一条行为断言，而不是只靠手工验证。
 - 新增 `manifest` 资源/权限：`tests/manifest.test.js` 会自动校验文件存在与权限被使用。
