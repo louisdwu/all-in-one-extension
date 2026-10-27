@@ -236,8 +236,8 @@ export function initHUDPanel() {
         hudCarouselInterval: 3,
         hudIconRound: true,
         // WAQI
-        waqiToken: '6562b075bbe15b2242ce4725a783f83d7696f385',
-        waqiCity: 'guangzhou',
+        waqiToken: '',
+        waqiCity: '',
         waqiRefreshRate: 60,
         waqiMetrics: { aqi: false, o3: true, pm25: false, pm10: false, no2: false, so2: false, co: false, t: false, h: false, p: false, w: false },
         // HA

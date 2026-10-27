@@ -384,8 +384,8 @@
                 has_shop: false, shop_url: "", answer_status: 0, is_senior_member: 1,
                 wbi_img: {
                     // wbi url 首次运行先从真实 nav 请求拦截捕获
-                    img_url: localStorage.getItem('wbi_img_url') || "https://i0.hdslb.com/bfs/wbi/6acec99d211244d3a6c0eb6216f22ed5.png",
-                    sub_url: localStorage.getItem('wbi_sub_url') || "https://i0.hdslb.com/bfs/wbi/70d742617d91456ca121544a4bcf6dfa.png"
+                    img_url: localStorage.getItem('wbi_img_url') || "",
+                    sub_url: localStorage.getItem('wbi_sub_url') || ""
                 },
                 is_jury: false
             }
