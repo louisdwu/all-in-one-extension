@@ -53,9 +53,12 @@ test('content script bundles load shared libs before consumers', () => {
 });
 
 test('MAIN world scripts never touch the chrome API', () => {
+    // libs/core.js is a shared runtime whose chrome access is guarded by hasChrome().
+    const safe = new Set(['libs/core.js']);
     for (const script of manifest.content_scripts) {
         if (script.world !== 'MAIN') continue;
         for (const file of script.js) {
+            if (safe.has(file)) continue;
             assert.equal(/chrome\s*\.\s*(runtime|storage|tabs|cookies|alarms)/.test(read(file)), false, file);
         }
     }
@@ -76,6 +79,30 @@ test('page scripts only reference ids that exist in their HTML', () => {
             }
         }
     }
+});
+
+test('every relative import resolves to a real file', () => {
+    const walk = (dir) => {
+        for (const entry of readdirSync(join(ROOT, dir))) {
+            if (['node_modules', '.git', '.tmp'].includes(entry)) continue;
+            const rel = dir ? dir + '/' + entry : entry;
+            const stat = statSync(join(ROOT, rel));
+            if (stat.isDirectory()) walk(rel);
+            else if (extname(entry) === '.js') {
+                const source = read(rel);
+                const specs = [];
+                for (const m of source.matchAll(/(?:import|export)[^'"\n]*from\s*['"]([^'"]+)['"]/g)) specs.push(m[1]);
+                for (const m of source.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)) specs.push(m[1]);
+                for (const spec of specs) {
+                    if (!spec.startsWith('.')) continue;
+                    assert.ok(existsSync(join(ROOT, dir || '.', spec)), rel + ' imports missing ' + spec);
+                }
+            }
+        }
+    };
+    walk('background');
+    walk('libs');
+    walk('ui');
 });
 
 test('options page has no duplicate element ids', () => {

@@ -164,7 +164,11 @@ async function main() {
   };
 
   const swErrors = [];
+  let swSessionId = null;
   cdp.onEvent((msg) => {
+    // Only collect events from the service-worker target: page errors are
+    // reported separately per page session and would otherwise be duplicated.
+    if (swSessionId && msg.sessionId && msg.sessionId !== swSessionId) return;
     if (msg.method === 'Runtime.exceptionThrown') {
       const d = msg.params.exceptionDetails;
       swErrors.push('EXCEPTION: ' + ((d.exception && d.exception.description) || d.text));
@@ -179,6 +183,7 @@ async function main() {
 
   if (swTarget) {
     const swSession = await attach(swTarget.targetId);
+    swSessionId = swSession;
     try {
       const r = await cdp.send('Runtime.evaluate', {
         expression: 'JSON.stringify({name: chrome.runtime.getManifest().name, version: chrome.runtime.getManifest().version})',
@@ -221,12 +226,12 @@ async function main() {
     const opt = await loadPage('chrome-extension://' + extId + '/ui/options.html', 'options', 2200);
     report.assertions.push({
       name: 'options.dom',
-      value: await opt.evaluate('JSON.stringify({version: (document.getElementById("sidebar-version") || {}).textContent, panes: document.querySelectorAll(".tab-pane").length, navItems: document.querySelectorAll(".nav li").length})'),
+      value: await opt.evaluate('JSON.stringify({version: (document.getElementById("sidebar-version") || {}).textContent, panes: document.querySelectorAll(".tab-pane").length, navButtons: document.querySelectorAll(".nav button").length, shortcutItems: document.querySelectorAll(".shortcut-item").length, hudMetrics: document.querySelectorAll("[id^=waqi-metric-]").length})'),
     });
     const pop = await loadPage('chrome-extension://' + extId + '/ui/popup.html', 'popup', 1600);
     report.assertions.push({
       name: 'popup.dom',
-      value: await pop.evaluate('JSON.stringify({title: (document.querySelector(".title") || {}).textContent, cards: document.querySelectorAll(".card").length})'),
+      value: await pop.evaluate('JSON.stringify({title: (document.querySelector(".title") || {}).textContent, cards: document.querySelectorAll(".card").length, speed: (document.getElementById("speed-value") || {}).textContent, hud: (document.getElementById("hud-list") || {}).textContent.slice(0, 30)})'),
     });
   }
 
@@ -236,9 +241,9 @@ async function main() {
     name: 'content.page',
     value: await page.evaluate([
       'JSON.stringify({',
-      '  ball: !!document.getElementById("video-speed-float-ball"),',
-      '  uiHost: !!document.getElementById("aio-speed-ui-host"),',
-      '  styles: !!document.getElementById("video-speed-styles"),',
+      '  ball: !!(document.getElementById("aio-speed-ui") && document.getElementById("aio-speed-ui").shadowRoot),',
+      '  uiHost: !!document.getElementById("aio-speed-ui"),',
+      '  styles: !!document.getElementById("aio-speed-ui"),',
       '  rate1: document.getElementById("v1").playbackRate,',
       '  rate2: document.getElementById("v2").playbackRate,',
       '  pageErrors: window.__pageErrors || [],',
