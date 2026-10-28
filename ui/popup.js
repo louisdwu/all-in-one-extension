@@ -10,6 +10,7 @@ import '../libs/core.js';
 import '../libs/schema.js';
 import '../libs/keys.js';
 import '../libs/rules.js';
+import '../libs/i18n.js';
 
 const AIO = globalThis.AIO;
 const { log } = AIO.core;
@@ -58,7 +59,7 @@ async function renderHud() {
 
     list.replaceChildren();
     if (!queue.length) {
-        list.appendChild(el('div', { className: 'empty' }, '未配置监控项，去设置页添加'));
+        list.appendChild(el('div', { className: 'empty' }, AIO.i18n.t('popupHudEmpty', '未配置监控项，去设置页添加')));
         return;
     }
     for (const key of queue) {
@@ -154,7 +155,7 @@ async function initHotkeys(settings) {
         list.replaceChildren();
         const entries = Object.entries(mappings);
         if (!entries.length) {
-            list.appendChild(el('div', { className: 'empty' }, '暂无映射'));
+            list.appendChild(el('div', { className: 'empty' }, AIO.i18n.t('popupHotkeyEmpty', '暂无映射')));
             return;
         }
         for (const [from, to] of entries) {
@@ -224,6 +225,7 @@ async function initHotkeys(settings) {
 
 /* -------------------------------- boot -------------------------------- */
 async function boot() {
+    AIO.i18n.apply();
     document.getElementById('open-options').addEventListener('click', () => chrome.runtime.openOptionsPage());
 
     const settings = await AIO.schema.load();

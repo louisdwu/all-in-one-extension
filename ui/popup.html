@@ -10,15 +10,15 @@
 <body>
     <header class="header">
         <span class="title">🌟 All in One</span>
-        <button type="button" id="open-options" class="icon-btn" title="打开设置" aria-label="打开设置">⚙️</button>
+        <button type="button" id="open-options" class="icon-btn" title="打开设置" aria-label="打开设置" data-i18n-title="popupOpenSettings" data-i18n-aria-label="popupOpenSettings">⚙️</button>
     </header>
 
     <main class="dashboard">
         <section class="card" id="card-hud">
             <div class="card-title">
-                <span>🖥️ HUD 监控</span>
-                <label class="toggle" title="HUD 总开关">
-                    <input type="checkbox" id="hud-toggle" aria-label="HUD 总开关">
+                <span data-i18n="popupHud">🖥️ HUD 监控</span>
+                <label class="toggle" title="HUD 总开关" data-i18n-title="popupHudToggle">
+                    <input type="checkbox" id="hud-toggle" aria-label="HUD 总开关" data-i18n-aria-label="popupHudToggle">
                     <span class="slider"></span>
                 </label>
             </div>
@@ -27,59 +27,59 @@
 
         <section class="card">
             <div class="card-title">
-                <span>🖱️ 标签页切换</span>
-                <label class="toggle" title="右键 + 滚轮切换标签页">
+                <span data-i18n="popupTabs">🖱️ 标签页切换</span>
+                <label class="toggle" title="右键 + 滚轮切换标签页" data-i18n-title="popupTabsToggle">
                     <input type="checkbox" id="aio-tabs-toggle" aria-label="标签页切换">
                     <span class="slider"></span>
                 </label>
             </div>
-            <p class="hint">按住<strong>鼠标右键</strong>并<strong>滚动滚轮</strong>呼出标签列表。</p>
+            <p class="hint" data-i18n="popupTabsHint">按住<strong>鼠标右键</strong>并<strong>滚动滚轮</strong>呼出标签列表。</p>
         </section>
 
         <section class="card">
             <div class="card-title">
-                <span>🎬 视频倍速</span>
-                <label class="toggle" title="全局启用倍速">
+                <span data-i18n="popupSpeeder">🎬 视频倍速</span>
+                <label class="toggle" title="全局启用倍速" data-i18n-title="popupSpeederToggle">
                     <input type="checkbox" id="speeder-toggle" aria-label="视频倍速">
                     <span class="slider"></span>
                 </label>
             </div>
             <div class="speed-row">
                 <span class="speed-value" id="speed-value">1.00x</span>
-                <span class="speed-state" id="speed-state">当前标签页</span>
+                <span class="speed-state" id="speed-state" data-i18n="popupSpeedState">当前标签页</span>
             </div>
             <div class="btn-row">
-                <button type="button" id="speed-down">− 减速</button>
-                <button type="button" id="speed-up">+ 加速</button>
-                <button type="button" id="speed-preset" class="primary">预设</button>
+                <button type="button" id="speed-down" data-i18n="popupSpeedDown">− 减速</button>
+                <button type="button" id="speed-up" data-i18n="popupSpeedUp">+ 加速</button>
+                <button type="button" id="speed-preset" class="primary" data-i18n="popupSpeedPreset">预设</button>
             </div>
             <p class="hint" id="speed-hint"></p>
         </section>
 
         <section class="card">
             <div class="card-title">
-                <span>🎹 本站快捷键映射</span>
-                <label class="toggle" title="在本站启用映射">
+                <span data-i18n="popupHotkeys">🎹 本站快捷键映射</span>
+                <label class="toggle" title="在本站启用映射" data-i18n-title="popupHotkeysToggle">
                     <input type="checkbox" id="hotkey-toggle" aria-label="本站快捷键映射">
                     <span class="slider"></span>
                 </label>
             </div>
             <div class="site-row"><span id="hotkey-site">读取中…</span></div>
             <div class="recorder">
-                <input type="text" id="hotkey-original" readonly placeholder="原键" aria-label="原按键">
+                <input type="text" id="hotkey-original" readonly placeholder="原键" aria-label="原按键" data-i18n-placeholder="popupHotkeyOriginal">
                 <span class="arrow">→</span>
-                <input type="text" id="hotkey-new" readonly placeholder="新键" aria-label="新按键">
+                <input type="text" id="hotkey-new" readonly placeholder="新键" aria-label="新按键" data-i18n-placeholder="popupHotkeyNew">
             </div>
             <div class="btn-row">
-                <button type="button" id="hotkey-add" class="primary">添加映射</button>
-                <button type="button" id="hotkey-clear" class="danger">清空本站</button>
+                <button type="button" id="hotkey-add" class="primary" data-i18n="popupHotkeyAdd">添加映射</button>
+                <button type="button" id="hotkey-clear" class="danger" data-i18n="popupHotkeyClear">清空本站</button>
             </div>
             <div id="hotkey-list" class="mapping-list"></div>
         </section>
 
         <section class="card">
-            <div class="card-title"><span>🕵️ 无痕按键</span></div>
-            <p class="hint">按住 <strong id="ez-key">Ctrl</strong> 并左键点击链接，即可在无痕窗口打开。</p>
+            <div class="card-title"><span data-i18n="popupIncognito">🕵️ 无痕按键</span></div>
+            <p class="hint"><span data-i18n="popupIncognitoHint">按住修饰键并左键点击链接，即可在无痕窗口打开</span>（<span data-i18n="popupIncognitoCurrent">当前：</span><strong id="ez-key">Ctrl</strong>）</p>
         </section>
     </main>
 

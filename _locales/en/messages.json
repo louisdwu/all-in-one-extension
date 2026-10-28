@@ -1,0 +1,78 @@
+{
+    "extName": {
+        "message": "All in One Extension",
+        "description": "Extension name (manifest uses __MSG_extName__)"
+    },
+    "extDescription": {
+        "message": "Multi-purpose browser toolkit: tab switcher, incognito opener, video speeder, hotkey remapper, bilibili enhancer and HUD monitor"
+    },
+    "popupOpenSettings": {
+        "message": "Open settings"
+    },
+    "popupHud": {
+        "message": "🖥️ HUD monitor"
+    },
+    "popupHudToggle": {
+        "message": "HUD master switch"
+    },
+    "popupHudEmpty": {
+        "message": "No metrics yet — add some in the settings page"
+    },
+    "popupTabs": {
+        "message": "🖱️ Tab switcher"
+    },
+    "popupTabsToggle": {
+        "message": "Right-click + wheel to switch tabs"
+    },
+    "popupTabsHint": {
+        "message": "Hold the right mouse button and scroll to open the tab list."
+    },
+    "popupSpeeder": {
+        "message": "🎬 Video speeder"
+    },
+    "popupSpeederToggle": {
+        "message": "Enable the speeder everywhere"
+    },
+    "popupSpeedState": {
+        "message": "Current tab"
+    },
+    "popupSpeedDown": {
+        "message": "− Slower"
+    },
+    "popupSpeedUp": {
+        "message": "+ Faster"
+    },
+    "popupSpeedPreset": {
+        "message": "Preset"
+    },
+    "popupHotkeys": {
+        "message": "🎹 Site hotkey mapping"
+    },
+    "popupHotkeysToggle": {
+        "message": "Enable mapping on this site"
+    },
+    "popupHotkeyOriginal": {
+        "message": "Original"
+    },
+    "popupHotkeyNew": {
+        "message": "New key"
+    },
+    "popupHotkeyAdd": {
+        "message": "Add mapping"
+    },
+    "popupHotkeyClear": {
+        "message": "Clear site"
+    },
+    "popupHotkeyEmpty": {
+        "message": "No mappings yet"
+    },
+    "popupIncognito": {
+        "message": "🕵️ Incognito opener"
+    },
+    "popupIncognitoHint": {
+        "message": "Hold the modifier and left-click a link to open it in an incognito window"
+    },
+    "popupIncognitoCurrent": {
+        "message": "Current: "
+    }
+}

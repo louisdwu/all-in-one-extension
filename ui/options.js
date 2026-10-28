@@ -7,6 +7,7 @@
  */
 import '../libs/core.js';
 import '../libs/schema.js';
+import '../libs/i18n.js';
 import { uiLog } from './modules/shared.js';
 
 import { initDashboard } from './modules/dashboard.js';
@@ -76,6 +77,7 @@ function guard(name, fn) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    globalThis.AIO.i18n.apply();
     const versionEl = document.getElementById('sidebar-version');
     if (versionEl) versionEl.textContent = 'v' + chrome.runtime.getManifest().version;
 

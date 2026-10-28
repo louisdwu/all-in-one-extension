@@ -86,8 +86,7 @@
         videos: new Set(),
         lastAppliedAt: 0,
         ui: null,
-        toastTimer: null,
-        persistTimer: null
+        toastTimer: null
     };
 
     /* ------------------------------- rules ------------------------------- */
@@ -238,27 +237,23 @@
     }
 
     /**
-     * Persist the current speed according to the configured memory mode
-     * ('off' | 'global' | 'site'). Writes are coalesced: dragging the speed up
-     * quickly must not produce one storage write per step.
+     * Ask the background to remember this speed ('off' | 'global' | 'site').
+     *
+     * The write is owned by the worker: a page timer would be throttled as soon
+     * as the tab goes to the background, so "change speed, switch tab" could lose
+     * the value. Sending is debounced only to avoid one message per key repeat.
      */
-    function persistSpeed() {
+    const sendPersist = AIO.core.debounce(() => {
         const settings = state.settings;
         if (!settings) return;
         const mode = settings.speederSpeedMemory;
         if (mode === 'off') return;
-        if (state.persistTimer) clearTimeout(state.persistTimer);
-        state.persistTimer = setTimeout(() => {
-            state.persistTimer = null;
-            if (mode === 'site') {
-                storage.getLocal(['speederSpeeds']).then((result) => {
-                    const next = AIO.speedMemory.remember(result.speederSpeeds, location.hostname, state.speed);
-                    storage.setLocal({ speederSpeeds: next });
-                });
-            } else {
-                storage.setLocal({ speederLastSpeed: state.speed });
-            }
-        }, 800);
+        AIO.core.post({ type: 'speeder:remember', speed: state.speed, mode, hostname: location.hostname });
+    }, 150);
+
+    function persistSpeed() {
+        if (!state.settings) return;
+        sendPersist();
     }
 
     /** Apply the remembered speed for this hostname (site → global → default). */

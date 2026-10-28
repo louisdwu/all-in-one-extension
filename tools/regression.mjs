@@ -10,6 +10,8 @@
  *      and removes the UI; turning it back on re-locks
  *   C. hotkey remap: pressing the mapped key is delivered to the page as the
  *      original key, and the original key is swallowed
+ *   D. per-site speed memory: a speed chosen on a site is stored and restored
+ *      when the same site is opened again
  *
  * Usage: node tools/regression.mjs [--ext=path] [--port=9444]
  */
@@ -25,6 +27,7 @@ const args = Object.fromEntries(process.argv.slice(2).map((a) => {
 }));
 const EXT_DIR = resolve(args.ext || process.cwd());
 const PORT = Number(args.port || 9444);
+const CHROME_BIN = process.env.AIO_CHROME || 'chromium';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (...a) => console.error('[regression]', ...a);
 
@@ -91,7 +94,7 @@ async function main() {
     const userDir = mkdtempSync(join(tmpdir(), 'aio-reg-'));
     const server = await startServer();
     const base = 'http://127.0.0.1:' + server.address().port + '/';
-    const child = spawn('chromium', [
+    const child = spawn(CHROME_BIN, [
         '--headless=new', '--remote-debugging-port=' + PORT, '--user-data-dir=' + userDir,
         '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
         '--disable-extensions-except=' + EXT_DIR, '--load-extension=' + EXT_DIR, 'about:blank'
@@ -106,12 +109,21 @@ async function main() {
     const cdp = new Cdp(version.webSocketDebuggerUrl);
     await cdp.connect();
 
+    // Live execution contexts per target. Destroyed contexts must be pruned,
+    // otherwise a navigation leaves a stale id behind and the next evaluate fails
+    // with "Cannot find context with specified id".
     const contexts = new Map();
     cdp.on((msg) => {
         if (msg.method === 'Runtime.executionContextCreated') {
             const list = contexts.get(msg.sessionId) || [];
             list.push(msg.params.context);
             contexts.set(msg.sessionId, list);
+        } else if (msg.method === 'Runtime.executionContextDestroyed') {
+            const list = (contexts.get(msg.sessionId) || [])
+                .filter((context) => context.id !== msg.params.executionContextId);
+            contexts.set(msg.sessionId, list);
+        } else if (msg.method === 'Runtime.executionContextsCleared') {
+            contexts.set(msg.sessionId, []);
         }
     });
 
@@ -120,19 +132,35 @@ async function main() {
         const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
         await cdp.send('Runtime.enable', {}, sessionId);
         await wait(1200);
-        const list = contexts.get(sessionId) || [];
-        const mainCtx = list.find((c) => c.auxData && c.auxData.isDefault);
-        const isoCtx = list.find((c) => c.name === 'All in One Extension');
-        const evaluate = async (expression, contextId) => {
-            const r = await cdp.send('Runtime.evaluate', { expression, contextId, returnByValue: true, awaitPromise: true }, sessionId);
-            if (r.exceptionDetails) throw new Error((r.exceptionDetails.exception || {}).description || r.exceptionDetails.text);
-            return r.result && r.result.value;
+        /** Resolve the wanted world *now* — contexts change across navigations. */
+        const evaluate = async (expression, world) => {
+            const list = contexts.get(sessionId) || [];
+            const context = world === 'iso'
+                ? list.filter((c) => c.name === 'All in One Extension').pop()
+                : list.filter((c) => c.auxData && c.auxData.isDefault).pop();
+            const params = { expression, returnByValue: true, awaitPromise: true };
+            if (context) params.contextId = context.id;
+
+            let result;
+            try {
+                result = await cdp.send('Runtime.evaluate', params, sessionId);
+            } catch (err) {
+                if (!params.contextId) throw err;
+                // The context vanished between lookup and evaluation: use the
+                // session's default context instead of failing the whole run.
+                delete params.contextId;
+                result = await cdp.send('Runtime.evaluate', params, sessionId);
+            }
+            if (result.exceptionDetails) {
+                throw new Error((result.exceptionDetails.exception || {}).description || result.exceptionDetails.text);
+            }
+            return result.result && result.result.value;
         };
         return {
             targetId,
             sessionId,
-            main: (expr) => evaluate(expr, mainCtx && mainCtx.id),
-            iso: (expr) => evaluate(expr, isoCtx && isoCtx.id)
+            main: (expr) => evaluate(expr, 'main'),
+            iso: (expr) => evaluate(expr, 'iso')
         };
     }
 
@@ -200,8 +228,43 @@ async function main() {
     check('mapped key is delivered as the original key', Array.isArray(remap.mapped) && remap.mapped.join(',') === 'f', JSON.stringify(remap));
     check('original key is swallowed', Array.isArray(remap.blocked) && remap.blocked.length === 0, JSON.stringify(remap));
 
-    // cleanup state so the profile is not left with test mappings
-    await page1.iso('AIO.schema.save({ hotkeyMappings: {} })').catch(() => {});
+    // ---------- D. per-site speed memory ----------
+    const swTarget = (await cdp.send('Target.getTargets')).targetInfos
+        .find((t) => t.type === 'service_worker' && t.url.startsWith('chrome-extension://'));
+    const extId = swTarget ? new URL(swTarget.url).host : null;
+
+    log('D: configuring speed memory');
+    await page1.iso('AIO.schema.save({ speederSpeedMemory: "site", defaultSpeed: 1, presetSpeed: "2.0", globalEnabled: true })');
+    await wait(600);
+
+    log('D: resolving tab id');
+    const tabId = await page1.iso('AIO.core.sendMessage({ type: "tabs:list" }).then(function (r) { var t = (r.tabs || []).filter(function (x) { return x.url.indexOf(location.origin) === 0; })[0]; return t ? t.id : -1; })');
+    log('D: tabId=' + tabId);
+
+    if (extId && typeof tabId === 'number' && tabId > 0) {
+        log('D: opening options page');
+        const ext = await openPage('chrome-extension://' + extId + '/ui/options.html');
+        log('D: sending speeder:command');
+        // Drive the real command channel: options page -> background/tab -> content script.
+        const commandResult = await ext.main('chrome.tabs.sendMessage(' + tabId + ', { type: "speeder:command", action: "preset" })');
+        check('speed command reaches the content script', !!commandResult && commandResult.ok === true && commandResult.speed === 2, JSON.stringify(commandResult));
+
+        await wait(1400); // persist debounce is 800ms
+        const store = await page1.iso('AIO.core.storage.getLocal(["speederSpeeds"])');
+        check('chosen speed is remembered for the hostname', !!store && store.speederSpeeds && store.speederSpeeds['127.0.0.1'] === 2, JSON.stringify(store));
+
+        log('D: opening a fresh tab for the same site');
+        const page3 = await openPage(base + '?three');
+        await wait(1600);
+        const restored = await page3.main('document.getElementById("v1").playbackRate');
+        check('remembered speed is restored on the next visit', restored === 2, 'rate=' + restored);
+    } else {
+        check('speed command reaches the content script', false, 'could not resolve extension id / tab id');
+    }
+
+    // cleanup state so the profile is not left with test mappings/speeds
+    await page1.iso('AIO.schema.save({ hotkeyMappings: {}, speederSpeedMemory: "site" })').catch(() => {});
+    await page1.iso('AIO.core.storage.setLocal({ speederSpeeds: {} })').catch(() => {});
 
     cdp.close();
     child.kill('SIGKILL');

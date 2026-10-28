@@ -1,0 +1,48 @@
+/* ============================================================================
+   Design tokens only: colours, radii, shadows, dark mode. No layout rules.
+   Loaded first by ui/options.css — see that file for the cascade order.
+   ========================================================================== */
+
+:root {
+    --primary-h: 217;
+    --primary: hsl(var(--primary-h) 91% 58%);
+    --primary-hover: hsl(var(--primary-h) 91% 48%);
+    --primary-soft: hsl(var(--primary-h) 91% 95%);
+
+    --success: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+
+    --bg: #f6f7f9;
+    --bg-panel: #ffffff;
+    --bg-subtle: #f1f3f7;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --border: #e2e8f0;
+
+    --radius-lg: 16px;
+    --radius-md: 12px;
+    --radius-sm: 8px;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / .05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / .08), 0 2px 4px -2px rgb(0 0 0 / .06);
+    --shadow-lg: 0 10px 24px -6px rgb(0 0 0 / .16);
+
+    --sidebar-width: 248px;
+    --transition: .2s cubic-bezier(.4, 0, .2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --primary-soft: hsl(var(--primary-h) 60% 22%);
+        --bg: #101114;
+        --bg-panel: #17181c;
+        --bg-subtle: #1e2026;
+        --text: #f2f4f8;
+        --text-muted: #9aa3b2;
+        --border: #2a2d35;
+        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / .4);
+        --shadow-lg: 0 10px 24px -6px rgb(0 0 0 / .6);
+    }
+}
+

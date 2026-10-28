@@ -19,6 +19,9 @@ const args = Object.fromEntries(process.argv.slice(2).map((a) => {
 }));
 const EXT_DIR = resolve(args.ext || process.cwd());
 const DEBUG_PORT = Number(args.port || 9333);
+// CI installs Chrome for Testing under a different name/path than a distro
+// chromium; allow overriding with AIO_CHROME.
+const CHROME_BIN = process.env.AIO_CHROME || 'chromium';
 const WAIT_MS = (ms) => new Promise((r) => setTimeout(r, ms));
 const LOG = (...a) => console.error('[smoke]', ...a);
 
@@ -99,7 +102,7 @@ function extractText(arg) {
   return arg.type || '';
 }
 
-const report = { extension: EXT_DIR, background: [], pages: [], assertions: [], stderr: [] };
+const report = { extension: EXT_DIR, background: [], pages: [], assertions: [], assertionFailures: [], stderr: [] };
 
 async function main() {
   LOG('starting chromium for', EXT_DIR);
@@ -108,7 +111,7 @@ async function main() {
   const port = server.address().port;
   const targetUrl = 'http://127.0.0.1:' + port + '/';
 
-  const child = spawn('chromium', [
+  const child = spawn(CHROME_BIN, [
     '--headless=new',
     '--remote-debugging-port=' + DEBUG_PORT,
     '--user-data-dir=' + userDir,
@@ -228,6 +231,62 @@ async function main() {
       name: 'options.dom',
       value: await opt.evaluate('JSON.stringify({version: (document.getElementById("sidebar-version") || {}).textContent, panes: document.querySelectorAll(".tab-pane").length, navButtons: document.querySelectorAll(".nav button").length, shortcutItems: document.querySelectorAll(".shortcut-item").length, hudMetrics: document.querySelectorAll("[id^=waqi-metric-]").length})'),
     });
+    const stylesJson = await opt.evaluate([
+        'JSON.stringify((function () {',
+        '  function cs(sel, prop) { var el = document.querySelector(sel); return el ? getComputedStyle(el)[prop] : null; }',
+        '  // @import rules nest their sheet, so count recursively.',
+        '  function countRules(sheet) {',
+        '    var total = 0;',
+        '    try {',
+        '      var rules = sheet.cssRules;',
+        '      for (var i = 0; i < rules.length; i++) {',
+        '        total++;',
+        '        if (rules[i].styleSheet) total += countRules(rules[i].styleSheet);',
+        '      }',
+        '    } catch (e) {}',
+        '    return total;',
+        '  }',
+        '  var rules = 0;',
+        '  for (var i = 0; i < document.styleSheets.length; i++) rules += countRules(document.styleSheets[i]);',
+        '  return {',
+        '    bodyBg: cs("body", "backgroundColor"),',
+        '    sidebarWidth: cs(".sidebar", "width"),',
+        '    navActiveBg: cs(".nav button.active", "backgroundColor"),',
+        '    sectionRadius: cs(".section", "borderTopLeftRadius"),',
+        '    toggleWidth: cs(".toggle", "width"),',
+        '    statusPosition: cs("#statusMessage", "position"),',
+        '    primaryBtnBg: cs("button.primary", "backgroundColor"),',
+        '    sheets: document.styleSheets.length,',
+        '    rules: rules',
+        '  };',
+        '})())'
+      ].join('\n'));
+    report.assertions.push({ name: 'options.styles', value: stylesJson });
+
+    // Hard assertions: a CSS refactor (e.g. splitting files, changing the
+    // cascade order) must not silently change the rendered page.
+    const EXPECTED_STYLES = {
+      bodyBg: 'rgb(246, 247, 249)',
+      sidebarWidth: '248px',
+      navActiveBg: 'rgb(231, 240, 254)',
+      sectionRadius: '16px',
+      toggleWidth: '42px',
+      statusPosition: 'fixed',
+      primaryBtnBg: 'rgb(50, 125, 245)'
+    };
+    try {
+      const styles = JSON.parse(stylesJson || '{}');
+      for (const [key, expected] of Object.entries(EXPECTED_STYLES)) {
+        if (styles[key] !== expected) {
+          report.assertionFailures.push('options style ' + key + ': expected ' + expected + ', got ' + styles[key]);
+        }
+      }
+      if (!(styles.rules >= 120)) {
+        report.assertionFailures.push('options stylesheet rules: expected >= 120, got ' + styles.rules + ' (a stylesheet may not have loaded)');
+      }
+    } catch (err) {
+      report.assertionFailures.push('could not parse style probe: ' + err.message);
+    }
     const pop = await loadPage('chrome-extension://' + extId + '/ui/popup.html', 'popup', 1600);
     report.assertions.push({
       name: 'popup.dom',
@@ -266,7 +325,9 @@ async function main() {
   console.log('=== SUMMARY ===');
   console.log('background issues: ' + report.background.length);
   for (const p of report.pages) console.log(p.label + ' issues: ' + p.errors.length);
-  process.exit(bad ? 1 : 0);
+  console.log('assertion failures: ' + report.assertionFailures.length);
+  for (const failure of report.assertionFailures) console.log('  ✖ ' + failure);
+  process.exit(bad + report.assertionFailures.length ? 1 : 0);
 }
 
 main().catch((e) => { console.error('SMOKE FAILED:', e); process.exit(2); });
