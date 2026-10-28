@@ -3,7 +3,26 @@ import assert from 'node:assert/strict';
 import '../libs/core.js';
 import '../libs/schema.js';
 
-const { normalize, normalizePreset, presetList, DEFAULT_SHORTCUTS, toStorage, SCHEMA_VERSION } = globalThis.AIO.schema;
+const { normalize, normalizePreset, presetList, DEFAULT_SHORTCUTS, toStorage, load, save, SCHEMA_VERSION } = globalThis.AIO.schema;
+
+/** Minimal chrome.storage.sync stub so save()/load() can be exercised in Node. */
+function withFakeStorage(initial, run) {
+    const store = JSON.parse(JSON.stringify(initial));
+    globalThis.chrome = {
+        runtime: { id: 'test', lastError: null },
+        storage: {
+            sync: {
+                get: (keys, callback) => callback(JSON.parse(JSON.stringify(store))),
+                set: (items, callback) => {
+                    Object.assign(store, JSON.parse(JSON.stringify(items)));
+                    if (callback) callback();
+                },
+                remove: (keys, callback) => { if (callback) callback(); }
+            }
+        }
+    };
+    return Promise.resolve(run(store)).finally(() => { delete globalThis.chrome; });
+}
 
 test('empty storage yields a complete, typed default object', () => {
     const settings = normalize({});
@@ -33,6 +52,38 @@ test('the duplicated subtitle switch stays in sync', () => {
     assert.equal(normalize({ biliAutoSubtitle: false }).bilibiliSubtitles.autoEnableSubtitle, false);
     // old nested key set, new key unset
     assert.equal(normalize({ bilibiliSubtitles: { autoEnableSubtitle: false } }).biliAutoSubtitle, false);
+});
+
+test('a stale nested subtitle flag cannot override the canonical switch', () => {
+    // Regression: save() always writes both keys, so the nested copy is present
+    // with the *previous* value. When it won, turning "自动开启中文字幕" off
+    // never persisted and every bilibili page still auto-enabled subtitles.
+    const settings = normalize({
+        biliAutoSubtitle: false,
+        bilibiliSubtitles: { autoEnableSubtitle: true, subtitleHotkey: 's' }
+    });
+    assert.equal(settings.biliAutoSubtitle, false);
+    assert.equal(settings.bilibiliSubtitles.autoEnableSubtitle, false);
+});
+
+test('saving the subtitle switch off persists through a reload', async () => {
+    await withFakeStorage({ biliAutoSubtitle: true, bilibiliSubtitles: { autoEnableSubtitle: true, subtitleHotkey: 's' } }, async (store) => {
+        const saved = await save({ biliAutoSubtitle: false });
+        assert.equal(saved.biliAutoSubtitle, false);
+        assert.equal(store.biliAutoSubtitle, false);
+        assert.equal(store.bilibiliSubtitles.autoEnableSubtitle, false, 'the mirror key must follow');
+        assert.equal((await load()).biliAutoSubtitle, false, 'reload keeps it off');
+
+        // A legacy writer that only knows the nested key still works...
+        const legacyOff = await save({ bilibiliSubtitles: { autoEnableSubtitle: false } });
+        assert.equal(legacyOff.biliAutoSubtitle, false);
+        assert.equal(legacyOff.bilibiliSubtitles.subtitleHotkey, 's', 'patching one field keeps the hotkey');
+
+        // ...and switching it back on does not leave a stale nested value.
+        const backOn = await save({ biliAutoSubtitle: true });
+        assert.equal(backOn.biliAutoSubtitle, true);
+        assert.equal(backOn.bilibiliSubtitles.autoEnableSubtitle, true);
+    });
 });
 
 test('numbers are clamped and coerced', () => {
