@@ -29,7 +29,7 @@ npm run bump          # 同时更新 manifest.json 与 package.json
 ```bash
 npm run verify      # 静态检查 + 单测，提交前必须全绿
 npm run smoke       # 采集 SW/页面运行时异常（本机 Chromium）
-npm run regression  # 10 项行为断言（标签切换/倍速开关/快捷键映射）
+npm run regression  # 13 项行为断言（标签切换/倍速开关/快捷键映射/倍速记忆）
 npm run bump        # 版本号
 ```
 
@@ -51,13 +51,15 @@ libs/                       ★ 共享层（无 import/export，挂 globalThis.A
 ├─ keys.js                  快捷键序列化/解析/匹配
 ├─ rules.js                 include/exclude 正则匹配（缓存 + 兜底）
 ├─ aqi.js                   IAQI → 浓度（HJ 633-2012）
+├─ speed_memory.js          倍速记忆三态（off/global/site）
+├─ i18n.js                  data-i18n 注解式翻译（t / apply）
 ├─ md5.js / wbi.js          B站 WBI 签名
 └─ bili.js                  URL 净化 / 视频页判定
 background/
 ├─ index.js                 组装入口（显式顺序）
 ├─ router.js                唯一 onMessage 路由 + handle() + broadcast()
 └─ features/                tabs / incognito / hotkeys / speeder / bilibili /
-                            commands / lifecycle / hud/*
+                            commands / lifecycle / diagnostics / hud/*
 content/
 ├─ lib/content.js           内容脚本运行时（缓存配置 + toast + 顶层帧判定）
 ├─ aio_tabs.js              右键+滚轮标签切换（Shadow DOM UI）
@@ -71,8 +73,11 @@ content/
    ├─ ui.js                 ISOLATED：字幕自动开启 + 字幕热键
    └─ inject.js             MAIN：未登录 1080P / 评论区 / WBI 重签
 ui/                         options（hash 路由/深色/诊断）+ popup（ES module）
+ui/styles/                  样式模块：tokens / base / components / panels（options.css 只做 @import）
+_locales/                   zh_CN + en（manifest 用 __MSG_*）
 tests/                      node:test
 tools/                      check.mjs / smoke.mjs / regression.mjs / bump-version.mjs
+.github/workflows/          verify.yml（静态检查 + 单测 + 真机冒烟/回归）
 docs/                       ARCHITECTURE / PERMISSIONS / IMPROVEMENT_PLAN
 ```
 
@@ -149,9 +154,22 @@ docs/                       ARCHITECTURE / PERMISSIONS / IMPROVEMENT_PLAN
 
 ---
 
+## 8.1 新增约定的速查
+
+- **样式**：改 `ui/styles/*.css`，不要改 `ui/options.css`（它只是 `@import` 顺序表）。
+  冒烟测试会断言 7 个计算样式 + 规则总数，拆分/调序导致回退会立刻失败。
+- **文案**：默认写死中文；需要翻译的元素加 `data-i18n="key"`（或 `-placeholder` / `-title` /
+  `-aria-label`），并在 `_locales/zh_CN` 与 `_locales/en` **同时**加 key（`check.mjs` 强制）。
+- **倍速记忆**：写入由后台 `speeder:remember` 负责（页面定时器在后台标签会被节流），
+  内容脚本只发消息，不要自己写 `speederSpeeds`。
+- **诊断**：新功能出问题时用 `AIO.core.log('tag')` 记录，`warn/error` 会自动进日志环，
+  设置页「关于与诊断」可直接看到。
+
 ## 9. 测试要求
 
 - 纯逻辑改动：在 `tests/` 加或改用例（`node:test` + `node:assert/strict`）。
 - 后台/内容脚本/UI 改动：跑 `npm run smoke`（0 异常）与 `npm run regression`（全绿）。
   新增交互功能时，优先往 `tools/regression.mjs` 加一条行为断言，而不是只靠手工验证。
-- 新增 `manifest` 资源/权限：`tests/manifest.test.js` 会自动校验文件存在与权限被使用。
+- 新增 `manifest` 资源/权限：`tests/manifest.test.js` 会自动校验文件存在与权限被使用；
+  `tools/check.mjs` 校验 `@import`/样式表/脚本引用、`_locales` 与 `data-i18n` 键完整性。
+- CI（`.github/workflows/verify.yml`）会跑同样的命令；本地绿 = CI 绿。

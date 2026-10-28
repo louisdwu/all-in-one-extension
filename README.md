@@ -12,10 +12,11 @@
 |------|------|
 | 🖱️ 标签页切换 | 按住鼠标右键 + 滚轮呼出标签列表，滚轮切换、松开确认、Esc 取消 |
 | 🕵️ 无痕按键 | 修饰键 + 左键点击链接 → 无痕窗口打开，并自动清理 `utm_*`/`spm_id_from` 等跟踪参数 |
-| 🎬 视频倍速 | 接管页面 `<video>` 倍速（含对抗站点重置），悬浮球 + 页面内快捷键 + 站点规则 |
+| 🎬 视频倍速 | 接管页面 `<video>` 倍速（含对抗站点重置），悬浮球 + 页面内快捷键 + 站点规则 + 按网站记住速度 |
 | 🎹 快捷键映射 | 按站点把某个按键的行为迁移到另一个键（例如 F → H） |
 | 📺 B站增强 | 自动中文字幕、字幕热键、未登录 1080P、评论区加载、AI 字幕解锁、播完暂停 |
 | 🖥️ HUD 监控 | 在扩展图标上轮播 WAQI 空气质量与 Home Assistant 实体数值，支持阈值变色 |
+| 🔍 诊断面板 | 消息处理器统计、最近告警/错误、存储占用、配置快照（无需 DevTools） |
 
 ## 安装
 
@@ -28,7 +29,7 @@
 ```bash
 npm run verify   # 静态检查 + 单元测试（零依赖，仅需 Node ≥ 20）
 npm run smoke      # 用本机 Chromium 真正加载扩展，采集后台/页面运行时错误
-npm run regression # 行为回归：标签切换 / 倍速开关 / 快捷键映射（10 项断言）
+npm run regression # 行为回归：标签切换 / 倍速开关 / 快捷键映射 / 倍速记忆（13 项断言）
 npm run verify:all # 以上全部
 npm run check      # 只跑静态检查
 npm test         # 只跑单元测试
@@ -36,6 +37,9 @@ npm run bump     # 更新 manifest.json / package.json 版本号
 ```
 
 - **无构建**：所有文件直接由浏览器加载；共享代码通过 `globalThis.AIO` 命名空间复用。
+- **CI**：`.github/workflows/verify.yml` 在推送/PR 时跑静态检查 + 单测，
+  并用 Chrome for Testing 跑冒烟与行为回归（`AIO_CHROME` 可指定浏览器路径）。
+- **国际化**：`_locales/zh_CN` + `_locales/en`；元素加 `data-i18n="key"` 即可增量翻译（见架构文档 §5.2）。
 - **改完即生效**：内容脚本需要刷新目标页面；后台与设置页改动在扩展刷新后生效。
 - 详细设计与决策记录见 [`docs/IMPROVEMENT_PLAN.md`](docs/IMPROVEMENT_PLAN.md)，
   目录结构与消息契约见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
@@ -45,6 +49,8 @@ npm run bump     # 更新 manifest.json / package.json 版本号
 扩展只申请 6 项权限，全部有对应代码，逐条说明见 [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md)。
 
 - 不采集、不上传任何数据；配置只存在本机 `chrome.storage`。
+- 声明期只申请 bilibili 与 WAQI 的域名权限；**Home Assistant 地址由你在设置页按需授权**
+  （`optional_host_permissions`），未授权时扩展不会访问该地址。
 - 网络请求只发生在你自己配置的地址（WAQI、Home Assistant）与你访问的 bilibili 页面内。
 
 ## 已知限制

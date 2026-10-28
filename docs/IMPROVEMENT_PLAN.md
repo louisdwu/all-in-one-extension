@@ -16,7 +16,7 @@
 |------|--------|--------|
 | 测试 | 0 用例 | 49 个 `node:test` 用例（含后台模块图启动测试） |
 | 静态检查 | 无 | `tools/check.mjs`：语法 / import 解析 / DOM id / MAIN 世界越界 / 密钥扫描 |
-| 真机验证 | 手工 | `tools/smoke.mjs`（异常采集）+ `tools/regression.mjs`（10 项行为断言） |
+| 真机验证 | 手工 | `tools/smoke.mjs`（异常采集 + 样式断言）+ `tools/regression.mjs`（13 项行为断言） |
 | 后台消息监听 | 7 个 `onMessage` 各自猜归属 | 1 个路由 + 显式 handler 注册表 |
 | 配置真相源 | 散落 10+ 文件，默认值各不相同 | `libs/schema.js` 单点，含旧数据迁移 |
 | 权限 | 9 个（3 个从未使用） | 6 个，全部有代码对应 |
@@ -181,14 +181,14 @@ MV3 的 content script **不能**用 ES module，而 service worker / 扩展页 
 | P4 | B 站模块拆分（md5/wbi 抽出、fetch/XHR 补丁修正、去掉全局劫持） | ✅ |
 | P5 | UI 重写：options 深色/深链接/无障碍/诊断；popup ES module | ✅ |
 | P6 | 文档、版本流程、提交 | ✅ |
-| P7 | 后续增强（见 §6） | ⏳ |
+| P7 | 后续增强：倍速记忆 / 诊断 / 可选权限 / i18n / CI / CSS 拆分 | ✅（见 §6） |
 
 ### 验收口径
 
 ```bash
 npm run verify      # 静态检查 + 49 个单测
 npm run smoke       # Chromium 真机：SW 0 异常、options/popup 0 异常、页面可交互
-npm run regression  # 10 项行为断言（标签切换 / 倍速开关 / 快捷键映射）
+npm run regression  # 13 项行为断言（标签切换 / 倍速开关 / 快捷键映射 / 倍速记忆）
 ```
 
 `regression` 覆盖最容易回归的三条路径：
@@ -213,19 +213,25 @@ npm run regression  # 10 项行为断言（标签切换 / 倍速开关 / 快捷�
 
 ---
 
-## 6. 后续可做（按性价比排序）
+## 6. 第二轮（P7）完成情况
 
-1. **按站点记住倍速**：目前只记"最后一次速度"（`speederLastSpeed`）；
-   可以按 hostname 存一张小表，YouTube 1.75x / B站 1.5x 各记各的。
-2. **可选权限**：把 `*://*/*` 拆成"基础权限 + 用户配置 HA 地址时按需申请 host 权限"，
-   安装时的权限提示会小很多（需要 `optional_host_permissions` + 引导 UI）。
-3. **诊断页可视化**：`tab-about` 已有数据，可加"消息类型列表 / 最近错误环形缓冲"。
-4. **i18n**：UI 文案抽到 `_locales`，`manifest.default_locale`。
-5. **Web Store 准备**：现在因为"未登录 1080P / 评论区解锁"这类绕过性功能，
-   上架风险很高；如果要公开分发，建议拆成两个扩展（通用工具 / B站增强），后者仅自签分发。
-6. **CI**：`npm run verify` 已在本地可跑；接 GitHub Actions 只需 `node-version: 22` + 两条命令。
-   `smoke` 需要 Chromium，可在 CI 用 `apt-get install chromium` 或 Playwright 镜像。
-7. **CSS 作用域**：options 页还可以继续拆成组件级 CSS（当前单文件 600 行仍可维护）。
+| 项 | 状态 | 落地方式 |
+|----|------|---------|
+| 按站点记住倍速 | ✅ | `libs/speed_memory.js` 三态模式（`off` / `global` / `site`），旧布尔 `speederRememberSpeed` 自动迁移；每站点一条、上限 200 条、LRU 淘汰；写入防抖 800ms；回归测试覆盖"换标签页后恢复" |
+| host 权限收窄 | ✅ | 声明期只留 bilibili + WAQI；Home Assistant 走 `optional_host_permissions`，由设置页在用户手势中申请；后台抓取前 `permissions.contains` 预检，把"未授权"与"网络失败"区分开 |
+| 诊断可视化 | ✅ | `libs/core.js` 日志环形缓冲（60 条）+ 路由按消息类型统计（调用/失败/平均耗时）+ 「关于与诊断」面板（消息表、最近告警、存储占用、配置快照、复制诊断） |
+| i18n | ✅ 基础设施 | `_locales/{zh_CN,en}` + `libs/i18n.js`（`data-i18n` 注解式，缺失即回退内联中文）+ manifest 本地化；**弹窗已全量双语**，设置页保留内联中文（增量迁移路径已就绪） |
+| CI | ✅ | `.github/workflows/verify.yml`：静态检查 + 单测；再用 Chrome for Testing 跑冒烟与行为回归（`AIO_CHROME` 指定浏览器路径） |
+| CSS 作用域 | ✅ | 拆为 `ui/styles/{tokens,base,components,panels}.css`，`options.css` 只做 `@import` 顺序表；**冒烟测试断言 7 个计算样式 + 规则总数**，拆分导致回退会直接失败 |
+
+### 仍然待做（按性价比）
+
+1. **按需注入**：`content_scripts` 仍是 `<all_urls>`，安装提示里的"读取和更改所有网站数据"
+   无法消除。若改用 `chrome.scripting.registerContentScripts` 动态注册，可把注入收敛到
+   "启用了功能且匹配规则的站点"，代价是架构复杂度明显上升（脚本生命周期要自己管）。
+2. **HUD 历史曲线**：`hudState` 只存最新值；可加 24h 环形缓冲 + 点击图标查看小图。
+3. **子帧独立记忆**：`all_frames` 下所有帧共享主站的记忆速度，可按帧 origin 细分。
+4. **Web Store 分发**：见 §7，仍需拆分。
 
 ---
 
@@ -235,4 +241,7 @@ npm run regression  # 10 项行为断言（标签切换 / 倍速开关 / 快捷�
   这是本项目最重要的开发体验，不值得为一个 import 语法牺牲。
 - **没有删除 B 站绕过逻辑**。它属于使用者个人的工具选择，但相关的
   "全局劫持 `setTimeout` / `Object.defineProperty`" 这类会波及无关网站的实现已被移除。
-- **没有动 `chrome.storage.sync` 的键名**（见 §5）。
+- **没有动 `chrome.storage.sync` 的键名**（见 §5），唯一例外是新增 `speederSpeedMemory`
+  并回收旧布尔 `speederRememberSpeed`（写入前先迁移，数据不丢）。
+- **设置页文案没有全部抽 i18n**：结构复杂、当前用户为中文，全量提取的收益低于风险；
+  机制（`data-i18n` + 校验）已就位，需要时按字符串增量迁移即可。
