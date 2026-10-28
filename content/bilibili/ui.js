@@ -20,7 +20,10 @@
     const CLOSE_SWITCH = '.bpx-player-ctrl-subtitle-close-switch';
 
     let config = { enabled: true, autoSubtitle: true, subtitleHotkey: 's' };
+    // 每次导航（含 SPA 切视频）只对齐一次字幕，避免和用户手动操作打架。
     let autoRan = false;
+    // 配置读出来之前不要动手：默认值会让"已关闭"的用户在慢速 SPA 跳转时被翻开。
+    let ready = false;
 
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -65,6 +68,45 @@
         return !!track;
     }
 
+    /**
+     * Close subtitles.
+     *
+     * Called when the auto-enable option is off: Bilibili restores the last
+     * subtitle choice on every new video, so "don't auto-enable" has to mean
+     * "make sure they are off", otherwise AI subtitles overlap baked-in ones.
+     */
+    async function disableSubtitle() {
+        const button = document.querySelector(SUBTITLE_BUTTON);
+        if (!button) return false;
+        hover(button, 'mouseenter');
+        await sleep(400);
+        const menu = document.querySelector(SUBTITLE_MENU);
+        if (!menu) {
+            hover(button, 'mouseleave');
+            return false;
+        }
+
+        const activeItem = menu.querySelector(MENU_ITEM + '.bpx-state-active');
+        const closeSwitch = menu.querySelector(CLOSE_SWITCH);
+        // 'bpx-state-active' on the "close subtitle" row means subtitles are OFF.
+        const currentlyOn = !!activeItem ||
+            (closeSwitch && !closeSwitch.classList.contains('bpx-state-active'));
+
+        if (!currentlyOn) {
+            hover(button, 'mouseleave');
+            subLog.debug('subtitle already off');
+            return true;
+        }
+        if (!closeSwitch) {
+            hover(button, 'mouseleave');
+            return false;
+        }
+        closeSwitch.click();
+        hover(button, 'mouseleave');
+        subLog.debug('subtitle closed');
+        return true;
+    }
+
     async function toggleSubtitle() {
         const button = document.querySelector(SUBTITLE_BUTTON);
         if (!button) return;
@@ -84,17 +126,23 @@
         hover(button, 'mouseleave');
     }
 
-    /** Wait for the player controls, then auto-enable once per navigation. */
+    /** Wait for the player controls, then align subtitles once per navigation. */
     function scheduleAutoSubtitle() {
-        if (!isTopFrame || autoRan || !config.autoSubtitle) return;
+        if (!isTopFrame || !ready || autoRan || !config.enabled) return;
         autoRan = true;
         AIO.core.dom.waitFor(SUBTITLE_BUTTON, { timeout: 20000 }).then(async (button) => {
             if (!button) return;
             await sleep(800);
-            // 用户在等待播放器控件期间关掉了功能：不要再补一次开启。
-            if (!config.enabled || !config.autoSubtitle) return;
-            const ok = await enableSubtitle();
-            subLog.debug('auto subtitle', ok ? 'enabled' : 'unavailable');
+            // 用户在等待播放器控件期间拨动了开关：以最新配置为准。
+            if (!config.enabled) return;
+            if (config.autoSubtitle) {
+                const ok = await enableSubtitle();
+                subLog.debug('auto subtitle', ok ? 'enabled' : 'unavailable');
+            } else {
+                // 功能关闭：主动收起 B站自己恢复的字幕，别让它压在硬字幕上。
+                const closed = await disableSubtitle();
+                subLog.debug('auto subtitle off', closed ? 'cleared' : 'unavailable');
+            }
         });
     }
 
@@ -118,12 +166,24 @@
     });
 
     function apply(settingsValue) {
+        const previous = config;
+        const hadConfig = ready;
         config = {
             enabled: settingsValue.biliEnabled !== false,
             autoSubtitle: settingsValue.biliAutoSubtitle !== false,
-            subtitleHotkey: settingsValue.bilibiliSubtitles.subtitleHotkey || 's'
+            subtitleHotkey: (settingsValue.bilibiliSubtitles || {}).subtitleHotkey || 's'
         };
-        if (config.enabled && config.autoSubtitle) scheduleAutoSubtitle();
+        ready = true;
+
+        if (!config.enabled) return;
+
+        if (hadConfig && previous.autoSubtitle !== config.autoSubtitle) {
+            // 用户刚拨动开关：当前页面立刻跟上，不用等刷新。
+            if (config.autoSubtitle) enableSubtitle();
+            else disableSubtitle();
+            return;
+        }
+        scheduleAutoSubtitle();
     }
 
     settings().then(apply);

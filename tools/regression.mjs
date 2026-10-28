@@ -17,7 +17,7 @@
  */
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -49,13 +49,56 @@ const FRAME_PAGE = [
     '</body></html>'
 ].join('\n');
 
+// Stand-in for the bilibili player's subtitle menu. The extension's bilibili
+// content script only runs on *.bilibili.com, so the harness loads the script
+// itself after stubbing the AIO runtime it expects.
+const BILI_PAGE = [
+    '<!doctype html><html><head><meta charset="utf-8"><title>AIO bili player stub</title></head><body>',
+    '<div class="bpx-player-ctrl-btn bpx-player-ctrl-subtitle">字幕</div>',
+    '<div class="bpx-player-ctrl-subtitle-menu">',
+    '  <ul>',
+    '    <li class="bpx-player-ctrl-subtitle-language-item" data-lan="zh-Hans">中文（中国）</li>',
+    '    <li class="bpx-player-ctrl-subtitle-language-item" data-lan="ai-zh">中文（自动生成）</li>',
+    '  </ul>',
+    '  <div class="bpx-player-ctrl-subtitle-close-switch bpx-state-active">关闭字幕</div>',
+    '</div>',
+    '<script>',
+    '(function () {',
+    '  var menu = document.querySelector(".bpx-player-ctrl-subtitle-menu");',
+    '  var button = document.querySelector(".bpx-player-ctrl-subtitle");',
+    '  var items = Array.prototype.slice.call(menu.querySelectorAll(".bpx-player-ctrl-subtitle-language-item"));',
+    '  var closeSwitch = menu.querySelector(".bpx-player-ctrl-subtitle-close-switch");',
+    '  window.__sub = { on: false, lan: null };',
+    '  window.__subClicks = 0;',
+    '  window.__setSub = function (lan) {',
+    '    window.__sub.on = true; window.__sub.lan = lan;',
+    '    items.forEach(function (item) { item.classList.toggle("bpx-state-active", item.getAttribute("data-lan") === lan); });',
+    '    closeSwitch.classList.remove("bpx-state-active");',
+    '  };',
+    '  button.addEventListener("mouseenter", function () { menu.style.display = "block"; });',
+    '  button.addEventListener("mouseleave", function () { menu.style.display = "none"; });',
+    '  items.forEach(function (item) {',
+    '    item.addEventListener("click", function () { window.__subClicks += 1; window.__setSub(item.getAttribute("data-lan")); });',
+    '  });',
+    '  closeSwitch.addEventListener("click", function () {',
+    '    window.__subClicks += 1; window.__sub.on = false; window.__sub.lan = null;',
+    '    items.forEach(function (item) { item.classList.remove("bpx-state-active"); });',
+    '    closeSwitch.classList.add("bpx-state-active");',
+    '  });',
+    '  if (location.search.indexOf("on=1") !== -1) window.__setSub("ai-zh");',
+    '  menu.style.display = "none";',
+    '})();',
+    '<' + '/script>',
+    '</body></html>'
+].join('\n');
+
 function startServer() {
     return new Promise((res) => {
         const server = createServer((req, resp) => {
             resp.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
             // /frame is served under a *different* hostname (localhost) so the
             // per-site speed memory cannot accidentally satisfy the assertion.
-            resp.end(req.url.startsWith('/frame') ? FRAME_PAGE : PAGE);
+            resp.end(req.url.startsWith('/frame') ? FRAME_PAGE : req.url.startsWith('/bili') ? BILI_PAGE : PAGE);
         });
         // Bind on all interfaces so both 127.0.0.1 and localhost resolve.
         server.listen(0, () => res(server));
@@ -319,7 +362,7 @@ async function main() {
         const commandResult = await ext.main('chrome.tabs.sendMessage(' + tabId + ', { type: "speeder:command", action: "preset" })');
         check('speed command reaches the content script', !!commandResult && commandResult.ok === true && commandResult.speed === 2, JSON.stringify(commandResult));
 
-        await wait(1400); // persist debounce is 800ms
+        await wait(2200); // persist debounce is 800ms; leave headroom for worker wake-ups
         const store = await page1.iso('AIO.core.storage.getLocal(["speederSpeeds"])');
         check('chosen speed is remembered for the hostname', !!store && store.speederSpeeds && store.speederSpeeds['127.0.0.1'] === 2, JSON.stringify(store));
 
@@ -353,6 +396,52 @@ async function main() {
 
     const frameRate = await page1.frame(frameOrigin, 'main', 'document.getElementById("v1").playbackRate');
     check('late iframe adopts the top-frame speed', frameRate === 2, 'rate=' + frameRate);
+
+    // ---------- F. bilibili subtitle switch ----------
+    // The bilibili content script only matches *.bilibili.com, so run it on the
+    // stub page against a minimal AIO runtime. This covers the two behaviours
+    // that used to be conflated: "off" must actually close restored subtitles,
+    // "on" must prefer the official Chinese track.
+    const biliUiSource = readFileSync(join(EXT_DIR, 'content/bilibili/ui.js'), 'utf8');
+    const biliBootstrap = (autoSubtitle) => [
+        'window.__aioSettings = { biliEnabled: true, biliAutoSubtitle: ' + autoSubtitle + ', bilibiliSubtitles: { subtitleHotkey: "s" } };',
+        'window.AIO = window.AIO || {};',
+        'window.AIO.core = {',
+        '  log: function () { var noop = function () {}; return { debug: noop, info: noop, warn: noop, error: noop }; },',
+        '  rafThrottle: function () { return function () {}; },',
+        '  onMessage: function () { return function () {}; },',
+        '  dom: { waitFor: function (selector) { return Promise.resolve(document.querySelector(selector)); } }',
+        '};',
+        'window.AIO.content = {',
+        '  log: window.AIO.core.log,',
+        '  settings: function () { return Promise.resolve(window.__aioSettings); },',
+        '  onChange: function (callback) { window.__aioOnChange = callback; },',
+        '  isTopFrame: true,',
+        '  isEditable: function () { return false; }',
+        '};',
+        'true'
+    ].join('\n');
+
+    log('F: auto-subtitle off must close restored subtitles');
+    const biliOff = await openPage(base + 'bili?on=1');
+    await biliOff.main(biliBootstrap(false));
+    await biliOff.main(biliUiSource);
+    await wait(2600);
+    const closedState = await biliOff.main('({ on: window.__sub.on, lan: window.__sub.lan, clicks: window.__subClicks })');
+    check('auto-subtitle off closes the subtitles bilibili restored', closedState.on === false && closedState.clicks >= 1, JSON.stringify(closedState));
+
+    log('F: auto-subtitle on must prefer the official track');
+    const biliOn = await openPage(base + 'bili');
+    await biliOn.main(biliBootstrap(true));
+    await biliOn.main(biliUiSource);
+    await wait(2600);
+    const picked = await biliOn.main('({ on: window.__sub.on, lan: window.__sub.lan })');
+    check('auto-subtitle on prefers the official Chinese track', picked.on === true && picked.lan === 'zh-Hans', JSON.stringify(picked));
+
+    await biliOn.main('window.__aioOnChange({ biliEnabled: true, biliAutoSubtitle: false, bilibiliSubtitles: { subtitleHotkey: "s" } })');
+    await wait(1600);
+    const toggledOff = await biliOn.main('({ on: window.__sub.on, lan: window.__sub.lan })');
+    check('turning the option off closes subtitles right away', toggledOff.on === false, JSON.stringify(toggledOff));
 
     // cleanup state so the profile is not left with test mappings/speeds
     await page1.iso('AIO.schema.save({ hotkeyMappings: {}, speederSpeedMemory: "site" })').catch(() => {});

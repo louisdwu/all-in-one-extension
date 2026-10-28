@@ -44,7 +44,7 @@ export async function initBilibili() {
     // object in sync for older builds.
     document.getElementById('bili-autoSubtitle')?.addEventListener('change', async (event) => {
         await schema.save({ biliAutoSubtitle: event.target.checked });
-        toast(event.target.checked ? '已开启自动字幕' : '已关闭自动字幕');
+        toast(event.target.checked ? '已开启自动字幕' : '已关闭自动字幕，当前页面会自动收起字幕');
     });
 
     // Single-key subtitle hotkey recorder.
