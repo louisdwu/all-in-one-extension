@@ -76,8 +76,7 @@ ui/                         options（hash 路由/深色/诊断）+ popup（ES m
 ui/styles/                  样式模块：tokens / base / components / panels（options.css 只做 @import）
 _locales/                   zh_CN + en（manifest 用 __MSG_*）
 tests/                      node:test
-tools/                      check.mjs / smoke.mjs / regression.mjs / bump-version.mjs
-.github/workflows/          verify.yml（静态检查 + 单测 + 真机冒烟/回归）
+tools/                      check.mjs / smoke.mjs / regression.mjs / perf.mjs / bump-version.mjs
 docs/                       ARCHITECTURE / PERMISSIONS / IMPROVEMENT_PLAN
 ```
 
@@ -166,6 +165,12 @@ docs/                       ARCHITECTURE / PERMISSIONS / IMPROVEMENT_PLAN
   设置页「关于与诊断」可直接看到。
 - **多帧**：内容脚本 `all_frames` 时会出现在每个 frame。只有顶层帧 `isTopFrame` 才建 UI；
   需要跨帧一致的状态走后台广播（参考 `speeder:applySpeed` / `speeder:tabSpeed`）。
+- **帧内懒启动**：速器注入每个 iframe，但只有真的出现 `<video>` 才 `boot()`
+  （读配置 + 订阅变更）。新增全站脚本时请沿用这个模式：先做零成本探测，再启动。
+- **MAIN 世界 bundle 不引共享层**：`libs/core.js` 在 MAIN 里没有用途（那里没有 chrome
+  API），只会让每个 iframe 多解析一份。两个 MAIN 脚本已合并为一个 bundle。
+- **性能基线**：20 个无视频 iframe 下，扩展带来的主线程开销约 46 ms（每帧 ~2.3 ms）。
+  新增全站注入的代码后，用 `npm run perf` 复测（对比"不装扩展"的同一页面），别凭感觉。
 
 ## 9. 测试要求
 
@@ -174,4 +179,5 @@ docs/                       ARCHITECTURE / PERMISSIONS / IMPROVEMENT_PLAN
   新增交互功能时，优先往 `tools/regression.mjs` 加一条行为断言，而不是只靠手工验证。
 - 新增 `manifest` 资源/权限：`tests/manifest.test.js` 会自动校验文件存在与权限被使用；
   `tools/check.mjs` 校验 `@import`/样式表/脚本引用、`_locales` 与 `data-i18n` 键完整性。
-- CI（`.github/workflows/verify.yml`）会跑同样的命令；本地绿 = CI 绿。
+- `npm run verify:all` 一次跑完静态检查 + 单测 + 冒烟 + 行为回归。**不在 GitHub 上跑 CI**
+  （本项目按个人自用维护），所以提交前本地必须自己跑绿。

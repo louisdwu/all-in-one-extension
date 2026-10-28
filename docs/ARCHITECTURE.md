@@ -80,6 +80,22 @@ fetchWaqi / fetchHa → runtime.state 合并 → rebuildQueue → setIcon
 - 轮播用 `setInterval`（可到 3 秒）；`chrome.alarms` 最小 30 秒，仅用于 SW 被挂起后重新拉起定时器。
 - 状态写入经 `createWriter('local', 400)` 合并，避免高频写。
 
+### 3.0 内容脚本 bundle 与开销
+
+`manifest.json` 现在是 5 个 bundle，按"注入范围"分层，避免把重的东西放进每个帧：
+
+| # | 范围 | 内容 | 说明 |
+|---|------|------|------|
+| 1 | 顶层帧 | core/keys/rules/schema + 内容运行时 + 标签切换 + 无痕 + 快捷键桥 | 只在顶层，功能都是页面级 |
+| 2 | **所有帧（MAIN）** | `hotkey_inject.js` + `speeder_inject.js`（合并，无共享层） | 轻量：只改原型/监听，不读存储 |
+| 3 | **所有帧（ISOLATED）** | 共享层 + 内容运行时 + 速器 | 懒启动：出现 `<video>` 才读配置 |
+| 4 | bilibili 视频页 | 共享层 + 守卫/字幕 | 页面级 |
+| 5 | bilibili 视频页（MAIN） | 共享层 + md5/wbi + 注入器 | 页面级 |
+
+两条硬约束：
+- **MAIN 世界 bundle 不要引共享层**（`libs/core.js` 在 MAIN 里用不到，白付解析成本）；
+- **所有帧的脚本必须懒启动**：加载时零存储访问、零监听，出现视频再 `boot()`。
+
 ### 3.1 子帧（iframe）与倍速
 
 速器的 ISOLATED 包和 MAIN 注入器都声明了 `all_frames: true`，所以**每个帧**都会接管

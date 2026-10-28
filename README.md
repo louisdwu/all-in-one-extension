@@ -1,6 +1,6 @@
 # All in One Extension (AIO)
 
-![Version](https://img.shields.io/badge/version-1.2026.1028.0846-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2026.1028.0909-blue.svg)
 ![Chrome](https://img.shields.io/badge/browser-Chrome-orange.svg)
 ![Manifest](https://img.shields.io/badge/manifest-v3-green.svg)
 
@@ -16,7 +16,7 @@
 |------|------|
 | 🖱️ 标签页切换 | 按住鼠标右键 + 滚轮呼出标签列表，滚轮切换、松开确认、Esc 取消 |
 | 🕵️ 无痕按键 | 修饰键 + 左键点击链接 → 无痕窗口打开，并自动清理 `utm_*`/`spm_id_from` 等跟踪参数 |
-| 🎬 视频倍速 | 接管页面 `<video>` 倍速（含对抗站点重置），悬浮球 + 页面内快捷键 + 站点规则 + 按网站记住速度；跨站 iframe（嵌入播放器）跟随顶层帧 |
+| 🎬 视频倍速 | 接管页面 `<video>` 倍速（含对抗站点重置），悬浮球 + 页面内快捷键 + 站点规则 + 按网站记住速度；跨站 iframe（嵌入播放器）跟随顶层帧。页面没有视频时脚本完全休眠（不读配置、不建 UI） |
 | 🎹 快捷键映射 | 按站点把某个按键的行为迁移到另一个键（例如 F → H） |
 | 📺 B站增强 | 自动中文字幕、字幕热键、未登录 1080P、评论区加载、AI 字幕解锁、播完暂停 |
 | 🖥️ HUD 监控 | 在扩展图标上轮播 WAQI 空气质量与 Home Assistant 实体数值，支持阈值变色 |
@@ -41,8 +41,8 @@ npm run bump     # 更新 manifest.json / package.json 版本号
 ```
 
 - **无构建**：所有文件直接由浏览器加载；共享代码通过 `globalThis.AIO` 命名空间复用。
-- **CI**：`.github/workflows/verify.yml` 在推送/PR 时跑静态检查 + 单测，
-  并用 Chrome for Testing 跑冒烟与行为回归（`AIO_CHROME` 可指定浏览器路径）。
+- **校验只在本地跑**（不在 GitHub 上跑 CI）：`npm run verify:all` 一条命令跑完
+  静态检查 + 单测 + 冒烟 + 行为回归。`AIO_CHROME` 可指定要用的浏览器可执行文件。
 - **国际化**：`_locales/zh_CN` + `_locales/en`；元素加 `data-i18n="key"` 即可增量翻译（见架构文档 §5.2）。
 - **改完即生效**：内容脚本需要刷新目标页面；后台与设置页改动在扩展刷新后生效。
 - 详细设计与决策记录见 [`docs/IMPROVEMENT_PLAN.md`](docs/IMPROVEMENT_PLAN.md)，
@@ -56,6 +56,29 @@ npm run bump     # 更新 manifest.json / package.json 版本号
 - 声明期只申请 bilibili 与 WAQI 的域名权限；**Home Assistant 地址由你在设置页按需授权**
   （`optional_host_permissions`），未授权时扩展不会访问该地址。
 - 网络请求只发生在你自己配置的地址（WAQI、Home Assistant）与你访问的 bilibili 页面内。
+
+## 性能
+
+- 倍速脚本在**每个 iframe** 里都会注入（这样嵌入播放器也能用同一套逻辑），但**没有视频就不启动**：
+  不读存储、不订阅设置变更、不建 UI，只留一个"只检查新增节点"的 MutationObserver；
+  真的有 `<video>` 出现时才加载配置并接管。
+- 页面没有 `<video>` 时不显示悬浮球。
+- 锁速引擎平时零轮询：只在锁定期间跑 500 ms 兜底，帧内 10 秒没有视频就自停。
+- 后台 HUD 用定时器 + 每分钟一次的保活闹钟；抓取串行化并按配置指纹比对，
+  改设置不会引发抓取风暴。
+- MAIN 世界只注入**一个**合并后的脚本（快捷键拦截 + 锁速），且不依赖共享层，
+  避免每个 iframe 多解析 13 KB。
+
+实测（无头 Chromium，20 个同源 iframe、都没视频，3 次取中位数）：
+
+| | 主线程任务时间 | JS 执行时间 |
+|---|---|---|
+| 不装扩展 | 43 ms | 0 ms |
+| 装扩展（现在） | 89 ms | 17 ms |
+| 装扩展（优化前） | 199 ms | 33 ms |
+
+即每个 iframe 约 **2.3 ms** 主线程开销（JS 约 0.85 ms）。页面通常 3–5 个 iframe，
+合计 10 ms 量级；跨域 iframe 各自独立进程，不占主页面的主线程。
 
 ## 已知限制
 

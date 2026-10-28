@@ -135,6 +135,10 @@
         state.videos.add(video);
         video.addEventListener('ratechange', onRateChange);
         video.addEventListener('loadedmetadata', () => applySpeed());
+        // A frame pays nothing (no storage read, no settings subscription) until
+        // it actually contains a video. This matters because the speeder is
+        // injected into every iframe on every site.
+        boot();
     }
 
     function scanVideos() {
@@ -486,8 +490,25 @@
         }
     }
 
-    settings().then(apply);
-    onChange(apply);
+    /**
+     * Boot once, and only when this frame has something to control.
+     * Loading settings and subscribing to changes are the two costs worth
+     * deferring; DOM scanning below is allocation-free until a video shows up.
+     */
+    let bootPromise = null;
+    function boot() {
+        if (bootPromise) return bootPromise;
+        bootPromise = settings().then((loaded) => {
+            apply(loaded);
+            onChange(apply);
+            return loaded;
+        });
+        return bootPromise;
+    }
+
+    // Cheap probe: one observer, no storage access, until a <video> appears.
+    startObserver();
+    scanVideos();
 
     /* ------------------------------ keyboard ------------------------------ */
     window.addEventListener('keydown', (event) => {
@@ -506,19 +527,23 @@
     AIO.core.onMessage((message) => {
         if (!message) return undefined;
         if (message.type === 'speeder:command') {
-            const action = message.action;
-            if (action === 'increase') step(state.settings ? state.settings.speederStep : 0.25);
-            else if (action === 'decrease') step(-(state.settings ? state.settings.speederStep : 0.25));
-            else if (action === 'preset') cyclePreset();
-            else if (action === 'reset') reset();
-            return { ok: true, speed: state.speed };
+            // The frame may still be dormant (no video seen yet): boot first.
+            return boot().then(() => {
+                const action = message.action;
+                const stepSize = state.settings ? state.settings.speederStep : 0.25;
+                if (action === 'increase') step(stepSize);
+                else if (action === 'decrease') step(-stepSize);
+                else if (action === 'preset') cyclePreset();
+                else if (action === 'reset') reset();
+                return { ok: true, speed: state.speed };
+            });
         }
         if (message.type === 'speeder:applySpeed') {
             adoptHostSpeed(message.speed);
             return { ok: true, speed: state.speed };
         }
         if (message.type === 'speeder:getSpeed' || message.action === 'getSpeed') {
-            return { ok: true, speed: state.speed, active: state.active };
+            return { ok: true, speed: state.speed, active: state.active, dormant: !bootPromise };
         }
         if (message.type === 'aio:toast') {
             if (isTopFrame) AIO.content.toast(message.message, message.level || 'info');

@@ -221,7 +221,8 @@ npm run regression  # 15 项行为断言（标签切换 / 倍速开关 / 快捷�
 | host 权限收窄 | ✅ | 声明期只留 bilibili + WAQI；Home Assistant 走 `optional_host_permissions`，由设置页在用户手势中申请；后台抓取前 `permissions.contains` 预检，把"未授权"与"网络失败"区分开 |
 | 诊断可视化 | ✅ | `libs/core.js` 日志环形缓冲（60 条）+ 路由按消息类型统计（调用/失败/平均耗时）+ 「关于与诊断」面板（消息表、最近告警、存储占用、配置快照、复制诊断） |
 | i18n | ✅ 基础设施 | `_locales/{zh_CN,en}` + `libs/i18n.js`（`data-i18n` 注解式，缺失即回退内联中文）+ manifest 本地化；**弹窗已全量双语**，设置页保留内联中文（增量迁移路径已就绪） |
-| CI | ✅ | `.github/workflows/verify.yml`：静态检查 + 单测；再用 Chrome for Testing 跑冒烟与行为回归（`AIO_CHROME` 指定浏览器路径） |
+| CI | ❌ 已移除 | 曾在 `.github/workflows/verify.yml` 接过 Actions，但本项目个人自用，不在 GitHub 上跑；
+  校验统一走本地 `npm run verify:all`（静态检查 + 单测 + 冒烟 + 行为回归） |
 | CSS 作用域 | ✅ | 拆为 `ui/styles/{tokens,base,components,panels}.css`，`options.css` 只做 `@import` 顺序表；**冒烟测试断言 7 个计算样式 + 规则总数**，拆分导致回退会直接失败 |
 
 ### 已修：子帧（iframe）跟随顶层帧速度
@@ -248,6 +249,7 @@ npm run regression  # 15 项行为断言（标签切换 / 倍速开关 / 快捷�
 | 按需注入（`registerContentScripts` 动态注册） | 安装提示无法消除，收益低于维护成本 |
 | HUD 历史曲线 | 原始数据在 Home Assistant 里本来就能看 |
 | 打包分发（Web Store / 拆分扩展） | 个人自用，没有分发需求 |
+| GitHub Actions CI | 个人自用，不在 GitHub 上跑流水线；本地 `npm run verify:all` 已覆盖 |
 
 ---
 

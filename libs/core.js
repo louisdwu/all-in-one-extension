@@ -416,6 +416,7 @@
         hasChrome,
         log,
         setLevel,
+        applyDebugSetting,
         LEVELS,
         storage: {
             get: storageGet,
@@ -445,19 +446,16 @@
         env
     };
 
-    // Silently keep the debug level in sync with the stored setting without
-    // waking the service worker on every page: read once, then watch changes.
-    if (hasChrome() && chrome.storage && chrome.storage.sync) {
-        chrome.storage.sync.get(['aioDebug'], (result) => {
-            void chrome.runtime.lastError;
-            if (result && result.aioDebug) setLevel('debug');
-        });
-        try {
-            chrome.storage.onChanged.addListener((changes, area) => {
-                if (area === 'sync' && changes.aioDebug) {
-                    setLevel(changes.aioDebug.newValue ? 'debug' : 'warn');
-                }
-            });
-        } catch (e) { /* ignore */ }
+    /**
+     * The debug level is NOT read here on purpose: this file is injected into
+     * every iframe, and a storage read per frame is a real cost. Each world sets
+     * it once it already has the settings in hand:
+     *   - background/index.js  (worker start)
+     *   - content/lib/content.js (when the frame boots, i.e. has a video)
+     *   - ui/options.js, ui/popup.js (page bootstrap)
+     */
+    function applyDebugSetting(settings) {
+        if (!settings) return;
+        setLevel(settings.aioDebug ? 'debug' : 'warn');
     }
 })(typeof globalThis !== 'undefined' ? globalThis : self);

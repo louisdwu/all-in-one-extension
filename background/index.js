@@ -20,8 +20,17 @@ import { initHUD, registerHUDMessages } from './features/hud/index.js';
 import { initLifecycle } from './features/lifecycle.js';
 import { registerDiagnostics } from './features/diagnostics.js';
 
-const { log } = globalThis.AIO.core;
+const { log, setLevel } = globalThis.AIO.core;
 const bgLog = log('bg');
+
+// The worker already pays for one storage read at startup; keep the debug level
+// live here instead of in libs/core.js (which runs in every content-script frame).
+globalThis.AIO.schema.load()
+    .then((settings) => globalThis.AIO.core.applyDebugSetting(settings))
+    .catch(() => {});
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'sync' && changes.aioDebug) setLevel(changes.aioDebug.newValue ? 'debug' : 'warn');
+});
 
 // Unhandled failures would otherwise vanish with the worker; keep them in the
 // log ring so the diagnostics panel can show them. (Node — used by the module

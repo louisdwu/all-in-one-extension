@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "__MSG_extName__",
-    "version": "1.2026.1028.0846",
+    "version": "1.2026.1028.0909",
     "description": "__MSG_extDescription__",
     "default_locale": "zh_CN",
     "permissions": [
@@ -45,18 +45,7 @@
                 "<all_urls>"
             ],
             "js": [
-                "content/hotkey_inject.js"
-            ],
-            "run_at": "document_start",
-            "all_frames": true,
-            "world": "MAIN"
-        },
-        {
-            "matches": [
-                "<all_urls>"
-            ],
-            "js": [
-                "libs/core.js",
+                "content/hotkey_inject.js",
                 "content/speeder_inject.js"
             ],
             "run_at": "document_start",
