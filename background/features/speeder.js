@@ -3,10 +3,37 @@
  */
 import '../../libs/core.js';
 import '../../libs/schema.js';
+import '../../libs/speed_memory.js';
 import { handle, broadcast } from '../router.js';
 
-const { log } = globalThis.AIO.core;
+const { log, storage } = globalThis.AIO.core;
 const speedLog = log('speeder');
+
+/* ------------------------------------------------------------------ *
+ * Speed memory writes live here, not in the content script.
+ *
+ * A page-side timer is throttled when the tab goes to the background
+ * (Chrome clamps timers in hidden tabs), so "change speed then switch tab"
+ * could silently lose the remembered value. The worker has no such limit and
+ * the in-memory mirror keeps concurrent updates from clobbering each other.
+ * ------------------------------------------------------------------ */
+const memoryWriter = storage.createWriter('local', 350);
+let speedsCache = null;
+
+async function loadSpeeds() {
+    if (speedsCache) return speedsCache;
+    const data = await storage.getLocal(['speederSpeeds']);
+    speedsCache = globalThis.AIO.speedMemory.normalize(data.speederSpeeds);
+    return speedsCache;
+}
+
+function hostnameFromSender(sender) {
+    try {
+        return sender && sender.tab && sender.tab.url ? new URL(sender.tab.url).hostname : '';
+    } catch (err) {
+        return '';
+    }
+}
 
 export function registerSpeeder() {
     handle('speeder:getSettings', async () => {
@@ -43,6 +70,25 @@ export function registerSpeeder() {
         await broadcast({ type: 'speeder:shortcutsChanged', shortcuts: settings.shortcuts }, {});
         return { ok: true, shortcuts: settings.shortcuts };
     }, ['updateSpeederShortcuts']);
+
+    /** Remember the current speed according to the configured mode. */
+    handle('speeder:remember', async (message, sender) => {
+        const mode = message.mode;
+        if (mode !== 'site' && mode !== 'global') return { ok: true, skipped: true };
+        const speed = globalThis.AIO.speedMemory.clampSpeed(message.speed);
+        if (speed === null) return { ok: false, error: 'invalid speed' };
+
+        if (mode === 'site') {
+            const hostname = message.hostname || hostnameFromSender(sender);
+            if (!hostname) return { ok: false, error: 'no hostname' };
+            const store = globalThis.AIO.speedMemory.remember(await loadSpeeds(), hostname, speed);
+            speedsCache = store;
+            memoryWriter.queue({ speederSpeeds: store });
+        } else {
+            memoryWriter.queue({ speederLastSpeed: speed });
+        }
+        return { ok: true };
+    }, ['speeder:rememberSpeed']);
 
     handle('speeder:openOptions', async () => {
         chrome.runtime.openOptionsPage();

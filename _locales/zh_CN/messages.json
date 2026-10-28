@@ -1,0 +1,78 @@
+{
+    "extName": {
+        "message": "All in One Extension",
+        "description": "扩展名称（manifest 使用 __MSG_extName__）"
+    },
+    "extDescription": {
+        "message": "多合一浏览器增强：标签切换 / 无痕打开 / 视频倍速 / 快捷键映射 / B站增强 / HUD 监控"
+    },
+    "popupOpenSettings": {
+        "message": "打开设置"
+    },
+    "popupHud": {
+        "message": "🖥️ HUD 监控"
+    },
+    "popupHudToggle": {
+        "message": "HUD 总开关"
+    },
+    "popupHudEmpty": {
+        "message": "未配置监控项，去设置页添加"
+    },
+    "popupTabs": {
+        "message": "🖱️ 标签页切换"
+    },
+    "popupTabsToggle": {
+        "message": "右键 + 滚轮切换标签页"
+    },
+    "popupTabsHint": {
+        "message": "按住鼠标右键并滚动滚轮呼出标签列表。"
+    },
+    "popupSpeeder": {
+        "message": "🎬 视频倍速"
+    },
+    "popupSpeederToggle": {
+        "message": "全局启用倍速"
+    },
+    "popupSpeedState": {
+        "message": "当前标签页"
+    },
+    "popupSpeedDown": {
+        "message": "− 减速"
+    },
+    "popupSpeedUp": {
+        "message": "+ 加速"
+    },
+    "popupSpeedPreset": {
+        "message": "预设"
+    },
+    "popupHotkeys": {
+        "message": "🎹 本站快捷键映射"
+    },
+    "popupHotkeysToggle": {
+        "message": "在本站启用映射"
+    },
+    "popupHotkeyOriginal": {
+        "message": "原键"
+    },
+    "popupHotkeyNew": {
+        "message": "新键"
+    },
+    "popupHotkeyAdd": {
+        "message": "添加映射"
+    },
+    "popupHotkeyClear": {
+        "message": "清空本站"
+    },
+    "popupHotkeyEmpty": {
+        "message": "暂无映射"
+    },
+    "popupIncognito": {
+        "message": "🕵️ 无痕按键"
+    },
+    "popupIncognitoHint": {
+        "message": "按住修饰键并左键点击链接，即可在无痕窗口打开"
+    },
+    "popupIncognitoCurrent": {
+        "message": "当前："
+    }
+}

@@ -120,6 +120,79 @@ for (const file of jsFiles) {
   }
 }
 
+/* ---------------- 2c. locales + data-i18n keys ---------------- */
+const localesDir = join(ROOT, '_locales');
+const localeMessages = new Map();
+if (manifest.default_locale) {
+  if (!exists('_locales/' + manifest.default_locale + '/messages.json')) {
+    fail('default_locale "' + manifest.default_locale + '" has no _locales/' + manifest.default_locale + '/messages.json');
+  }
+} else {
+  note('manifest has no default_locale (i18n disabled)');
+}
+try {
+  for (const entry of readdirSync(localesDir)) {
+    const file = '_locales/' + entry + '/messages.json';
+    if (!exists(file)) continue;
+    try {
+      localeMessages.set(entry, JSON.parse(read(file)));
+    } catch (err) {
+      fail('invalid JSON in ' + file + ': ' + err.message);
+    }
+  }
+} catch (err) {
+  /* no _locales directory at all */
+}
+
+// every __MSG_key__ referenced by the manifest must exist in the default locale
+const defaultMessages = localeMessages.get(manifest.default_locale) || {};
+const manifestText = read('manifest.json');
+for (const match of manifestText.matchAll(/__MSG_([A-Za-z0-9_@]+)__/g)) {
+  if (!defaultMessages[match[1]]) fail('manifest references __MSG_' + match[1] + '__ which is missing from the default locale');
+}
+
+// every data-i18n key must exist in every locale, so translations cannot drift
+for (const htmlFile of allFiles.filter((f) => f.startsWith('ui/') && f.endsWith('.html'))) {
+  const source = read(htmlFile);
+  for (const match of source.matchAll(/data-i18n(?:-[a-z-]+)?="([^"]+)"/g)) {
+    for (const [localeName, messages] of localeMessages) {
+      if (!messages[match[1]]) fail(htmlFile + ' uses data-i18n="' + match[1] + '" but ' + localeName + ' has no such message');
+    }
+  }
+}
+
+/* ---------------- 2d. stylesheet & script references ---------------- */
+function resolveFrom(file, specifier) {
+    return resolve(dirname(join(ROOT, file)), specifier);
+}
+
+function isFile(absolutePath) {
+    try {
+        return statSync(absolutePath).isFile();
+    } catch (err) {
+        return false;
+    }
+}
+
+for (const htmlFile of allFiles.filter((file) => file.endsWith('.html'))) {
+    const source = read(htmlFile);
+    for (const match of source.matchAll(/<link[^>]+href="([^"]+)"/g)) {
+        if (/^(https?:|data:|#)/.test(match[1])) continue;
+        if (!isFile(resolveFrom(htmlFile, match[1]))) fail(htmlFile + ' links a missing stylesheet: ' + match[1]);
+    }
+    for (const match of source.matchAll(/<script[^>]+src="([^"]+)"/g)) {
+        if (/^(https?:|data:)/.test(match[1])) continue;
+        if (!isFile(resolveFrom(htmlFile, match[1]))) fail(htmlFile + ' loads a missing script: ' + match[1]);
+    }
+}
+
+for (const cssFile of allFiles.filter((file) => file.endsWith('.css'))) {
+    const source = read(cssFile);
+    for (const match of source.matchAll(/@import\s+url\(\s*['"]?([^'")]+)['"]?\s*\)/g)) {
+        if (!isFile(resolveFrom(cssFile, match[1]))) fail(cssFile + ' imports a missing stylesheet: ' + match[1]);
+    }
+}
+
 /* ---------------- 3. DOM ids ---------------- */
 function checkHtml(htmlPath, scriptPaths) {
   const html = read(htmlPath);
