@@ -27,7 +27,7 @@ function hydrate(settings) {
     };
     set('speed-globalToggle', settings.globalEnabled);
     set('speed-hideBallToggle', settings.hideFloatingBall);
-    set('speed-remember', settings.speederRememberSpeed);
+    set('speed-memory', settings.speederSpeedMemory);
     set('speed-defaultSpeed', settings.defaultSpeed);
     set('speed-presetSpeed', settings.presetSpeed);
     set('speed-step', settings.speederStep);
@@ -53,7 +53,7 @@ function bindBaseFields() {
         await schema.save({
             globalEnabled: document.getElementById('speed-globalToggle').checked,
             hideFloatingBall: document.getElementById('speed-hideBallToggle').checked,
-            speederRememberSpeed: document.getElementById('speed-remember').checked,
+            speederSpeedMemory: document.getElementById('speed-memory').value,
             defaultSpeed,
             presetSpeed: document.getElementById('speed-presetSpeed').value,
             speederStep: parseFloat(document.getElementById('speed-step').value) || 0.25,
@@ -119,6 +119,12 @@ async function addRule(type) {
 }
 
 function bindRules() {
+    // The memory mode applies immediately (no need to press save).
+    document.getElementById('speed-memory')?.addEventListener('change', async (event) => {
+        await schema.save({ speederSpeedMemory: event.target.value });
+        toast({ site: '已改为按网站记住速度', global: '已改为全局记住速度', off: '已关闭速度记忆' }[event.target.value] || '已保存');
+    });
+
     document.getElementById('speed-addInclude')?.addEventListener('click', () => addRule('include'));
     document.getElementById('speed-addExclude')?.addEventListener('click', () => addRule('exclude'));
     for (const [type, field] of Object.entries(RULE_FIELDS)) {

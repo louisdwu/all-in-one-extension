@@ -20,14 +20,26 @@
 ## `host_permissions`
 
 ```json
-"host_permissions": ["*://*/*"]
+"host_permissions": ["*://*.bilibili.com/*", "https://api.waqi.info/*"],
+"optional_host_permissions": ["*://*/*"]
 ```
 
-原因：内容脚本需要在「任意网站」上提供标签切换、无痕点击与倍速接管；
-HUD 需要访问用户**自行填写**的 Home Assistant 地址（局域网地址无法预先枚举）。
+| 域名 | 为什么必须在声明期就拿到 |
+|------|------------------------|
+| `*://*.bilibili.com/*` | `chrome.cookies` 读写 `aio_pnd` / 读取 SESSDATA；`chrome.webNavigation` 事件需要对应 host 权限才会触发 |
+| `https://api.waqi.info/*` | 后台直接抓取空气质量数据（跨域 fetch 需要 host 权限） |
 
-如需进一步收敛，可改成"基础权限 + 可选 host 权限"（见
-`docs/IMPROVEMENT_PLAN.md` §6.2）：仅在用户填入 HA 地址时申请对应 origin。
+**Home Assistant 走「按需授权」**：它的地址是你自己填的（通常还是内网地址），
+不可能预先声明。流程是：
+
+1. 在「HUD 监控」填入地址 → 点「保存」或「立即抓取」；
+2. 设置页在**用户手势**中调用 `chrome.permissions.request({ origins: ['http://your-ha:8123/*'] })`；
+3. 未授权时该地址不会被访问，面板显示「🔐 访问该地址需要单独授权」与「授权此地址」按钮；
+4. 后台抓取前也会 `chrome.permissions.contains` 预检，避免拿到一个含义不明的 CORS 错误。
+
+内容脚本本身通过 `content_scripts.matches`（`<all_urls>`）获得注入能力，
+不依赖 `host_permissions`。因此声明期的「读取和更改所有网站数据」提示仍然存在，
+但**扩展主动发起网络请求的范围**已收窄到上表 + 你授权过的 HA 地址。
 
 ## 敏感数据处理
 

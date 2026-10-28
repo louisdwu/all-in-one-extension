@@ -19,6 +19,32 @@ export function haQueueKey(entityId) {
     return 'ha_' + String(entityId).replace(/[\s\r\n]/g, '');
 }
 
+/** Origin match pattern for a user-provided HA URL ("http://host:8123/*"). */
+export function haOriginPattern(url) {
+    try {
+        const parsed = new URL(String(url || ''));
+        if (!/^https?:$/.test(parsed.protocol)) return null;
+        return parsed.origin + '/*';
+    } catch (err) {
+        return null;
+    }
+}
+
+/**
+ * Home Assistant lives on an arbitrary (usually private) origin, so it is
+ * covered by optional_host_permissions and the user grants it from the options
+ * page. Without the grant, a service-worker fetch would fail with an opaque
+ * CORS error — we detect that up front and report it.
+ */
+export async function hasHaPermission(pattern) {
+    if (!pattern) return false;
+    try {
+        return await chrome.permissions.contains({ origins: [pattern] });
+    } catch (err) {
+        return false;
+    }
+}
+
 /**
  * @param {object} settings normalized settings
  * @returns {Promise<{metrics: object, ok: boolean}>}
@@ -27,7 +53,13 @@ export async function fetchHa(settings) {
     const base = cleanUrl(settings.haUrl);
     const token = cleanToken(settings.haToken);
     const entities = Array.isArray(settings.haEntities) ? settings.haEntities : [];
-    if (!base || !token || !entities.length) return { metrics: {}, ok: false };
+    if (!base || !token || !entities.length) return { metrics: {}, ok: false, reason: 'unconfigured' };
+
+    const originPattern = haOriginPattern(base);
+    if (originPattern && !(await hasHaPermission(originPattern))) {
+        haLog.debug('missing host permission for', originPattern);
+        return { metrics: {}, ok: false, reason: 'needs_permission', origin: originPattern };
+    }
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);

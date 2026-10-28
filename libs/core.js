@@ -28,13 +28,54 @@
         currentLevel = LEVELS[level] || currentLevel;
     }
 
+    /* Bounded in-memory log ring so the diagnostics panel can show recent
+     * warnings/errors without the user opening DevTools. Reset on worker restart. */
+    const LOG_RING_MAX = 60;
+    const logRing = [];
+
+    function stringifyArg(arg) {
+        if (typeof arg === 'string') return arg;
+        if (arg instanceof Error) return arg.message;
+        try {
+            return JSON.stringify(arg);
+        } catch (err) {
+            return String(arg);
+        }
+    }
+
+    function record(level, tag, args) {
+        try {
+            logRing.push({
+                at: Date.now(),
+                level,
+                tag,
+                message: args.map(stringifyArg).join(' ').slice(0, 400)
+            });
+            if (logRing.length > LOG_RING_MAX) logRing.shift();
+        } catch (err) { /* recording must never throw */ }
+    }
+
     function log(tag) {
         const prefix = '[AIO:' + tag + ']';
         return {
-            debug(...args) { if (currentLevel <= LEVELS.debug) console.debug(prefix, ...args); },
-            info(...args) { if (currentLevel <= LEVELS.info) console.info(prefix, ...args); },
-            warn(...args) { if (currentLevel <= LEVELS.warn) console.warn(prefix, ...args); },
-            error(...args) { if (currentLevel <= LEVELS.error) console.error(prefix, ...args); }
+            debug(...args) {
+                if (currentLevel > LEVELS.debug) return;
+                console.debug(prefix, ...args);
+                record('debug', tag, args);
+            },
+            info(...args) {
+                if (currentLevel > LEVELS.info) return;
+                console.info(prefix, ...args);
+                record('info', tag, args);
+            },
+            warn(...args) {
+                if (currentLevel <= LEVELS.warn) console.warn(prefix, ...args);
+                record('warn', tag, args);
+            },
+            error(...args) {
+                if (currentLevel <= LEVELS.error) console.error(prefix, ...args);
+                record('error', tag, args);
+            }
         };
     }
 
@@ -391,6 +432,10 @@
         sendMessage,
         post,
         onMessage,
+        logRing: {
+            list: () => logRing.slice(),
+            clear: () => { logRing.length = 0; }
+        },
         debounce,
         throttle,
         rafThrottle,

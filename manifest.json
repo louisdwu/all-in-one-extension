@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "All in One Extension",
-    "version": "1.2026.1028.0116",
+    "version": "1.2026.1028.0808",
     "description": "Chrome extension for multi-functional utilities (Incognito, Hotkeys, Video Speeder, Home Assistant Monitor).",
     "permissions": [
         "tabs",
@@ -12,6 +12,10 @@
         "webNavigation"
     ],
     "host_permissions": [
+        "*://*.bilibili.com/*",
+        "https://api.waqi.info/*"
+    ],
+    "optional_host_permissions": [
         "*://*/*"
     ],
     "background": {
@@ -67,6 +71,7 @@
                 "libs/keys.js",
                 "libs/rules.js",
                 "libs/schema.js",
+                "libs/speed_memory.js",
                 "content/lib/content.js",
                 "content/speeder.js"
             ],

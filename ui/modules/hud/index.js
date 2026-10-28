@@ -22,6 +22,7 @@ export async function initHud() {
     const settings = await schema.load();
     hydrate(settings);
     renderEntities(settings.haEntities);
+    await refreshHaPermissionState();
 
     const debouncedSave = core.debounce(() => saveAll({ reschedule: false }), 700);
 
@@ -31,20 +32,38 @@ export async function initHud() {
         debouncedSave();
     });
 
-    document.getElementById('hud-save')?.addEventListener('click', () => saveAll({ reschedule: true }));
+    document.getElementById('hud-save')?.addEventListener('click', async () => {
+        await requestHaPermission();
+        await saveAll({ reschedule: true });
+        await refreshHaPermissionState();
+    });
+
     document.getElementById('hud-test')?.addEventListener('click', async (event) => {
         const button = event.currentTarget;
         button.disabled = true;
+        await requestHaPermission();
         await saveAll({ reschedule: false });
         const result = await core.sendMessage({ type: 'hud:refresh' }, 20000);
         button.disabled = false;
         if (result && result.ok) {
             toast('已抓取 ' + (result.items || 0) + ' 项数据');
             renderLiveValues(await core.storage.getLocal(['hudState']), settings);
+        } else if (result && result.reason === 'needs_permission') {
+            toast('Home Assistant 地址尚未授权，请点击「授权此地址」', 'error');
         } else {
             toast('抓取失败：请检查 Token / 地址 / 网络', 'error');
         }
+        await refreshHaPermissionState();
     });
+
+    document.getElementById('ha-grant')?.addEventListener('click', async () => {
+        const granted = await requestHaPermission();
+        await refreshHaPermissionState();
+        toast(granted ? '已授权，正在抓取…' : '未授权，Home Assistant 数据将无法读取', granted ? 'success' : 'error');
+        if (granted) await core.sendMessage({ type: 'hud:updateConfig' });
+    });
+
+    document.getElementById('ha-url')?.addEventListener('change', () => refreshHaPermissionState());
 
     renderLiveValues(await core.storage.getLocal(['hudState']), settings);
     renderTimestamps(await core.storage.getLocal(['hudLastSuccessWaqi', 'hudLastSuccessHa', 'hudLastWaqiPubS']));
@@ -58,6 +77,51 @@ export async function initHud() {
     });
 
     uiLog.debug('hud panel ready');
+}
+
+/* ---------------------------- host permission ---------------------------- */
+
+function haOriginPattern() {
+    const value = (document.getElementById('ha-url')?.value || '').trim();
+    if (!value) return null;
+    try {
+        const url = new URL(value);
+        if (!/^https?:$/.test(url.protocol)) return null;
+        return url.origin + '/*';
+    } catch (err) {
+        return null;
+    }
+}
+
+/** Ask Chrome for the HA origin. Must run inside a user gesture (button click). */
+async function requestHaPermission() {
+    const pattern = haOriginPattern();
+    if (!pattern) return false;
+    try {
+        if (await chrome.permissions.contains({ origins: [pattern] })) return true;
+        return await chrome.permissions.request({ origins: [pattern] });
+    } catch (err) {
+        return false;
+    }
+}
+
+/** Show or hide the "grant access" bar depending on the current state. */
+async function refreshHaPermissionState() {
+    const bar = document.getElementById('ha-permission-bar');
+    if (!bar) return;
+    const pattern = haOriginPattern();
+    let granted = true;
+    if (pattern) {
+        try {
+            granted = await chrome.permissions.contains({ origins: [pattern] });
+        } catch (err) {
+            granted = false;
+        }
+    }
+    const shouldShow = !!pattern && !granted;
+    bar.hidden = !shouldShow;
+    const label = document.getElementById('ha-grant');
+    if (label && pattern) label.title = pattern;
 }
 
 /* ------------------------------- hydrate ------------------------------- */

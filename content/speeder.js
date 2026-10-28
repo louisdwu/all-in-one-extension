@@ -237,13 +237,43 @@
         setSpeed(state.settings.defaultSpeed);
     }
 
+    /**
+     * Persist the current speed according to the configured memory mode
+     * ('off' | 'global' | 'site'). Writes are coalesced: dragging the speed up
+     * quickly must not produce one storage write per step.
+     */
     function persistSpeed() {
-        if (!state.settings || !state.settings.speederRememberSpeed) return;
+        const settings = state.settings;
+        if (!settings) return;
+        const mode = settings.speederSpeedMemory;
+        if (mode === 'off') return;
         if (state.persistTimer) clearTimeout(state.persistTimer);
         state.persistTimer = setTimeout(() => {
             state.persistTimer = null;
-            storage.setLocal({ speederLastSpeed: state.speed });
+            if (mode === 'site') {
+                storage.getLocal(['speederSpeeds']).then((result) => {
+                    const next = AIO.speedMemory.remember(result.speederSpeeds, location.hostname, state.speed);
+                    storage.setLocal({ speederSpeeds: next });
+                });
+            } else {
+                storage.setLocal({ speederLastSpeed: state.speed });
+            }
         }, 800);
+    }
+
+    /** Apply the remembered speed for this hostname (site → global → default). */
+    function restoreRememberedSpeed(settings) {
+        if (settings.speederSpeedMemory === 'off') return;
+        storage.getLocal(['speederSpeeds', 'speederLastSpeed']).then((result) => {
+            const resolved = AIO.speedMemory.resolve(result.speederSpeeds, location.hostname, {
+                mode: settings.speederSpeedMemory,
+                defaultSpeed: settings.defaultSpeed,
+                globalSpeed: result.speederLastSpeed
+            });
+            if (Math.abs(resolved - state.speed) < 0.001) return;
+            state.speed = clampSpeed(resolved);
+            applySpeed();
+        });
     }
 
     /* --------------------------------- UI --------------------------------- */
@@ -416,14 +446,7 @@
         if (!wasActive) {
             state.speed = clampSpeed(settings.defaultSpeed);
             refreshUI();
-            storage.getLocal(['speederLastSpeed']).then((result) => {
-                if (!settings.speederRememberSpeed) return;
-                const saved = parseFloat(result.speederLastSpeed);
-                if (isFinite(saved) && saved > 0 && Math.abs(saved - state.speed) > 0.001) {
-                    state.speed = clampSpeed(saved);
-                    applySpeed();
-                }
-            });
+            restoreRememberedSpeed(settings);
         }
         applySpeed();
         refreshUI();

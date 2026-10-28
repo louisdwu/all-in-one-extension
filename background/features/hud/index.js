@@ -190,13 +190,17 @@ async function refresh(source = 'FULL') {
             }
         }
 
+        let haReason = null;
         if (source === 'HA' || source === 'FULL') {
             const result = await fetchHa(settings);
+            if (result.reason) haReason = result.reason;
             if (Object.keys(result.metrics).length) {
                 Object.assign(runtime.state, result.metrics);
                 ok = ok || result.ok;
                 failed = failed || !result.ok;
                 if (result.ok) patch[STORAGE.lastHa] = Date.now();
+            } else if (result.reason === 'needs_permission') {
+                failed = true;
             }
         }
 
@@ -206,8 +210,8 @@ async function refresh(source = 'FULL') {
         await storage.setLocal(patch);
         await renderCurrent();
 
-        hudLog.debug('refresh', source, { ok, failed, items: runtime.queue.length });
-        return { ok, failed, items: runtime.queue.length };
+        hudLog.debug('refresh', source, { ok, failed, items: runtime.queue.length, haReason });
+        return { ok, failed, items: runtime.queue.length, reason: haReason };
     })();
 
     try {

@@ -139,9 +139,14 @@
                     <span class="label">隐藏页面右下角悬浮球</span>
                     <label class="toggle"><input type="checkbox" id="speed-hideBallToggle" aria-label="隐藏悬浮球"><span class="slider"></span></label>
                 </div>
-                <div class="toggle-container">
-                    <span class="label">记住上次使用的速度</span>
-                    <label class="toggle"><input type="checkbox" id="speed-remember" aria-label="记住上次速度"><span class="slider"></span></label>
+                <div class="form-group" style="margin-top:12px">
+                    <label for="speed-memory">记住播放速度</label>
+                    <select id="speed-memory">
+                        <option value="site">按网站分别记住（推荐）</option>
+                        <option value="global">全局记住上次速度</option>
+                        <option value="off">不记住，每次都用默认速度</option>
+                    </select>
+                    <div class="help-text">按网站记忆会为每个域名保存一个速度（最多 200 个），再次打开同一站点时自动恢复。</div>
                 </div>
 
                 <div class="row" style="margin-top:16px">
@@ -354,6 +359,10 @@
                 <div class="status-bar">
                     <span>🕒 上次成功：<strong id="ha-last-success-time">从未</strong></span>
                 </div>
+                <div class="status-bar" id="ha-permission-bar" hidden>
+                    <span>🔐 访问该地址需要单独授权</span>
+                    <button type="button" id="ha-grant" class="secondary" style="padding:4px 10px">授权此地址</button>
+                </div>
                 <div class="row">
                     <div class="form-group">
                         <label for="ha-url">服务地址</label>
@@ -422,7 +431,17 @@
                 <div class="btn-group">
                     <button type="button" id="about-copy" class="secondary">📋 复制诊断信息</button>
                     <button type="button" id="about-sync-check" class="secondary">🔍 校验配置完整性</button>
+                    <button type="button" id="diag-refresh" class="secondary">🔄 刷新诊断</button>
+                    <button type="button" id="diag-clear-log" class="secondary">🧹 清空日志</button>
                 </div>
+
+                <h3>后台消息处理器</h3>
+                <p class="help-text">点击次数 / 失败次数 / 平均耗时（Service Worker 重启后归零）。</p>
+                <div id="diag-messages" class="diag-table"><div class="help-text">点击「刷新诊断」读取</div></div>
+
+                <h3>最近告警与错误</h3>
+                <pre class="code-block" id="diag-errors">点击「刷新诊断」读取</pre>
+
                 <h3>当前配置快照</h3>
                 <pre class="code-block" id="about-snapshot">加载中…</pre>
             </div>
