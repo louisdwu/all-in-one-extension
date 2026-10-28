@@ -91,6 +91,8 @@
         AIO.core.dom.waitFor(SUBTITLE_BUTTON, { timeout: 20000 }).then(async (button) => {
             if (!button) return;
             await sleep(800);
+            // 用户在等待播放器控件期间关掉了功能：不要再补一次开启。
+            if (!config.enabled || !config.autoSubtitle) return;
             const ok = await enableSubtitle();
             subLog.debug('auto subtitle', ok ? 'enabled' : 'unavailable');
         });

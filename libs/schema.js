@@ -190,11 +190,15 @@
             ? source.bilibiliSubtitles
             : {};
 
-        // Two legacy keys describe the same switch. Whichever is explicitly set
-        // wins; otherwise fall back to the default.
+        // Two legacy keys describe the same switch. `biliAutoSubtitle` is the
+        // canonical one and must win when present: `toStorage()` also writes the
+        // nested copy, so if the nested copy took precedence a stale `true`
+        // would resurrect the switch right after the user turned it off (that
+        // made "关闭自动开启字幕" impossible to persist). The nested key is only
+        // a fallback for data written by builds that knew nothing else.
         let autoSubtitle = DEFAULTS.biliAutoSubtitle;
-        if (source.biliAutoSubtitle !== undefined) autoSubtitle = bool(source.biliAutoSubtitle, autoSubtitle);
         if (subtitlePrefs.autoEnableSubtitle !== undefined) autoSubtitle = bool(subtitlePrefs.autoEnableSubtitle, autoSubtitle);
+        if (source.biliAutoSubtitle !== undefined) autoSubtitle = bool(source.biliAutoSubtitle, autoSubtitle);
 
         return {
             aioSchemaVersion: SCHEMA_VERSION,
@@ -298,7 +302,21 @@
     async function save(patch) {
         const c = core();
         const current = await load();
-        const settings = normalize(Object.assign({}, current, patch || {}));
+        const next = Object.assign({}, current, patch || {});
+
+        // `bilibiliSubtitles` is a nested object, so the shallow merge above
+        // would drop `subtitleHotkey` whenever a caller patches only one field.
+        // A legacy writer that only knows the nested `autoEnableSubtitle` flag
+        // would also be overridden by the canonical flat key, so lift it.
+        const prefsPatch = patch && patch.bilibiliSubtitles;
+        if (prefsPatch && typeof prefsPatch === 'object') {
+            next.bilibiliSubtitles = Object.assign({}, current.bilibiliSubtitles, prefsPatch);
+            if (prefsPatch.autoEnableSubtitle !== undefined && patch.biliAutoSubtitle === undefined) {
+                next.biliAutoSubtitle = bool(prefsPatch.autoEnableSubtitle, current.biliAutoSubtitle);
+            }
+        }
+
+        const settings = normalize(next);
         if (c) await c.storage.setSync(toStorage(settings));
         return settings;
     }
