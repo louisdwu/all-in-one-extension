@@ -1,5 +1,22 @@
 # 更新记录
 
+## 2.4 — 2026-10-28
+
+### 修复
+
+- **全屏下看不到倍速 toast**：页面全屏的是 `<video>` 元素本身时（浏览器播放器自带的
+  全屏按钮、多数原生播放器），视频的子节点是 fallback content，永不被渲染；旧逻辑把
+  速器 UI 宿主塞进全屏元素，于是悬浮球和 toast 在全屏里一起「消失」（实测 toast 的
+  rect 为 0×0）。现在浮层改用 **top layer**：宿主加 `popover="manual"` 并
+  `showPopover()`，每次 `fullscreenchange` 重新 show 一次，DOM 不再搬动。
+  全屏是播放器 `<div>` 的站点（B 站 / YouTube）行为不变，原生 `<video>` 全屏也有 toast 了。
+- 页面级 toast（`AIO.content.toast`，浮球隐藏或后台 `aio:toast` 时使用）同样走 top layer，
+  全屏里也能看见。
+
+### 测试
+
+- 回归增至 16 项：新增「原生 `<video>` 全屏时倍速 toast 仍然可见且尺寸非零」。
+
 ## 2.3 — 2026-10-28
 
 ### 变更

@@ -365,6 +365,53 @@
         return { host, root };
     }
 
+    /* ------------------------------ top layer ------------------------------ */
+    const domLog = log('dom');
+    const overlays = new Set();
+    let overlayListener = false;
+
+    /** Re-show a popover overlay so it is the newest entry in the top layer. */
+    function promoteOverlay(host) {
+        if (!host.isConnected) return;
+        try {
+            if (host.matches(':popover-open')) host.hidePopover();
+            host.showPopover();
+        } catch (err) {
+            domLog.debug('overlay cannot enter the top layer', err && err.message);
+        }
+    }
+
+    /**
+     * Keep an overlay painted above fullscreen content.
+     *
+     * A fullscreen element is rendered in the browser's top layer: anything
+     * that stays in <body> is painted behind it, while children of a
+     * fullscreened <video> are fallback content that is never painted at all
+     * (that is why moving the speed UI inside the video made the speed toast
+     * disappear on every player that fullscreens the video element itself).
+     * A manual popover lives in the same top layer, so re-showing it after
+     * each fullscreen change puts the overlay back on top without touching
+     * the page's DOM. No-op (and no attribute) where the Popover API is missing.
+     */
+    function topLayer(host) {
+        if (!host || typeof host.showPopover !== 'function') return;
+        if (!host.hasAttribute('popover')) host.setAttribute('popover', 'manual');
+        overlays.add(host);
+        if (!overlayListener) {
+            overlayListener = true;
+            document.addEventListener('fullscreenchange', () => {
+                for (const node of overlays) {
+                    if (!node.isConnected) overlays.delete(node);
+                    else promoteOverlay(node);
+                }
+            }, true);
+        }
+        // Re-ordering after a fullscreen change is the listener's job; here we
+        // only make sure the overlay is showing at all (the popover may have
+        // been closed by the browser in the meantime).
+        if (!host.matches(':popover-open')) promoteOverlay(host);
+    }
+
     /** Wait for a selector with a hard timeout (never an infinite observer). */
     function waitFor(selector, { root: scope = document, timeout = 8000 } = {}) {
         return new Promise((resolve) => {
@@ -442,7 +489,7 @@
         rafThrottle,
         idle,
         sleep,
-        dom: { el, css, escapeHtml, shadowHost, waitFor, listen },
+        dom: { el, css, escapeHtml, shadowHost, topLayer, waitFor, listen },
         env
     };
 

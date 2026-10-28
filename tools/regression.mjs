@@ -211,7 +211,8 @@ async function main() {
             const context = world === 'iso'
                 ? list.filter((c) => c.name === 'All in One Extension').pop()
                 : list.filter((c) => c.auxData && c.auxData.isDefault).pop();
-            const params = { expression, returnByValue: true, awaitPromise: true };
+            // userGesture: the fullscreen assertion below needs an activation.
+            const params = { expression, returnByValue: true, awaitPromise: true, userGesture: true };
             if (context) params.contextId = context.id;
 
             let result;
@@ -442,6 +443,42 @@ async function main() {
     await wait(1600);
     const toggledOff = await biliOn.main('({ on: window.__sub.on, lan: window.__sub.lan })');
     check('turning the option off closes subtitles right away', toggledOff.on === false, JSON.stringify(toggledOff));
+
+    // ---------- G. speed toast stays visible in fullscreen ----------
+    // Regression: a page that fullscreens the <video> element itself never paints
+    // the video's children (they are fallback content), so the old "move the UI
+    // host into the fullscreen element" trick made the toast invisible on every
+    // native player. The overlay must live in the top layer instead.
+    log('G: fullscreen speed toast');
+    // requestFullscreen only works in the active document: earlier cases opened
+    // other tabs, so bring this one back to the front first.
+    await cdp.send('Target.activateTarget', { targetId: page1.targetId });
+    await wait(600);
+    const fsTarget = await page1.main('document.getElementById("v1").requestFullscreen().then(function () { return document.fullscreenElement ? document.fullscreenElement.tagName : null; }).catch(function (e) { return "err:" + e.message; })');
+    await wait(700);
+    await page1.main('window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", code: "ArrowRight", ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true }))');
+    await wait(400);
+    const toastState = await page1.main([
+        '(function () {',
+        '  var ui = document.getElementById("aio-speed-ui");',
+        '  var toast = ui && ui.shadowRoot ? ui.shadowRoot.querySelector(".toast") : null;',
+        '  var rect = toast ? toast.getBoundingClientRect() : null;',
+        '  return {',
+        '    fullscreen: document.fullscreenElement ? document.fullscreenElement.tagName : null,',
+        '    uiParent: ui && ui.parentElement ? ui.parentElement.tagName : null,',
+        '    shown: toast ? toast.classList.contains("show") : false,',
+        '    width: rect ? Math.round(rect.width) : 0,',
+        '    height: rect ? Math.round(rect.height) : 0,',
+        '    text: toast ? toast.textContent : null',
+        '  };',
+        '})()'
+    ].join('\n'));
+    check('speed toast stays visible while the video element is fullscreen',
+        fsTarget === 'VIDEO' && toastState.fullscreen === 'VIDEO' && toastState.shown === true &&
+        toastState.width > 0 && toastState.height > 0,
+        JSON.stringify(toastState));
+    await page1.main('document.exitFullscreen && document.exitFullscreen()').catch(() => {});
+    await wait(400);
 
     // cleanup state so the profile is not left with test mappings/speeds
     await page1.iso('AIO.schema.save({ hotkeyMappings: {}, speederSpeedMemory: "site" })').catch(() => {});
