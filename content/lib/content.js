@@ -71,6 +71,18 @@
     /* ------------------------------ toast ------------------------------ */
     const TOAST_CSS = `
         :host { all: initial; }
+        /* Top-layer popover (see AIO.core.dom.topLayer): the UA sheet would give
+           the host a full-viewport box, so neutralise it and keep the host an
+           invisible anchor for the fixed-position toasts. The all:initial
+           above also overrides the UA display:none of a closed popover,
+           hence the two display rules below. */
+        :host([popover]) {
+            position: fixed; inset: auto; margin: 0; padding: 0; border: 0;
+            width: 0; height: 0; background: transparent; overflow: visible;
+            pointer-events: none;
+        }
+        :host([popover]:not(:popover-open)) { display: none; }
+        :host([popover]:popover-open) { display: block; }
         .wrap {
             position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%);
             display: flex; flex-direction: column; gap: 8px; align-items: center;
@@ -89,7 +101,8 @@
 
     function toast(message, level = 'info', timeout = 2600) {
         if (!message) return;
-        const { root: shadow } = dom.shadowHost('aio-toast-host', TOAST_CSS);
+        const { host, root: shadow } = dom.shadowHost('aio-toast-host', TOAST_CSS);
+        dom.topLayer(host);
         let wrap = shadow.querySelector('.wrap');
         if (!wrap) {
             wrap = document.createElement('div');
@@ -102,10 +115,7 @@
         wrap.appendChild(item);
         setTimeout(() => {
             item.remove();
-            if (!wrap.children.length) {
-                const host = document.getElementById('aio-toast-host');
-                if (host) host.remove();
-            }
+            if (!wrap.children.length) host.remove();
         }, timeout);
     }
 

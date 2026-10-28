@@ -29,6 +29,16 @@
     const UI_HOST_ID = 'aio-speed-ui';
     const CSS = `
         :host { all: initial; }
+        /* Top-layer popover (AIO.core.dom.topLayer) so the UI stays visible while
+           the page is fullscreen; the UA sheet assumes a full-viewport popover,
+           so the host is reset to a zero-size anchor. */
+        :host([popover]) {
+            position: fixed; inset: auto; margin: 0; padding: 0; border: 0;
+            width: 0; height: 0; background: transparent; overflow: visible;
+            pointer-events: none;
+        }
+        :host([popover]:not(:popover-open)) { display: none; }
+        :host([popover]:popover-open) { display: block; }
         .stage { position: fixed; right: 20px; bottom: 20px; z-index: 2147483647; pointer-events: none;
                  font: 13px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         .ball {
@@ -304,6 +314,7 @@
     function ensureUI() {
         if (state.ui && state.ui.host.isConnected) return state.ui;
         const { host, root } = dom.shadowHost(UI_HOST_ID, CSS);
+        dom.topLayer(host);
         const stage = document.createElement('div');
         stage.className = 'stage';
 
@@ -440,15 +451,26 @@
             destroyUI();
             return;
         }
-        ensureUI();
+        const ui = ensureUI();
+        dom.topLayer(ui.host);
         updateUI();
     }
 
     /* ----------------------------- fullscreen ----------------------------- */
+    /**
+     * Fallback for browsers without the Popover API: move the UI host into the
+     * fullscreen element so it is not painted behind it.
+     *
+     * A fullscreened <video> never paints its children (they are fallback
+     * content), so there the host stays in <body>; the toast is then invisible,
+     * which is exactly what the top-layer overlay above fixes on modern Chrome.
+     */
     document.addEventListener('fullscreenchange', () => {
-        if (!state.ui) return;
+        if (!state.ui || state.ui.host.hasAttribute('popover')) return;
         const target = document.fullscreenElement;
-        const parent = target || document.body || document.documentElement;
+        const parent = target && target.tagName !== 'VIDEO'
+            ? target
+            : (document.body || document.documentElement);
         if (state.ui.host.parentNode !== parent) parent.appendChild(state.ui.host);
     });
 

@@ -107,6 +107,24 @@ fetchWaqi / fetchHa → runtime.state 合并 → rebuildQueue → setIcon
 - 被 include/exclude 规则排除的帧不参与；
 - 记忆按**帧自己的 hostname** 存，所以同站点嵌套与跨站点嵌套都符合直觉。
 
+### 3.2 全屏与顶层浮层
+
+全屏元素渲染在浏览器的 **top layer** 里：留在 `<body>` 里的东西会被它盖住；而
+被全屏的 `<video>` 本身的子节点是 fallback content，**永远不渲染**。所以
+「把 UI 宿主塞进全屏元素里」这个老做法在 B 站/YouTube（全屏的是播放器 `<div>`）能用，
+在原生 `<video>` 全屏（浏览器播放器自带的全屏按钮）上会让悬浮球和 toast 一起消失。
+
+现在的做法（`AIO.core.dom.topLayer(host)`）：
+
+- 宿主加 `popover="manual"` 并 `showPopover()`，进入同一个 top layer，**不搬 DOM**；
+- 每次 `fullscreenchange` 先 `hidePopover()` 再 `showPopover()`，让浮层重新成为
+  top layer 里最新的一层（否则新进入全屏的元素会盖在它上面）；
+- 宿主被 CSS 重置成零尺寸、`pointer-events: none` 的锚点，交互元素自己开
+  `pointer-events: auto`，页面点击照常穿透；
+- 没有 Popover API 的浏览器保持原行为（塞进非 `<video>` 的全屏元素）。
+
+toast（`content/lib/content.js`）和速器 UI（`content/speeder.js`）都走这条路径。
+
 ## 4. 消息契约
 
 | type | 方向 | 载荷 / 返回 |
