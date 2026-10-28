@@ -7,7 +7,7 @@
  *
  * Usage: node tools/bump-version.mjs [--dry]
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -35,5 +35,14 @@ if (!dry) {
   const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
   pkg.version = version;
   writeFileSync(packagePath, JSON.stringify(pkg, null, 4) + '\n');
+
+  // Keep the static shields badge in the README in sync (private repos cannot
+  // use shields' dynamic github/package-json endpoint).
+  const readmePath = resolve(ROOT, 'README.md');
+  if (existsSync(readmePath)) {
+    const readme = readFileSync(readmePath, 'utf8');
+    const next = readme.replace(/badge\/version-[0-9.]+-blue\.svg/g, 'badge/version-' + version + '-blue.svg');
+    if (next !== readme) writeFileSync(readmePath, next);
+  }
 }
 console.log((dry ? '[dry] ' : '') + 'version ' + previous + ' → ' + version);
