@@ -16,7 +16,7 @@
 |------|--------|--------|
 | 测试 | 0 用例 | 49 个 `node:test` 用例（含后台模块图启动测试） |
 | 静态检查 | 无 | `tools/check.mjs`：语法 / import 解析 / DOM id / MAIN 世界越界 / 密钥扫描 |
-| 真机验证 | 手工 | `tools/smoke.mjs`（异常采集 + 样式断言）+ `tools/regression.mjs`（13 项行为断言） |
+| 真机验证 | 手工 | `tools/smoke.mjs`（异常采集 + 样式断言）+ `tools/regression.mjs`（15 项行为断言） |
 | 后台消息监听 | 7 个 `onMessage` 各自猜归属 | 1 个路由 + 显式 handler 注册表 |
 | 配置真相源 | 散落 10+ 文件，默认值各不相同 | `libs/schema.js` 单点，含旧数据迁移 |
 | 权限 | 9 个（3 个从未使用） | 6 个，全部有代码对应 |
@@ -188,7 +188,7 @@ MV3 的 content script **不能**用 ES module，而 service worker / 扩展页 
 ```bash
 npm run verify      # 静态检查 + 49 个单测
 npm run smoke       # Chromium 真机：SW 0 异常、options/popup 0 异常、页面可交互
-npm run regression  # 13 项行为断言（标签切换 / 倍速开关 / 快捷键映射 / 倍速记忆）
+npm run regression  # 15 项行为断言（标签切换 / 倍速开关 / 快捷键映射 / 倍速记忆 / 子帧）
 ```
 
 `regression` 覆盖最容易回归的三条路径：
@@ -224,14 +224,30 @@ npm run regression  # 13 项行为断言（标签切换 / 倍速开关 / 快捷�
 | CI | ✅ | `.github/workflows/verify.yml`：静态检查 + 单测；再用 Chrome for Testing 跑冒烟与行为回归（`AIO_CHROME` 指定浏览器路径） |
 | CSS 作用域 | ✅ | 拆为 `ui/styles/{tokens,base,components,panels}.css`，`options.css` 只做 `@import` 顺序表；**冒烟测试断言 7 个计算样式 + 规则总数**，拆分导致回退会直接失败 |
 
-### 仍然待做（按性价比）
+### 已修：子帧（iframe）跟随顶层帧速度
 
-1. **按需注入**：`content_scripts` 仍是 `<all_urls>`，安装提示里的"读取和更改所有网站数据"
-   无法消除。若改用 `chrome.scripting.registerContentScripts` 动态注册，可把注入收敛到
-   "启用了功能且匹配规则的站点"，代价是架构复杂度明显上升（脚本生命周期要自己管）。
-2. **HUD 历史曲线**：`hudState` 只存最新值；可加 24h 环形缓冲 + 点击图标查看小图。
-3. **子帧独立记忆**：`all_frames` 下所有帧共享主站的记忆速度，可按帧 origin 细分。
-4. **Web Store 分发**：见 §7，仍需拆分。
+先说清楚**修改前**的真实状况：ISOLATED 速器（真正设置 `video.playbackRate` 的那个）
+此前**没有** `all_frames`，所以它只注入顶层帧；MAIN 世界的锁速注入器虽然进了每个子帧，
+但只有收到 `data-aio-speed-action` 属性才会动作，而那个属性只有本帧的 ISOLATED 脚本会写。
+结论：**嵌入的 iframe 播放器（YouTube / B 站外链）完全不受控** —— 顶层调到 2×，
+里面还是 1×。（我在上一版文档里写成"各帧按自己站点记忆"，那是不准确的。）现在：
+
+- 任一帧改变速度后，后台把目标速度广播到该标签页的**所有帧**（`speeder:applySpeed`）；
+- **后加载**的 iframe 初始化时主动问一次 `speeder:tabSpeed`（后台按键记录每标签页当前速度），
+  拿到值再锁定，所以懒加载播放器也能跟上；
+- 被规则（include/exclude）排除的帧不参与，保持"这个站点不该被接管"的语义；
+- 记忆仍按**帧自己的 hostname** 存，同站点嵌套时天然一致。
+
+回归测试覆盖：顶层设为 2× 后动态插入一个 `localhost` 源（与主站 `127.0.0.1` 不同源、
+记忆键也不同）的 iframe，断言它能读到 2 并真的把 video 锁到 2。
+
+### 已决定不做（保留结论，避免以后重复讨论）
+
+| 项 | 原因 |
+|----|------|
+| 按需注入（`registerContentScripts` 动态注册） | 安装提示无法消除，收益低于维护成本 |
+| HUD 历史曲线 | 原始数据在 Home Assistant 里本来就能看 |
+| 打包分发（Web Store / 拆分扩展） | 个人自用，没有分发需求 |
 
 ---
 

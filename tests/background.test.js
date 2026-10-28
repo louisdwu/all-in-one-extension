@@ -47,7 +47,9 @@ globalThis.chrome = {
         query: async () => [],
         sendMessage: async () => {},
         get: async () => ({}),
-        update: async () => ({})
+        update: async () => ({}),
+        onRemoved: makeEvent(),
+        onUpdated: makeEvent()
     },
     windows: { create: async () => ({}), update: async () => ({}) },
     cookies: {

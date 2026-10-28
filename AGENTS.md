@@ -29,7 +29,7 @@ npm run bump          # 同时更新 manifest.json 与 package.json
 ```bash
 npm run verify      # 静态检查 + 单测，提交前必须全绿
 npm run smoke       # 采集 SW/页面运行时异常（本机 Chromium）
-npm run regression  # 13 项行为断言（标签切换/倍速开关/快捷键映射/倍速记忆）
+npm run regression  # 15 项行为断言（标签切换/倍速开关/快捷键映射/倍速记忆/子帧）
 npm run bump        # 版本号
 ```
 
@@ -164,6 +164,8 @@ docs/                       ARCHITECTURE / PERMISSIONS / IMPROVEMENT_PLAN
   内容脚本只发消息，不要自己写 `speederSpeeds`。
 - **诊断**：新功能出问题时用 `AIO.core.log('tag')` 记录，`warn/error` 会自动进日志环，
   设置页「关于与诊断」可直接看到。
+- **多帧**：内容脚本 `all_frames` 时会出现在每个 frame。只有顶层帧 `isTopFrame` 才建 UI；
+  需要跨帧一致的状态走后台广播（参考 `speeder:applySpeed` / `speeder:tabSpeed`）。
 
 ## 9. 测试要求
 

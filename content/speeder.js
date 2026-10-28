@@ -246,10 +246,35 @@
     const sendPersist = AIO.core.debounce(() => {
         const settings = state.settings;
         if (!settings) return;
-        const mode = settings.speederSpeedMemory;
-        if (mode === 'off') return;
-        AIO.core.post({ type: 'speeder:remember', speed: state.speed, mode, hostname: location.hostname });
+        // The worker persists (or not, when memory is off) and always pushes the
+        // value to the other frames of this tab.
+        AIO.core.post({
+            type: 'speeder:remember',
+            speed: state.speed,
+            mode: settings.speederSpeedMemory,
+            hostname: location.hostname
+        });
     }, 150);
+
+    /**
+     * Adopt a speed pushed by another frame of this tab (see background/features/speeder.js).
+     * Only the top frame owns the UI; sub-frames (embedded players) follow it.
+     */
+    let pendingHostSpeed = null;
+    let queriedTabSpeed = false;
+
+    function adoptHostSpeed(value) {
+        const next = clampSpeed(value);
+        if (!state.settings) {
+            pendingHostSpeed = next; // settings not loaded yet: replay after apply()
+            return;
+        }
+        if (!state.active) return;   // this frame is excluded by the URL rules
+        if (Math.abs(next - state.speed) < 0.001) return;
+        state.speed = next;
+        applySpeed();
+        updateUI();
+    }
 
     function persistSpeed() {
         if (!state.settings) return;
@@ -443,8 +468,22 @@
             refreshUI();
             restoreRememberedSpeed(settings);
         }
+        // A frame that was scrolled into view before its settings arrived.
+        if (pendingHostSpeed !== null) {
+            const queued = pendingHostSpeed;
+            pendingHostSpeed = null;
+            if (Math.abs(queued - state.speed) > 0.001) state.speed = queued;
+        }
         applySpeed();
         refreshUI();
+
+        // Sub-frames have no UI: adopt whatever the top frame is using.
+        if (!isTopFrame && !queriedTabSpeed) {
+            queriedTabSpeed = true;
+            AIO.core.sendMessage({ type: 'speeder:tabSpeed' }).then((result) => {
+                if (result && typeof result.speed === 'number') adoptHostSpeed(result.speed);
+            });
+        }
     }
 
     settings().then(apply);
@@ -472,6 +511,10 @@
             else if (action === 'decrease') step(-(state.settings ? state.settings.speederStep : 0.25));
             else if (action === 'preset') cyclePreset();
             else if (action === 'reset') reset();
+            return { ok: true, speed: state.speed };
+        }
+        if (message.type === 'speeder:applySpeed') {
+            adoptHostSpeed(message.speed);
             return { ok: true, speed: state.speed };
         }
         if (message.type === 'speeder:getSpeed' || message.action === 'getSpeed') {

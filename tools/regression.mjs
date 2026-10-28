@@ -43,13 +43,22 @@ const PAGE = [
     '</script></body></html>'
 ].join('\n');
 
+const FRAME_PAGE = [
+    '<!doctype html><html><head><meta charset="utf-8"><title>AIO frame</title></head><body>',
+    '<video id="v1" width="320" height="180"></video>',
+    '</body></html>'
+].join('\n');
+
 function startServer() {
     return new Promise((res) => {
         const server = createServer((req, resp) => {
             resp.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-            resp.end(PAGE);
+            // /frame is served under a *different* hostname (localhost) so the
+            // per-site speed memory cannot accidentally satisfy the assertion.
+            resp.end(req.url.startsWith('/frame') ? FRAME_PAGE : PAGE);
         });
-        server.listen(0, '127.0.0.1', () => res(server));
+        // Bind on all interfaces so both 127.0.0.1 and localhost resolve.
+        server.listen(0, () => res(server));
     });
 }
 
@@ -109,21 +118,39 @@ async function main() {
     const cdp = new Cdp(version.webSocketDebuggerUrl);
     await cdp.connect();
 
-    // Live execution contexts per target. Destroyed contexts must be pruned,
-    // otherwise a navigation leaves a stale id behind and the next evaluate fails
-    // with "Cannot find context with specified id".
-    const contexts = new Map();
+    // Live execution contexts, keyed by the session they belong to.
+    // Cross-site iframes run in a separate renderer process (OOPIF) whose
+    // contexts are only reported on an auto-attached child session, so the
+    // registry is global and each entry remembers its own sessionId.
+    // Destroyed contexts must be pruned, otherwise a navigation leaves a stale
+    // id behind and the next evaluate fails with "Cannot find context".
+    const contexts = new Map();      // sessionId -> context[]
+    const allContexts = [];          // { sessionId, context }
+
     cdp.on((msg) => {
+        if (msg.method === 'Target.attachedToTarget') {
+            const childSession = msg.params.sessionId;
+            // Enable the domains we need on the OOPIF session.
+            cdp.send('Runtime.enable', {}, childSession).catch(() => {});
+            cdp.send('Page.enable', {}, childSession).catch(() => {});
+            return;
+        }
         if (msg.method === 'Runtime.executionContextCreated') {
             const list = contexts.get(msg.sessionId) || [];
             list.push(msg.params.context);
             contexts.set(msg.sessionId, list);
+            allContexts.push({ sessionId: msg.sessionId, context: msg.params.context });
         } else if (msg.method === 'Runtime.executionContextDestroyed') {
-            const list = (contexts.get(msg.sessionId) || [])
-                .filter((context) => context.id !== msg.params.executionContextId);
-            contexts.set(msg.sessionId, list);
+            const id = msg.params.executionContextId;
+            contexts.set(msg.sessionId, (contexts.get(msg.sessionId) || []).filter((c) => c.id !== id));
+            for (let i = allContexts.length - 1; i >= 0; i--) {
+                if (allContexts[i].sessionId === msg.sessionId && allContexts[i].context.id === id) allContexts.splice(i, 1);
+            }
         } else if (msg.method === 'Runtime.executionContextsCleared') {
             contexts.set(msg.sessionId, []);
+            for (let i = allContexts.length - 1; i >= 0; i--) {
+                if (allContexts[i].sessionId === msg.sessionId) allContexts.splice(i, 1);
+            }
         }
     });
 
@@ -131,6 +158,9 @@ async function main() {
         const { targetId } = await cdp.send('Target.createTarget', { url });
         const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
         await cdp.send('Runtime.enable', {}, sessionId);
+        // Auto-attach so out-of-process iframes expose their contexts.
+        await cdp.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }, sessionId)
+            .catch(() => {});
         await wait(1200);
         /** Resolve the wanted world *now* — contexts change across navigations. */
         const evaluate = async (expression, world) => {
@@ -156,11 +186,51 @@ async function main() {
             }
             return result.result && result.result.value;
         };
+        /**
+         * Evaluate inside a sub-frame.
+         *
+         * The frame's main-world context reports the real page origin, while its
+         * isolated (content-script) context reports the *extension* origin. So:
+         * find the main context by origin, take its frameId, then pick the
+         * isolated context with the same frameId. Cross-site frames live in
+         * another process; their contexts arrive on an auto-attached session,
+         * which is why the registry is global.
+         */
+        const evaluateInFrame = async (urlPrefix, world, expression) => {
+            const mainEntry = allContexts.filter((entry) => {
+                const aux = entry.context.auxData || {};
+                return !!aux.isDefault && (entry.context.origin || '').startsWith(urlPrefix);
+            }).pop();
+            if (!mainEntry) {
+                const seen = allContexts.map((entry) => (entry.context.origin || '?') + '/' + (entry.context.name || 'main')).join(', ');
+                throw new Error('no frame with origin ' + urlPrefix + ' (have: ' + seen + ')');
+            }
+            let match = mainEntry;
+            if (world === 'iso') {
+                const frameId = mainEntry.context.auxData.frameId;
+                match = allContexts.filter((entry) => {
+                    const aux = entry.context.auxData || {};
+                    return aux.frameId === frameId && entry.context.name === 'All in One Extension';
+                }).pop();
+                if (!match) {
+                    throw new Error('no isolated context in frame ' + urlPrefix + ' (content script not injected?)');
+                }
+            }
+            const result = await cdp.send('Runtime.evaluate', {
+                expression, contextId: match.context.id, returnByValue: true, awaitPromise: true
+            }, match.sessionId);
+            if (result.exceptionDetails) {
+                throw new Error((result.exceptionDetails.exception || {}).description || result.exceptionDetails.text);
+            }
+            return result.result && result.result.value;
+        };
+
         return {
             targetId,
             sessionId,
             main: (expr) => evaluate(expr, 'main'),
-            iso: (expr) => evaluate(expr, 'iso')
+            iso: (expr) => evaluate(expr, 'iso'),
+            frame: evaluateInFrame
         };
     }
 
@@ -261,6 +331,28 @@ async function main() {
     } else {
         check('speed command reaches the content script', false, 'could not resolve extension id / tab id');
     }
+
+
+    // ---------- E. sub-frame follows the top frame ----------
+    // Created *after* the top frame picked 2x: the frame cannot rely on the
+    // broadcast, it has to ask the worker for the tab speed on init.
+    const frameOrigin = 'http://localhost:' + server.address().port;
+    log('E: injecting a late iframe from ' + frameOrigin);
+    await page1.main([
+        'var f = document.createElement("iframe");',
+        'f.id = "embedded";',
+        'f.width = 320; f.height = 180;',
+        'f.src = "' + frameOrigin + '/frame?late=1";',
+        'document.body.appendChild(f);',
+        'true'
+    ].join('\n'));
+    await wait(2500);
+
+    const frameSpeed = await page1.frame(frameOrigin, 'iso', 'AIO.core.sendMessage({ type: "speeder:tabSpeed" })');
+    check('sub-frame can read the tab speed', !!frameSpeed && frameSpeed.speed === 2, JSON.stringify(frameSpeed));
+
+    const frameRate = await page1.frame(frameOrigin, 'main', 'document.getElementById("v1").playbackRate');
+    check('late iframe adopts the top-frame speed', frameRate === 2, 'rate=' + frameRate);
 
     // cleanup state so the profile is not left with test mappings/speeds
     await page1.iso('AIO.schema.save({ hotkeyMappings: {}, speederSpeedMemory: "site" })').catch(() => {});

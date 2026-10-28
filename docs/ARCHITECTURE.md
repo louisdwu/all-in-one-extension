@@ -80,6 +80,17 @@ fetchWaqi / fetchHa → runtime.state 合并 → rebuildQueue → setIcon
 - 轮播用 `setInterval`（可到 3 秒）；`chrome.alarms` 最小 30 秒，仅用于 SW 被挂起后重新拉起定时器。
 - 状态写入经 `createWriter('local', 400)` 合并，避免高频写。
 
+### 3.1 子帧（iframe）与倍速
+
+速器的 ISOLATED 包和 MAIN 注入器都声明了 `all_frames: true`，所以**每个帧**都会接管
+自己内部的 `<video>`（嵌入的 YouTube / B 站播放器在各自 frame 里）。但 UI 只在顶层帧
+（`isTopFrame` 判定，子帧不建悬浮球、不弹提示）：
+
+- 顶层帧改速度 → `speeder:remember` → 后台广播 `speeder:applySpeed` 给该标签页所有帧；
+- **后加载**的 iframe（点击展开、懒加载）主动问 `speeder:tabSpeed`，拿到当前值再锁定；
+- 被 include/exclude 规则排除的帧不参与；
+- 记忆按**帧自己的 hostname** 存，所以同站点嵌套与跨站点嵌套都符合直觉。
+
 ## 4. 消息契约
 
 | type | 方向 | 载荷 / 返回 |
@@ -90,8 +101,11 @@ fetchWaqi / fetchHa → runtime.state 合并 → rebuildQueue → setIcon
 | `hotkeys:context` | 弹窗 → 后台 | → `{ hostname, mappings, enabled }` |
 | `hotkeys:setMappings` / `deleteMapping` / `clearSite` / `setSiteEnabled` | 弹窗/设置页 → 后台 | → `{ ok, mappings? }` |
 | `speeder:getSettings` / `saveSettings` / `getShortcuts` / `setShortcuts` | 页面 → 后台 | 设置对象 |
-| `speeder:command` | 后台 → 内容脚本 | `{ action: increase\|decrease\|preset\|reset }` |
+| `speeder:command` | 后台 → 内容脚本（所有帧） | `{ action: increase\|decrease\|preset\|reset }` |
 | `speeder:getSpeed` | 弹窗 → 内容脚本 | → `{ speed, active }` |
+| `speeder:remember` | 内容脚本 → 后台 | `{ speed, mode, hostname }` → 写记忆（mode=off 时跳过）并广播 `speeder:applySpeed` 给该标签页**所有帧** |
+| `speeder:applySpeed` | 后台 → 全部帧 | `{ speed }`：子帧跟随顶层帧 |
+| `speeder:tabSpeed` | 子帧 → 后台 | → `{ speed }` 或 `null`：后加载的 iframe 初始化时取当前值 |
 | `bili:getSettings` / `saveSettings` / `captureCookies` | 页面 → 后台 | 设置 / Cookie |
 | `hud:refresh` / `hud:updateConfig` / `hud:getState` | 页面 → 后台 | 抓取结果 / 状态（`reason: 'needs_permission'` 表示 HA 地址未授权） |
 | `diag:snapshot` / `diag:clearLog` / `diag:ping` | 设置页 → 后台 | 消息统计、日志环、存储占用、健康检查 |

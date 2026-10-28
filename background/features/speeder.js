@@ -34,6 +34,28 @@ function hostnameFromSender(sender) {
         return '';
     }
 }
+/* ------------------------------------------------------------------ *
+ * Per-tab current speed.
+ *
+ * The speeder runs in every frame (all_frames: true) but only the top frame
+ * has UI. Without this map, an embedded player (YouTube/Bilibili iframe) would
+ * keep its own site default while the page shows 2x - and a frame loaded later
+ * (lazy iframe) would never learn the current speed.
+ * ------------------------------------------------------------------ */
+const tabSpeeds = new Map();
+
+chrome.tabs.onRemoved.addListener((tabId) => tabSpeeds.delete(tabId));
+
+/** Push the speed to every frame of the tab (frameId omitted = all frames). */
+async function broadcastTabSpeed(tabId, speed) {
+    if (tabId === undefined || tabId < 0 || typeof speed !== 'number') return;
+    try {
+        await chrome.tabs.sendMessage(tabId, { type: 'speeder:applySpeed', speed });
+    } catch (err) {
+        // No content script in any frame (chrome://, PDF viewer, ...).
+    }
+}
+
 
 export function registerSpeeder() {
     handle('speeder:getSettings', async () => {
@@ -74,7 +96,6 @@ export function registerSpeeder() {
     /** Remember the current speed according to the configured mode. */
     handle('speeder:remember', async (message, sender) => {
         const mode = message.mode;
-        if (mode !== 'site' && mode !== 'global') return { ok: true, skipped: true };
         const speed = globalThis.AIO.speedMemory.clampSpeed(message.speed);
         if (speed === null) return { ok: false, error: 'invalid speed' };
 
@@ -84,11 +105,26 @@ export function registerSpeeder() {
             const store = globalThis.AIO.speedMemory.remember(await loadSpeeds(), hostname, speed);
             speedsCache = store;
             memoryWriter.queue({ speederSpeeds: store });
-        } else {
+        } else if (mode === 'global') {
             memoryWriter.queue({ speederLastSpeed: speed });
         }
-        return { ok: true };
-    }, ['speeder:rememberSpeed']);
+        // Frame sync happens even when memory is off: the UI lives in the top
+        // frame, so an embedded player must still follow the chosen speed.
+        const tabId = sender && sender.tab && sender.tab.id;
+        if (tabId !== undefined && tabId >= 0) {
+            tabSpeeds.set(tabId, speed);
+            broadcastTabSpeed(tabId, speed);
+        }
+        return { ok: true, speed, persisted: mode === 'site' || mode === 'global' };
+    }, ['speeder:rememberSpeed', 'speeder:setSpeed']);
+
+    /** Current speed for the sender's tab (sub-frames ask on init). */
+    handle('speeder:tabSpeed', async (message, sender) => {
+        const tabId = sender && sender.tab && sender.tab.id;
+        const speed = tabId === undefined ? undefined : tabSpeeds.get(tabId);
+        return { ok: true, speed: typeof speed === 'number' ? speed : null };
+    });
+
 
     handle('speeder:openOptions', async () => {
         chrome.runtime.openOptionsPage();
