@@ -20,8 +20,29 @@
     } catch (err) { /* not allowed in some contexts */ }
 
     if (!AIO || !AIO.content) return;
-    const { log, settings, onChange, isTopFrame } = AIO.content;
+    const { log, settings, onChange, isTopFrame, toast } = AIO.content;
     const guardLog = log('bili:guard');
+
+    /**
+     * Publish the *real* login state for the MAIN-world injector.
+     *
+     * SESSDATA and DedeUserID are HttpOnly, so `document.cookie` in the page
+     * cannot answer this — only the background can. Set asynchronously: the
+     * injector treats a missing attribute as "unknown" and stays careful.
+     */
+    function publishLoginState() {
+        AIO.core.sendMessage({ type: 'bili:loginState' }, 2000).then((res) => {
+            // No answer (worker asleep / timed out) leaves the attribute unset,
+            // which the injector reads as "unknown" — never assume logged out.
+            if (!res || typeof res.loggedIn !== 'boolean') return;
+            try {
+                document.documentElement.setAttribute('data-aio-bili-login', res.loggedIn ? 'true' : 'false');
+            } catch (err) {
+                guardLog.debug('login state publish failed', err.message);
+            }
+        });
+    }
+    publishLoginState();
 
     const POPUP_SELECTORS = [
         '.bili-mini-mask', '.bili-mini-login-wrapper', '.bili-mini-login', '.bili-mini-login-right-wp',
@@ -87,6 +108,47 @@
         observer = null;
     }
 
+    /* --------------------------- quality-cap hints --------------------------- */
+    let hintObserver = null;
+    let lastHint = '';
+
+    /**
+     * The injector flags "the server capped the stream below 1080P" on a DOM
+     * attribute (cross-world contract); we own the user-visible toast.
+     */
+    function readHint() {
+        let raw = '';
+        try {
+            raw = document.documentElement.getAttribute('data-aio-bili-hint') || '';
+        } catch (err) {
+            return;
+        }
+        if (!raw || raw === lastHint) return;
+        lastHint = raw;
+        try {
+            document.documentElement.removeAttribute('data-aio-bili-hint');
+        } catch (err) { /* ignore */ }
+        let message = '';
+        try {
+            message = JSON.parse(raw).message || '';
+        } catch (err) {
+            guardLog.debug('bad hint payload', err.message);
+        }
+        if (message) toast(message, 'info', 6500);
+    }
+
+    function startHintObserver() {
+        if (hintObserver) return;
+        hintObserver = new MutationObserver(readHint);
+        hintObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-aio-bili-hint'] });
+        readHint();
+    }
+
+    function stopHintObserver() {
+        if (hintObserver) hintObserver.disconnect();
+        hintObserver = null;
+    }
+
     function publishConfig(settingsValue) {
         const payload = {
             enabled: settingsValue.biliEnabled !== false,
@@ -112,6 +174,7 @@
         const config = publishConfig(settingsValue);
         if (!enabled) {
             stopObserver();
+            stopHintObserver();
             if (styleEl) styleEl.remove();
             styleEl = null;
             return;
@@ -119,6 +182,7 @@
         if (isTopFrame) {
             installStyles();
             startObserver();
+            startHintObserver();
             removePopups();
         }
         guardLog.debug('config published', config);

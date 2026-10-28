@@ -1,6 +1,6 @@
 # All in One Extension (AIO)
 
-![Version](https://img.shields.io/badge/version-1.2026.1028.1854-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2026.1028.2217-blue.svg)
 ![Chrome](https://img.shields.io/badge/browser-Chrome-orange.svg)
 ![Manifest](https://img.shields.io/badge/manifest-v3-green.svg)
 
@@ -18,7 +18,7 @@
 | 🕵️ 无痕按键 | 修饰键 + 左键点击链接 → 无痕窗口打开，并自动清理 `utm_*`/`spm_id_from` 等跟踪参数 |
 | 🎬 视频倍速 | 接管页面 `<video>` 倍速（含对抗站点重置），悬浮球 + 页面内快捷键 + 站点规则 + 按网站记住速度；跨站 iframe（嵌入播放器）跟随顶层帧。页面没有视频时脚本完全休眠（不读配置、不建 UI） |
 | 🎹 快捷键映射 | 按站点把某个按键的行为迁移到另一个键（例如 F → H） |
-| 📺 B站增强 | 自动中文字幕、字幕热键、未登录 1080P、评论区加载、AI 字幕解锁、播完暂停 |
+| 📺 B站增强 | 自动中文字幕、字幕热键、评论区加载、AI 字幕解锁、播完暂停；1080P 需要登录态（B站已对未登录限到 480P），在设置页存一个账号后无痕窗口会自动沿用 |
 | 🖥️ HUD 监控 | 在扩展图标上轮播 WAQI 空气质量与 Home Assistant 实体数值，支持阈值变色 |
 | 🔍 诊断面板 | 消息处理器统计、最近告警/错误、存储占用、配置快照（无需 DevTools） |
 

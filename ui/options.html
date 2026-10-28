@@ -246,6 +246,7 @@
                     <span class="label">1080P 畅享（自动防打断）</span>
                     <label class="toggle"><input type="checkbox" id="bili-1080p-enable" aria-label="1080P"><span class="slider"></span></label>
                 </div>
+                <p class="help-text">注意：B站已对未登录请求只下发 480P 视频流（强行请求 1080P 也会被降级），因此未登录时最高只能到 720P/480P；真正的 1080P 需要下面「账号 Cookie」里的登录态。</p>
                 <div class="toggle-container">
                     <span class="label">查看评论区</span>
                     <label class="toggle"><input type="checkbox" id="bili-comments-enable" aria-label="评论区"><span class="slider"></span></label>
@@ -261,8 +262,8 @@
             </div>
 
             <div class="section">
-                <h3 style="margin-top:0">🔑 账号 Cookie（可选）</h3>
-                <p class="help-text">填入专用账号的 SESSDATA 后，可在无痕窗口解锁完整评论区与字幕。Cookie 只保存在本机同步存储中，不会上传。</p>
+                <h3 style="margin-top:0">🔑 账号 Cookie（可选，1080P 必需）</h3>
+                <p class="help-text">B站只给已登录的客户端下发 1080P。填入一个专用账号的 SESSDATA 后，无痕窗口会在打开 B站时自动带上它（仅在该无痕会话内有效，窗口关闭即清除），无需在无痕窗口里重复登录。Cookie 只保存在本机扩展存储中，不会上传到任何服务器。</p>
                 <div class="form-group">
                     <label for="bili-sessdata">SESSDATA</label>
                     <input type="password" id="bili-sessdata" placeholder="粘贴 SESSDATA" autocomplete="off">
@@ -271,9 +272,15 @@
                     <label for="bili-dede-userid">DedeUserID</label>
                     <input type="text" id="bili-dede-userid" placeholder="粘贴 DedeUserID" autocomplete="off">
                 </div>
+                <div class="toggle-container">
+                    <span class="label">无痕窗口沿用此账号（1080P 必需）</span>
+                    <label class="toggle"><input type="checkbox" id="bili-incognito-login" aria-label="无痕沿用账号"><span class="slider"></span></label>
+                </div>
                 <div class="btn-group">
                     <button type="button" id="bili-fetch-cookies" class="secondary">从浏览器读取当前登录账号</button>
+                    <button type="button" id="bili-seed-incognito" class="secondary">立即写入已打开的无痕窗口</button>
                 </div>
+                <p class="help-text" id="bili-cookie-status">正在检查…</p>
             </div>
         </section>
 

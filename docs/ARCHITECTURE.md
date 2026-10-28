@@ -21,6 +21,8 @@ Chrome 把扩展代码隔离在多个世界里，**跨世界不能直接共享�
 | `data-aio-hotkeys` | content/hotkey_gate.js | hotkey_inject.js | `{ enabled, mappings }` |
 | `data-aio-bili-config` | content/bilibili/guard.js | bilibili/inject.js | B站功能开关快照 |
 | `data-aio-incognito` | guard.js（同步） | inject.js（同步） | 是否无痕上下文 |
+| `data-aio-bili-login` | guard.js（异步，问后台） | inject.js | 当前 cookie store 里有没有真实登录（`SESSDATA` 是 HttpOnly，页面读不到） |
+| `data-aio-bili-hint` | inject.js | guard.js | 需要提示用户的一句话（如「未登录最高 480P」），读完即删 |
 
 > 为什么不注入 `<script>`：内联脚本受页面 CSP 约束，bilibili 这类站点可能直接拦截。
 > 为什么不广播事件：MAIN 与 ISOLATED 同时监听时存在注册时序竞争，属性没有这个问题。
@@ -141,6 +143,9 @@ toast（`content/lib/content.js`）和速器 UI（`content/speeder.js`）都走�
 | `speeder:applySpeed` | 后台 → 全部帧 | `{ speed }`：子帧跟随顶层帧 |
 | `speeder:tabSpeed` | 子帧 → 后台 | → `{ speed }` 或 `null`：后加载的 iframe 初始化时取当前值 |
 | `bili:getSettings` / `saveSettings` / `captureCookies` | 页面 → 后台 | 设置 / Cookie |
+| `bili:loginState` | 页面 → 后台 | → `{ loggedIn, incognito }`：按发送方标签的 cookie store 判断 |
+| `bili:incognitoStatus` | 设置页 → 后台 | → `{ allowed, loginEnabled, hasCredential }`（无痕权限 / 开关 / 是否存了 SESSDATA） |
+| `bili:seedIncognitoLogin` | 设置页 → 后台 | 把「专用账号」写进所有活着的无痕 cookie store → `{ ok, seeded }` |
 | `hud:refresh` / `hud:updateConfig` / `hud:getState` | 页面 → 后台 | 抓取结果 / 状态（`reason: 'needs_permission'` 表示 HA 地址未授权） |
 | `diag:snapshot` / `diag:clearLog` / `diag:ping` | 设置页 → 后台 | 消息统计、日志环、存储占用、健康检查 |
 | `aio:settingsChanged` | 后台 → 所有标签页 | `{ keys }`（页面自行重读 schema） |
@@ -156,7 +161,7 @@ toast（`content/lib/content.js`）和速器 UI（`content/speeder.js`）都走�
 - 无痕：`ezEnabled`、`modifierKey`
 - 快捷键映射：`hotkeyEnabled`、`hotkeyMappings`、`enabledSites`
 - 倍速：`globalEnabled`、`hideFloatingBall`、`includeRules`、`excludeRules`、`defaultSpeed`、`presetSpeed`、`shortcuts`、`speederStep`、`speederMinRate`、`speederMaxRate`、`speederSpeedMemory`（`off|global|site`，旧布尔 `speederRememberSpeed` 自动迁移）
-- B站：`biliEnabled`、`biliAutoSubtitle`、`bilibiliSubtitles`、`bilibili1080PEnabled`、`biliCommentsEnabled`、`biliAISubtitleEnabled`、`biliAutoPlay`、`biliPlayNextDisabled`、`biliCookies`
+- B站：`biliEnabled`、`biliAutoSubtitle`、`bilibiliSubtitles`、`bilibili1080PEnabled`、`biliCommentsEnabled`、`biliAISubtitleEnabled`、`biliAutoPlay`、`biliPlayNextDisabled`、`biliCookies`、`biliIncognitoLogin`
 - HUD：`hudEnabled`、`hudIconRound`、`hudCarouselInterval`、`waqi*`、`ha*`
 - 元信息：`aioDebug`、`aioSchemaVersion`
 

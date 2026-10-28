@@ -11,13 +11,16 @@
  */
 import '../../libs/core.js';
 import '../../libs/schema.js';
+import '../../libs/bili.js';
 import { handle, broadcast } from '../router.js';
+import { isAllowedIncognitoAccess } from './incognito.js';
 
 const { log, storage } = globalThis.AIO.core;
 const biliLog = log('bilibili');
 
 const COOKIE_NAME = 'aio_pnd';
 const COOKIE_DOMAIN = '.bilibili.com';
+const BILI_URL = 'https://www.bilibili.com';
 const ONE_YEAR = 365 * 24 * 60 * 60;
 
 async function listStores() {
@@ -72,6 +75,71 @@ async function ensureCookieInStore(storeId) {
     }
 }
 
+/**
+ * Write the stored 「专用账号」 login into an incognito cookie store.
+ *
+ * Why this exists: bilibili stopped serving >480P streams to logged-out clients
+ * (a playurl at qn=80 still returns quality=64 with 480P/360P renditions), so
+ * the old "fake the nav response, then ask for 1080P" trick cannot produce real
+ * 1080P any more. An incognito window therefore needs a real session, and the
+ * only one we are allowed to use is the SESSDATA the user saved by hand.
+ *
+ * No `expirationDate` on purpose: these are session cookies, so the credential
+ * dies with the incognito session instead of lingering on disk.
+ */
+async function seedIncognitoLogin(storeId, options = {}) {
+    const overwrite = options.overwrite === true;
+    if (!storeId) return { ok: false, reason: 'no_store' };
+
+    const settings = await globalThis.AIO.schema.load();
+    if (!settings.biliIncognitoLogin) return { ok: false, reason: 'disabled' };
+
+    const pairs = globalThis.AIO.bili.loginCookies(settings.biliCookies);
+    if (!pairs.length) return { ok: false, reason: 'no_credential' };
+
+    if (!overwrite) {
+        const existing = await chrome.cookies.get({ url: BILI_URL, name: 'SESSDATA', storeId }).catch(() => null);
+        if (existing && existing.value) return { ok: true, skipped: 'already_logged_in' };
+    }
+
+    let written = 0;
+    for (const pair of pairs) {
+        try {
+            await chrome.cookies.set({
+                url: BILI_URL,
+                name: pair.name,
+                value: pair.value,
+                domain: COOKIE_DOMAIN,
+                path: '/',
+                secure: true,
+                httpOnly: true,
+                sameSite: 'lax',
+                storeId
+            });
+            written += 1;
+        } catch (err) {
+            biliLog.debug('incognito login cookie failed for', pair.name, err.message);
+        }
+    }
+
+    // Older builds faked a login by writing a non-HttpOnly `DedeUserID` cookie
+    // from the page. With only SESSDATA stored that fake would survive and
+    // disagree with the real session, so drop it.
+    if (written && !pairs.some((pair) => pair.name === 'DedeUserID')) {
+        await chrome.cookies.remove({ url: BILI_URL, name: 'DedeUserID', storeId }).catch(() => {});
+    }
+
+    if (written) biliLog.info('incognito session seeded with', written, 'cookie(s)');
+    return { ok: written > 0, written };
+}
+
+/** Re-seed every incognito store that is currently alive. */
+async function seedAllIncognitoStores(options) {
+    const stores = await listStores();
+    return Promise.all(stores.filter((store) => store.incognito)
+        .map((store) => seedIncognitoLogin(store.id, options)));
+}
+
 export function registerBilibili() {
     handle('bili:getSettings', async () => {
         const settings = await globalThis.AIO.schema.load();
@@ -119,6 +187,40 @@ export function registerBilibili() {
         return { ok: true, success: true, enabled: settings.bilibili1080PEnabled };
     });
 
+    /**
+     * Is the page that asked us logged in? Answering from the background is the
+     * only reliable way: SESSDATA/DedeUserID are HttpOnly, so a content script
+     * cannot see them in `document.cookie`.
+     */
+    handle('bili:loginState', async (message, sender) => {
+        const tab = sender && sender.tab;
+        const storeId = tab ? tab.cookieStoreId : undefined;
+        const cookie = await chrome.cookies.get({ url: BILI_URL, name: 'SESSDATA', storeId }).catch(() => null);
+        return {
+            ok: true,
+            loggedIn: !!(cookie && cookie.value),
+            incognito: !!(tab && tab.incognito)
+        };
+    });
+
+    /** Settings page: can incognito even run us, and is there a credential? */
+    handle('bili:incognitoStatus', async () => {
+        const settings = await globalThis.AIO.schema.load();
+        return {
+            ok: true,
+            allowed: await isAllowedIncognitoAccess(),
+            loginEnabled: settings.biliIncognitoLogin,
+            hasCredential: globalThis.AIO.bili.loginCookies(settings.biliCookies).length > 0
+        };
+    });
+
+    /** Manual "make this incognito window logged in now" (used by the options page). */
+    handle('bili:seedIncognitoLogin', async () => {
+        const results = await seedAllIncognitoStores({ overwrite: true });
+        const seeded = results.filter((result) => result && result.ok).length;
+        return { ok: seeded > 0, seeded, results };
+    });
+
     /** Pull SESSDATA/DedeUserID out of the browser (incognito store preferred). */
     handle('bili:captureCookies', async () => {
         const stores = await listStores();
@@ -143,19 +245,27 @@ export function registerBilibili() {
 
     // Keep the cookie aligned with the stored setting.
     chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === 'sync' && changes.biliPlayNextDisabled) {
+        if (area !== 'sync') return;
+        if (changes.biliPlayNextDisabled) {
             syncPlayNextCookie(!!changes.biliPlayNextDisabled.newValue);
+        }
+        // A freshly saved/captured credential (or a toggled switch) must reach
+        // incognito windows that are already open.
+        if (changes.biliCookies || changes.biliIncognitoLogin) {
+            seedAllIncognitoStores({ overwrite: true });
         }
     });
 
-    // Only touch cookies while the feature is actually enabled.
+    // Cookie work runs per navigation: seed the incognito login (1080P needs a
+    // real session) and keep the play-next flag cookie in the tab's store.
     chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
         if (details.frameId !== 0) return;
         const settings = await globalThis.AIO.schema.load();
-        if (!settings.biliPlayNextDisabled) return;
+        if (!settings.biliIncognitoLogin && !settings.biliPlayNextDisabled) return;
         const tab = await chrome.tabs.get(details.tabId).catch(() => null);
         if (!tab || !tab.cookieStoreId) return;
-        await ensureCookieInStore(tab.cookieStoreId);
+        if (tab.incognito && settings.biliIncognitoLogin) await seedIncognitoLogin(tab.cookieStoreId);
+        if (settings.biliPlayNextDisabled) await ensureCookieInStore(tab.cookieStoreId);
     }, { url: [{ hostSuffix: 'bilibili.com' }] });
 
     // Align once on worker start.

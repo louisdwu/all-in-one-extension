@@ -480,6 +480,51 @@ async function main() {
     await page1.main('document.exitFullscreen && document.exitFullscreen()').catch(() => {});
     await wait(400);
 
+    // ---------- H. bilibili 1080P loop must yield to the server cap ----------
+    // bilibili advertises 1080P in accept_quality but only hands out 480P
+    // renditions to logged-out clients. Asking again every 2s only produced a
+    // "清晰度不可用" toast loop, so the injector must ask once, notice the
+    // downgrade and stop — with a hint pointing at the account setting.
+    log('H: server-side quality cap must stop the 1080P loop');
+    const biliInject = await openPage(base + 'bili?inject=1');
+    await biliInject.main([
+        'window.__qualityCalls = [];',
+        'window.player = {',
+        '  requestQuality: function (q) { window.__qualityCalls.push(q); },',
+        '  getSupportedQualityList: function () { return [80, 64, 32, 16]; },',
+        '  getQuality: function () { return { nowQ: 64 }; }',
+        '};',
+        'window.__playurlBody = JSON.stringify({ code: 0, data: {',
+        '  quality: 64, accept_quality: [112, 80, 64, 32, 16],',
+        '  dash: { video: [{ id: 32, height: 480 }, { id: 16, height: 360 }] }',
+        '} });',
+        'var realFetch = window.fetch.bind(window);',
+        'window.fetch = function (input, init) {',
+        '  var url = typeof input === "string" ? input : (input && input.url) || "";',
+        '  if (url.indexOf("/x/player/wbi/playurl") >= 0) {',
+        '    return Promise.resolve(new Response(window.__playurlBody, { status: 200, headers: { "content-type": "application/json" } }));',
+        '  }',
+        '  return realFetch(input, init);',
+        '};',
+        'document.documentElement.setAttribute("data-aio-bili-login", "no");',
+        'true'
+    ].join('\n'));
+    await biliInject.main(readFileSync(join(EXT_DIR, 'libs/md5.js'), 'utf8'));
+    await biliInject.main(readFileSync(join(EXT_DIR, 'libs/wbi.js'), 'utf8'));
+    await biliInject.main(readFileSync(join(EXT_DIR, 'content/bilibili/inject.js'), 'utf8'));
+    await wait(3000);
+    const firstRound = await biliInject.main('window.__qualityCalls.slice()');
+    check('logged-out page still asks for 1080P once', firstRound.indexOf(80) >= 0, JSON.stringify(firstRound));
+
+    await biliInject.main('fetch("https://api.bilibili.com/x/player/wbi/playurl?avid=1&cid=1&qn=80&fnval=4048").then(function () { return true; })');
+    await wait(600);
+    const settled = await biliInject.main('window.__qualityCalls.length');
+    await wait(4500); // more than two 2s ticks
+    const capped = await biliInject.main('({ calls: window.__qualityCalls.length, hint: document.documentElement.getAttribute("data-aio-bili-hint") })');
+    check('a server-side downgrade stops the repeated 1080P requests', settled === capped.calls,
+        'before=' + settled + ' after=' + capped.calls);
+    check('the cap is explained to the user', !!capped.hint && capped.hint.indexOf('480P') >= 0, capped.hint || 'no hint');
+
     // cleanup state so the profile is not left with test mappings/speeds
     await page1.iso('AIO.schema.save({ hotkeyMappings: {}, speederSpeedMemory: "site" })').catch(() => {});
     await page1.iso('AIO.core.storage.setLocal({ speederSpeeds: {} })').catch(() => {});

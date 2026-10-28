@@ -112,4 +112,17 @@ function getCookieValue(name) {
 
 ## 5. 本插件特有功能：自动获取
 
-在 **"B站增强"** 设置页面，点击 **"从浏览器自动获取当前登录账号"** 按钮，插件会自动调用 `chrome.cookies.getAll` 获取当前浏览器中 B 站的登录信息并填充到输入框中。这避免了手动复制的繁琐操作。
+在 **"B站增强"** 设置页面，点击 **"从浏览器读取当前登录账号"** 按钮，插件会自动调用 `chrome.cookies.getAll` 获取当前浏览器中 B 站的登录信息并填充到输入框中。这避免了手动复制的繁琐操作。
+
+### 5.1 为什么无痕窗口需要这份 Cookie
+
+B站现在只给**已登录**客户端下发 1080P：未登录时 `playurl` 即使带 `qn=80`，返回的 `quality` 也只有 64，并且 DASH 里只有 480P/360P；而 `accept_quality` 仍会列出 1080P，所以播放器看起来「有 1080P 选项，选了却更糊」。
+
+因此插件不再靠伪造登录硬顶 1080P，而是：
+
+1. 你在设置页保存一份「专用账号」的 `SESSDATA`（或点按钮从当前浏览器读一份）；
+2. 打开无痕窗口里的 B站页面时，后台用 `chrome.cookies.set({ storeId, httpOnly: true })` 把它写进**无痕 cookie store**（不写 `expirationDate`，即会话 cookie，窗口关闭就消失）；
+3. 页面因此是「真登录」状态，播放器自己就会给到 1080P（账号有大会员时连 1080P+/4K 也能用）；
+4. 如果没存过 `SESSDATA`，页面会提示「未登录最高 480P」，而不是反复请求注定失败的 1080P。
+
+相关设置项：`biliCookies`（`sessdata` / `dedeUserId`）与 `biliIncognitoLogin`（无痕是否沿用）。

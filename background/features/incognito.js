@@ -9,7 +9,7 @@ const { log } = globalThis.AIO.core;
 const incogLog = log('incognito');
 
 /** Chrome refuses incognito windows unless the user allowed it per extension. */
-function isAllowedIncognitoAccess() {
+export function isAllowedIncognitoAccess() {
     return new Promise((resolve) => {
         try {
             if (!chrome.extension || typeof chrome.extension.isAllowedIncognitoAccess !== 'function') {

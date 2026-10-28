@@ -11,8 +11,8 @@
 | `storage` | `libs/schema.js`、HUD | 保存配置（sync）与运行态数据（local） |
 | `alarms` | `background/features/hud/index.js` | Service Worker 被挂起后重新拉起 HUD 调度（MV3 无长驻后台） |
 | `idle` | `background/features/hud/index.js` | 系统唤醒/解锁后立即刷新数据，避免展示过期数值 |
-| `cookies` | `background/features/bilibili.js` | ① 读取你自己登录的 SESSDATA 供无痕窗口使用（需你手动点击按钮）② 维护 `aio_pnd` 开关 cookie（仅功能开启时存在） |
-| `webNavigation` | `background/features/bilibili.js` | 在进入 bilibili 页面时把开关 cookie 同步到该标签所在的 cookie store（含无痕） |
+| `cookies` | `background/features/bilibili.js` | ① 读取你自己登录的 SESSDATA（需你手动点击按钮）② 把这份「专用账号」写成无痕会话的 cookie（B站只给登录用户下发 1080P；写的是会话 cookie，无痕窗口关闭即消失）③ 维护 `aio_pnd` 开关 cookie（仅功能开启时存在） |
+| `webNavigation` | `background/features/bilibili.js` | 进入 bilibili 页面时：给无痕标签写入登录态、把开关 cookie 同步到该标签所在的 cookie store |
 
 > 已删除的历史权限：`scripting`、`notifications`、`activeTab`（代码中从未使用）。
 > `tests/manifest.test.js` 会持续校验"声明的权限必须被代码使用"。

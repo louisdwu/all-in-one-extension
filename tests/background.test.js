@@ -55,6 +55,7 @@ globalThis.chrome = {
     cookies: {
         getAllCookieStores: async () => [],
         getAll: async () => [],
+        get: async () => null,
         set: async () => {},
         remove: async () => {}
     },
@@ -94,7 +95,7 @@ test('background module graph boots and registers its handlers', async () => {
     assert.ok(AIO.schema, 'schema must be installed');
     const { registeredTypes } = await import('../background/router.js');
     const types = registeredTypes();
-    for (const type of ['tabs:list', 'tabs:activate', 'incognito:open', 'hotkeys:context', 'speeder:getSettings', 'bili:getSettings', 'hud:refresh', 'diag:snapshot', 'diag:ping', 'getTabs', 'saveSpeederSettings']) {
+    for (const type of ['tabs:list', 'tabs:activate', 'incognito:open', 'hotkeys:context', 'speeder:getSettings', 'bili:getSettings', 'bili:loginState', 'bili:incognitoStatus', 'bili:seedIncognitoLogin', 'hud:refresh', 'diag:snapshot', 'diag:ping', 'getTabs', 'saveSpeederSettings']) {
         assert.ok(types.includes(type), 'missing handler: ' + type);
     }
 });
