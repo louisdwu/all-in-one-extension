@@ -51,7 +51,8 @@
         defaultSpeed: 1,
         presetSpeed: '2.0',
         shortcuts: Object.assign({}, DEFAULT_SHORTCUTS),
-        speederRememberSpeed: true,
+        /** 'off' | 'global' | 'site' — see libs/speed_memory.js */
+        speederSpeedMemory: 'site',
         speederMinRate: 0.25,
         speederMaxRate: 16,
         speederStep: 0.25,
@@ -113,6 +114,19 @@
         // (event.key) is "Ctrl+Shift+ArrowRight". Accept both when reading.
         const map = { Right: 'ArrowRight', Left: 'ArrowLeft', Up: 'ArrowUp', Down: 'ArrowDown', Esc: 'Escape' };
         return combo.split('+').map((part) => map[part] || part).join('+');
+    }
+
+    /**
+     * Speed memory used to be a boolean (`speederRememberSpeed`); it is now a
+     * three-way mode. Old values migrate transparently on read.
+     */
+    function normalizeSpeedMemory(source) {
+        const raw = source.speederSpeedMemory;
+        if (['off', 'global', 'site'].includes(raw)) return raw;
+        if (source.speederRememberSpeed !== undefined) {
+            return bool(source.speederRememberSpeed, true) ? 'global' : 'off';
+        }
+        return DEFAULTS.speederSpeedMemory;
     }
 
     function normalizeShortcuts(value) {
@@ -205,7 +219,7 @@
             defaultSpeed: num(source.defaultSpeed, DEFAULTS.defaultSpeed, 0.25, 16),
             presetSpeed: normalizePreset(source.presetSpeed),
             shortcuts: normalizeShortcuts(source.shortcuts),
-            speederRememberSpeed: bool(source.speederRememberSpeed, DEFAULTS.speederRememberSpeed),
+            speederSpeedMemory: normalizeSpeedMemory(source),
             speederMinRate: num(source.speederMinRate, DEFAULTS.speederMinRate, 0.1, 16),
             speederMaxRate: num(source.speederMaxRate, DEFAULTS.speederMaxRate, 0.25, 16),
             speederStep: num(source.speederStep, DEFAULTS.speederStep, 0.05, 4),
@@ -314,8 +328,11 @@
         const raw = await c.storage.getSync(null);
         const dirty = raw.aioSchemaVersion !== SCHEMA_VERSION ||
             raw.shortcutReference !== undefined ||
+            raw.speederRememberSpeed !== undefined ||
             (raw.bilibiliSubtitles && raw.bilibiliSubtitles.autoEnableSubtitle !== raw.biliAutoSubtitle);
         if (raw.shortcutReference !== undefined) await c.storage.removeSync(['shortcutReference']);
+        // The boolean is folded into speederSpeedMemory by normalize().
+        if (raw.speederRememberSpeed !== undefined) await c.storage.removeSync(['speederRememberSpeed']);
         if (!dirty) return false;
         const settings = normalize(raw);
         await c.storage.setSync(toStorage(settings));
@@ -329,6 +346,7 @@
         WAQI_METRIC_KEYS,
         DEFAULT_SHORTCUTS,
         normalize,
+        normalizeSpeedMemory,
         normalizePreset,
         normalizeKeyCombo,
         presetList,

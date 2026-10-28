@@ -22,7 +22,7 @@ export function registerSpeeder() {
             minRate: settings.speederMinRate,
             maxRate: settings.speederMaxRate,
             step: settings.speederStep,
-            rememberSpeed: settings.speederRememberSpeed
+            speedMemory: settings.speederSpeedMemory
         };
     }, ['getSpeederSettings']);
 

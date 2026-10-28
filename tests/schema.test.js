@@ -50,6 +50,15 @@ test('preset speeds are validated, deduped and clamped', () => {
     assert.deepEqual(presetList({ presetSpeed: '1, 2.5' }), [1, 2.5]);
 });
 
+test('speed memory mode replaces the old boolean flag', () => {
+    assert.equal(normalize({}).speederSpeedMemory, 'site', 'new installs remember per site');
+    assert.equal(normalize({ speederRememberSpeed: true }).speederSpeedMemory, 'global');
+    assert.equal(normalize({ speederRememberSpeed: false }).speederSpeedMemory, 'off');
+    assert.equal(normalize({ speederSpeedMemory: 'global' }).speederSpeedMemory, 'global');
+    assert.equal(normalize({ speederSpeedMemory: 'nonsense' }).speederSpeedMemory, 'site');
+    assert.equal(normalize({ speederSpeedMemory: 'global', speederRememberSpeed: false }).speederSpeedMemory, 'global');
+});
+
 test('entities and mappings are sanitized', () => {
     const settings = normalize({
         haEntities: [{ id: ' sensor.power ', name: '功率', op: 'x', warn: 10 }, { id: '' }],

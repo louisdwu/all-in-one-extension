@@ -592,6 +592,30 @@ button:disabled { opacity: .55; cursor: not-allowed; }
     word-break: break-all;
 }
 
+/* ------------------------------- diagnostics ------------------------------- */
+.diag-table {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    font-size: 12px;
+}
+
+.diag-row {
+    display: grid;
+    grid-template-columns: 1fr 64px 64px 76px;
+    gap: 8px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+}
+
+.diag-row:last-child { border-bottom: 0; }
+.diag-row.head { background: var(--bg-subtle); font-weight: 700; color: var(--text-muted); }
+.diag-row span { font-variant-numeric: tabular-nums; }
+.diag-row .type { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+.diag-row .num { text-align: right; }
+.diag-row .num.bad { color: var(--danger); font-weight: 700; }
+
 @media (max-width: 720px) {
     body { display: block; }
     .sidebar { position: static; width: auto; height: auto; border-right: 0; border-bottom: 1px solid var(--border); }

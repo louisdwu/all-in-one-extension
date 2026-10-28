@@ -64,6 +64,15 @@ globalThis.chrome = {
     extension: { isAllowedIncognitoAccess: (cb) => cb(true) }
 };
 
+// Emulate the worker scope: addEventListener exists there but not in Node.
+const scopeListeners = new Map();
+globalThis.addEventListener = (type, handler) => {
+    scopeListeners.set(type, handler);
+};
+globalThis.removeEventListener = (type) => {
+    scopeListeners.delete(type);
+};
+
 globalThis.OffscreenCanvas = class {
     constructor(width, height) { this.width = width; this.height = height; }
     getContext() {
@@ -76,12 +85,14 @@ globalThis.fetch = async () => ({ ok: true, json: async () => ({ status: 'ok', d
 
 test('background module graph boots and registers its handlers', async () => {
     await import('../background/index.js');
+    assert.equal(scopeListeners.has('error'), true, 'uncaught errors must be captured');
+    assert.equal(scopeListeners.has('unhandledrejection'), true, 'unhandled rejections must be captured');
     const AIO = globalThis.AIO;
     assert.ok(AIO && AIO.core, 'core runtime must be installed');
     assert.ok(AIO.schema, 'schema must be installed');
     const { registeredTypes } = await import('../background/router.js');
     const types = registeredTypes();
-    for (const type of ['tabs:list', 'tabs:activate', 'incognito:open', 'hotkeys:context', 'speeder:getSettings', 'bili:getSettings', 'hud:refresh', 'getTabs', 'saveSpeederSettings']) {
+    for (const type of ['tabs:list', 'tabs:activate', 'incognito:open', 'hotkeys:context', 'speeder:getSettings', 'bili:getSettings', 'hud:refresh', 'diag:snapshot', 'diag:ping', 'getTabs', 'saveSpeederSettings']) {
         assert.ok(types.includes(type), 'missing handler: ' + type);
     }
 });

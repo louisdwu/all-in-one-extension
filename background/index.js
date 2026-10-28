@@ -18,9 +18,23 @@ import { registerBilibili } from './features/bilibili.js';
 import { registerCommands } from './features/commands.js';
 import { initHUD, registerHUDMessages } from './features/hud/index.js';
 import { initLifecycle } from './features/lifecycle.js';
+import { registerDiagnostics } from './features/diagnostics.js';
 
 const { log } = globalThis.AIO.core;
 const bgLog = log('bg');
+
+// Unhandled failures would otherwise vanish with the worker; keep them in the
+// log ring so the diagnostics panel can show them. (Node — used by the module
+// graph test — has no addEventListener on globalThis, hence the guard.)
+if (typeof globalThis.addEventListener === 'function') {
+    globalThis.addEventListener('error', (event) => {
+        bgLog.error('uncaught:', event.message || event.type);
+    });
+    globalThis.addEventListener('unhandledrejection', (event) => {
+        const reason = event.reason;
+        bgLog.error('unhandled rejection:', (reason && reason.message) || String(reason));
+    });
+}
 
 registerTabs();
 registerIncognito();
@@ -28,6 +42,7 @@ registerHotkeys();
 registerSpeeder();
 registerBilibili();
 registerHUDMessages();
+registerDiagnostics();
 installRouter();
 registerCommands();
 

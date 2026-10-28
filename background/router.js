@@ -19,6 +19,35 @@ const routerLog = log('router');
 /** @type {Map<string, (message: any, sender: chrome.runtime.MessageSender) => any>} */
 const handlers = new Map();
 
+/** Per-type call statistics, surfaced by the diagnostics panel. */
+const stats = new Map();
+const startedAt = Date.now();
+
+function recordStat(type, durationMs, error) {
+    let entry = stats.get(type);
+    if (!entry) {
+        entry = { type, calls: 0, errors: 0, totalMs: 0, lastAt: 0, lastError: '' };
+        stats.set(type, entry);
+    }
+    entry.calls += 1;
+    entry.totalMs += durationMs;
+    entry.lastAt = Date.now();
+    if (error) {
+        entry.errors += 1;
+        entry.lastError = error;
+    }
+}
+
+export function messageStats() {
+    return Array.from(stats.values())
+        .map((entry) => Object.assign({}, entry, { avgMs: entry.calls ? Math.round((entry.totalMs / entry.calls) * 10) / 10 : 0 }))
+        .sort((a, b) => b.calls - a.calls);
+}
+
+export function routerStartedAt() {
+    return startedAt;
+}
+
 /**
  * Register a handler for a message type (plus optional legacy aliases).
  * Handler may be async; exceptions are reported to the caller instead of
@@ -45,12 +74,18 @@ export function installRouter() {
             try { sendResponse(payload === undefined ? { ok: true } : payload); } catch (err) { /* port closed */ }
         };
 
+        const started = Date.now();
         Promise.resolve()
             .then(() => handler(message, sender))
-            .then(reply)
+            .then((result) => {
+                recordStat(type, Date.now() - started);
+                reply(result);
+            })
             .catch((err) => {
+                const message2 = String((err && err.message) || err);
+                recordStat(type, Date.now() - started, message2);
                 routerLog.error('handler "' + type + '" failed:', err);
-                reply({ ok: false, error: String((err && err.message) || err) });
+                reply({ ok: false, error: message2 });
             });
         return true; // keep the channel open for the async reply
     });
