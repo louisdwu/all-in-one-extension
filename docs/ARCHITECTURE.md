@@ -40,6 +40,8 @@ Chrome 把扩展代码隔离在多个世界里，**跨世界不能直接共享�
 | `keys.js` | `serialize()` / `parse()` / `matches()` / `matchAction()` / `isValid()` / `display()` |
 | `rules.js` | `matches(url, {includeRules, excludeRules})`，正则编译缓存 + 非法正则兜底 |
 | `aqi.js` | `toConcentration(iaqi, pollutant)` |
+| `speed_memory.js` | 倍速记忆三态（off/global/site）：`clampSpeed` / `normalize` / `resolve` / `remember` |
+| `i18n.js` | `t(key, fallback)` / `apply(scope)`（`data-i18n` 注解式增量翻译） |
 | `md5.js` / `wbi.js` | B 站 WBI 签名（`encWbi` / `getMixinKey` / `useWebKey`） |
 | `bili.js` | `purifyUrl` / `isVideoPage` |
 
@@ -55,6 +57,7 @@ background/index.js        组装（显式 import 顺序）
        speeder.js          倍速设置（读写走 schema）
        bilibili.js         设置 + aio_pnd cookie 策略 + Cookie 抓取
        commands.js         chrome.commands → 活动标签页
+       diagnostics.js      diag:snapshot（消息统计 + 日志环 + 存储占用）
        lifecycle.js        onInstalled 补全缺失键（绝不覆盖用户设置）、迁移、变更广播
        hud/
          index.js          调度器：定时器 + alarm 保活 + 抓取串行化 + 轮播
@@ -90,7 +93,8 @@ fetchWaqi / fetchHa → runtime.state 合并 → rebuildQueue → setIcon
 | `speeder:command` | 后台 → 内容脚本 | `{ action: increase\|decrease\|preset\|reset }` |
 | `speeder:getSpeed` | 弹窗 → 内容脚本 | → `{ speed, active }` |
 | `bili:getSettings` / `saveSettings` / `captureCookies` | 页面 → 后台 | 设置 / Cookie |
-| `hud:refresh` / `hud:updateConfig` / `hud:getState` | 页面 → 后台 | 抓取结果 / 状态 |
+| `hud:refresh` / `hud:updateConfig` / `hud:getState` | 页面 → 后台 | 抓取结果 / 状态（`reason: 'needs_permission'` 表示 HA 地址未授权） |
+| `diag:snapshot` / `diag:clearLog` / `diag:ping` | 设置页 → 后台 | 消息统计、日志环、存储占用、健康检查 |
 | `aio:settingsChanged` | 后台 → 所有标签页 | `{ keys }`（页面自行重读 schema） |
 | `aio:toast` | 后台 → 指定标签页 | `{ message, level }` |
 
@@ -103,12 +107,40 @@ fetchWaqi / fetchHa → runtime.state 合并 → rebuildQueue → setIcon
 - 标签页：`aioTabsEnabled`、`aioTabsDelay`、`aioTabsWrap`
 - 无痕：`ezEnabled`、`modifierKey`
 - 快捷键映射：`hotkeyEnabled`、`hotkeyMappings`、`enabledSites`
-- 倍速：`globalEnabled`、`hideFloatingBall`、`includeRules`、`excludeRules`、`defaultSpeed`、`presetSpeed`、`shortcuts`、`speederStep`、`speederMinRate`、`speederMaxRate`、`speederRememberSpeed`
+- 倍速：`globalEnabled`、`hideFloatingBall`、`includeRules`、`excludeRules`、`defaultSpeed`、`presetSpeed`、`shortcuts`、`speederStep`、`speederMinRate`、`speederMaxRate`、`speederSpeedMemory`（`off|global|site`，旧布尔 `speederRememberSpeed` 自动迁移）
 - B站：`biliEnabled`、`biliAutoSubtitle`、`bilibiliSubtitles`、`bilibili1080PEnabled`、`biliCommentsEnabled`、`biliAISubtitleEnabled`、`biliAutoPlay`、`biliPlayNextDisabled`、`biliCookies`
 - HUD：`hudEnabled`、`hudIconRound`、`hudCarouselInterval`、`waqi*`、`ha*`
 - 元信息：`aioDebug`、`aioSchemaVersion`
 
-运行态在 `chrome.storage.local`：`hudState`、`hudQueueKeys`、`hudCarouselIndex`、`hudLastSuccessWaqi`、`hudLastSuccessHa`、`hudLastWaqiPubV/S`、`hudLastWaqiLag`、`speederLastSpeed`。
+运行态在 `chrome.storage.local`：`hudState`、`hudQueueKeys`、`hudCarouselIndex`、`hudLastSuccessWaqi`、`hudLastSuccessHa`、`hudLastWaqiPubV/S`、`hudLastWaqiLag`、`speederLastSpeed`（全局模式）、`speederSpeeds`（按站点模式，最多 200 条）。
+
+## 5.1 样式表结构
+
+`ui/options.css` 只是入口，用 `@import` 按**固定顺序**串联：
+
+```
+ui/options.css          @import 顺序表
+  styles/tokens.css     设计令牌 + 深色模式（无布局规则）
+  styles/base.css       页面骨架：重置、body、侧边栏、内容列、排版、卡片、响应式
+  styles/components.css 控件：表单、按钮、开关、toast、列表、诊断表格
+  styles/panels.css     面板专用：仪表盘网格、HUD、关于页
+```
+
+顺序即级联顺序。`tools/smoke.mjs` 会断言若干 **计算样式**（body 背景、侧边栏宽度、
+卡片圆角、开关尺寸、按钮主色、规则总数），所以拆分文件或调整顺序导致的样式回退会直接让
+冒烟测试失败 —— 不需要肉眼比对。
+
+## 5.2 国际化（增量式）
+
+- `manifest.default_locale = zh_CN`，`name`/`description` 使用 `__MSG_extName__` / `__MSG_extDescription__`。
+- UI 文案默认写死中文，需要翻译的元素加 `data-i18n="key"`（或 `data-i18n-placeholder` /
+  `data-i18n-title` / `data-i18n-aria-label`），启动时 `AIO.i18n.apply()` 只在目标语言
+  定义了该 key 时替换。这样"翻译一个字符串"= 往 `_locales/<lang>/messages.json` 加一条 +
+  给元素加属性，**不需要动逻辑**。
+- `tools/check.mjs` 强制：每个 `data-i18n` key 必须在**所有** locale 中存在（防漂移），
+  并且 manifest 里的每个 `__MSG_*` 都在默认语言里有定义。
+- 当前状态：manifest 与弹窗文案已双语；设置页文案保留内联中文（结构复杂、收益低，
+  需要翻译时按同样方式逐步加 key 即可）。
 
 ## 6. 生命周期
 

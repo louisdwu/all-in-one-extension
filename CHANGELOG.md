@@ -1,5 +1,35 @@
 # 更新记录
 
+## 2.1 — 2026-10-28
+
+第二轮：把方案里列出的增强项全部落地。
+
+### 新增
+
+- **按站点记住倍速**：新增 `libs/speed_memory.js`（三态 `off`/`global`/`site`，纯函数 + 单测）；
+  每站点保存一个速度（上限 200 条，LRU 淘汰），写入防抖 800ms；设置页改为下拉选择。
+  旧的布尔开关 `speederRememberSpeed` 自动迁移为 `global`/`off`。
+- **诊断面板**：后台日志环形缓冲（60 条）+ 按消息类型的调用/失败/平均耗时统计；
+  「关于与诊断」新增消息表格、最近告警列表、刷新/清空按钮；复制的诊断信息包含统计。
+  另外捕获 service worker 的 `error` / `unhandledrejection`。
+- **可选 host 权限**：声明期权限收窄为 bilibili + WAQI，Home Assistant 地址改为
+  设置页按需授权（`optional_host_permissions`），未授权时明确提示而不是报"网络错误"。
+  后台抓取前用 `chrome.permissions.contains` 预检。
+- **i18n**：`_locales/zh_CN` + `_locales/en`，`libs/i18n.js`（`data-i18n` 注解式，
+  缺 key 回退内联中文），manifest 名称/描述本地化；弹窗文案已全量双语。
+- **CI**：`.github/workflows/verify.yml` 在 push/PR 上跑静态检查 + 单测，
+  并用 Chrome for Testing 跑冒烟与行为回归。
+- **样式表拆分**：`ui/options.css` 变为 `@import` 顺序表，规则拆到
+  `ui/styles/{tokens,base,components,panels}.css`。
+
+### 测试
+
+- 单元测试 59 个（新增 speed_memory 8 个、schema 迁移 1 个）。
+- 行为回归 13 项（新增：按站点记忆的"命令→存储→新标签页恢复"链路）。
+- 冒烟测试新增 7 项计算样式断言 + 规则总数断言，样式重构导致回退会直接失败。
+- `tools/check.mjs` 新增：`@import`/样式表/脚本引用存在性、`_locales` 与 `data-i18n`
+  键完整性（防翻译漂移）、manifest 的 `__MSG_*` 可解析。
+
 ## 2.0 — 2026-10-28
 
 工程底座重写 + 三个严重缺陷修复。功能集合不变，配置与存储键保持向后兼容。
@@ -32,7 +62,7 @@
 - 弹窗改为 ES module，倍速支持步长/上下限/记忆上次速度。
 - 内容脚本：UI 全部 Shadow DOM 化（悬浮球、面板、标签切换器、toast）。
 - 工具链：`tools/check.mjs`、`tools/smoke.mjs`（Chromium + CDP 真机）、
-  `tools/regression.mjs`（10 项行为断言）、`tools/bump-version.mjs`。
+  `tools/regression.mjs`（行为断言）、`tools/bump-version.mjs`。
 - 49 个 `node:test` 用例，含"后台模块图能否启动"的冒烟测试。
 
 ### 移除
