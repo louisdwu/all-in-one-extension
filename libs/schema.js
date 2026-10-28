@@ -67,6 +67,8 @@
         biliAutoPlay: false,
         biliPlayNextDisabled: false,
         biliCookies: { sessdata: '', dedeUserId: '' },
+        /** 无痕窗口里把上面这份「专用账号」登录态写进无痕 cookie store。 */
+        biliIncognitoLogin: true,
 
         // ---- HUD ----
         hudEnabled: true,
@@ -240,6 +242,7 @@
             biliAutoPlay: bool(source.biliAutoPlay, DEFAULTS.biliAutoPlay),
             biliPlayNextDisabled: bool(source.biliPlayNextDisabled, DEFAULTS.biliPlayNextDisabled),
             biliCookies: normalizeCookies(source.biliCookies),
+            biliIncognitoLogin: bool(source.biliIncognitoLogin, DEFAULTS.biliIncognitoLogin),
 
             hudEnabled: bool(source.hudEnabled, DEFAULTS.hudEnabled),
             hudIconRound: bool(source.hudIconRound, DEFAULTS.hudIconRound),

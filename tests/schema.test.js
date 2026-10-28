@@ -126,3 +126,18 @@ test('toStorage only emits persisted keys', () => {
     assert.equal(Object.prototype.hasOwnProperty.call(stored, 'aioSchemaVersion'), true);
     assert.equal(Object.prototype.hasOwnProperty.call(stored, 'notAKey'), false);
 });
+
+test('incognito login reuse is on by default and can be turned off', () => {
+    assert.equal(normalize({}).biliIncognitoLogin, true);
+    assert.equal(normalize({ biliIncognitoLogin: false }).biliIncognitoLogin, false);
+    // Every switch in this schema treats anything but a truthy literal as off.
+    assert.equal(normalize({ biliIncognitoLogin: 'nope' }).biliIncognitoLogin, false);
+});
+
+test('biliIncognitoLogin survives a save/load round-trip', async () => {
+    await withFakeStorage({}, async (store) => {
+        await save({ biliIncognitoLogin: false });
+        assert.equal(store.biliIncognitoLogin, false);
+        assert.equal((await load()).biliIncognitoLogin, false);
+    });
+});

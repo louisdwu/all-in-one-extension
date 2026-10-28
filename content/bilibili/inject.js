@@ -4,6 +4,13 @@
  * Scope: while logged out, make the player behave as if the account could play
  * 1080P, show subtitles and load comments; optionally force "stop after finish".
  *
+ * Reality check (2026): the playurl endpoint no longer hands 1080P renditions to
+ * logged-out clients — qn=80 comes back as quality=64 with 480P/360P DASH
+ * streams — so this file can only *ask*. Real 1080P needs a session, which the
+ * background provides by writing the user's saved SESSDATA into the incognito
+ * cookie store (see background/features/bilibili.js). When the cap is detected
+ * we stop re-requesting and raise a hint instead of fighting the server.
+ *
  * Deliberate removals from the previous version (each one broke unrelated sites):
  *   - global override of `Object.defineProperty` (patched every library on the page)
  *   - global override of `window.setTimeout` (delayed every 25–35s timer anywhere)
@@ -41,9 +48,25 @@
         }
     };
 
-    // A real login is identified by the presence of DedeUserID__ckMd5. Never
-    // intercept anything for logged-in users — their account experience wins.
-    const isLogin = !!document.cookie.match(/DedeUserID__ckMd5=([^;]+)/);
+    // A real login cannot be detected from `document.cookie`: SESSDATA and
+    // DedeUserID are HttpOnly. The ISOLATED guard asks the background and
+    // publishes the answer as `data-aio-bili-login`; 'unknown' means it has not
+    // answered yet (service worker still booting), so stay careful.
+    function loginState() {
+        try {
+            const raw = document.documentElement.getAttribute('data-aio-bili-login');
+            if (raw === 'true') return 'yes';
+            if (raw === 'false') return 'no';
+        } catch (err) { /* ignore */ }
+        return 'unknown';
+    }
+
+    function isLoggedIn() {
+        const state = loginState();
+        if (state !== 'unknown') return state === 'yes';
+        // Legacy fallback for sessions whose ckMd5 is not HttpOnly.
+        return !!document.cookie.match(/DedeUserID__ckMd5=([^;]+)/);
+    }
 
     const shouldLockPlayNext = () => {
         if (config.enabled === false || !config.playNextDisabled) return false;
@@ -238,6 +261,69 @@
         return typeof url === 'string' && url.includes('api.bilibili.com/x/player/wbi/playurl') && config.video1080p !== false;
     }
 
+    /* ------------------- quality observation (server-side cap) ------------------- */
+    const QUALITY_LABELS = {
+        127: '8K', 126: '杜比视界', 125: 'HDR', 120: '4K', 116: '1080P60',
+        112: '1080P+', 80: '1080P', 74: '720P60', 64: '720P', 32: '480P', 16: '360P'
+    };
+
+    const qualityLabel = (qn) => QUALITY_LABELS[qn] || (qn ? qn + 'P' : '未知');
+
+    /**
+     * What the server actually granted. bilibili keeps *advertising* 1080P in
+     * `accept_quality` for logged-out clients but only hands out 480P/360P
+     * renditions, so `quality` is the only honest field.
+     */
+    const observed = { granted: 0, height: 0, accept: [], capped: false };
+    let hintSent = false;
+
+    function resetQualityObservation() {
+        observed.granted = 0;
+        observed.height = 0;
+        observed.accept = [];
+        observed.capped = false;
+        hintSent = false;
+    }
+
+    /** What the user can actually watch right now, in human terms. */
+    function observedLabel() {
+        if (observed.height) return observed.height + 'P';
+        return qualityLabel(observed.granted);
+    }
+
+    function sendCapHint() {
+        if (hintSent) return;
+        hintSent = true;
+        const message = 'B站未登录最高只有 ' + observedLabel() +
+            '。在设置页填入账号 SESSDATA 并勾选「无痕窗口沿用此账号」后即可看 1080P。';
+        try {
+            document.documentElement.setAttribute('data-aio-bili-hint', JSON.stringify({ reason: 'quality_capped', message }));
+        } catch (err) { /* ignore */ }
+    }
+
+    function observePlayurl(text) {
+        try {
+            const json = JSON.parse(text);
+            const data = json && json.data;
+            if (!data) return;
+            const granted = Number(data.quality) || 0;
+            if (granted) observed.granted = granted;
+            if (Array.isArray(data.accept_quality) && data.accept_quality.length) observed.accept = data.accept_quality;
+            // `quality` can claim 720P while the DASH ladder stops at 480P; the
+            // rendition heights tell the user what they actually get.
+            if (data.dash && Array.isArray(data.dash.video)) {
+                for (const stream of data.dash.video) {
+                    const height = Number(stream.height) || 0;
+                    if (height > observed.height) observed.height = height;
+                }
+            }
+            observed.capped = observed.accept.indexOf(80) >= 0 && observed.granted > 0 && observed.granted < 80;
+            if (observed.capped) sendCapHint();
+        } catch (err) {
+            log.debug('playurl body is not json', err.message);
+        }
+    }
+
     /* ------------------------------- XHR hook ------------------------------- */
     const nativeOpen = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function (method, url) {
@@ -264,7 +350,11 @@
             enumerable: descriptor.enumerable,
             get() {
                 const value = descriptor.get.call(this);
-                if (!this.__aioUrl || !needsPatch(this.__aioUrl)) return value;
+                if (!this.__aioUrl) return value;
+                // Observation only: the player reads the playurl once and we must
+                // not change its body, just learn which quality really arrived.
+                if (prop === 'responseText' && typeof value === 'string' && isPlayurl(this.__aioUrl)) observePlayurl(value);
+                if (!needsPatch(this.__aioUrl)) return value;
                 if (prop === 'responseText' && typeof value === 'string') return patchBody(value, this.__aioUrl);
                 if (prop === 'response' && value && typeof value === 'object') {
                     try { return JSON.parse(patchBody(JSON.stringify(value), this.__aioUrl)); } catch (err) { return value; }
@@ -310,6 +400,16 @@
         }
 
         const promise = nextInit ? nativeFetch.call(window, nextInput, nextInit) : nativeFetch.call(window, nextInput);
+
+        // Observe (never rewrite) the playurl body to learn the granted quality.
+        if (isPlayurl(url)) {
+            promise.then((response) => {
+                try {
+                    response.clone().text().then(observePlayurl, () => {});
+                } catch (err) { /* body already consumed */ }
+            }, () => {});
+        }
+
         if (!needsPatch(url)) return promise;
 
         return promise.then(async (response) => {
@@ -319,9 +419,23 @@
         });
     };
 
-    if (!isLogin && config.comments !== false) {
-        if (!document.cookie.includes('DedeUserID=')) {
+    let fakeUidWritten = false;
+
+    /**
+     * The old build wrote a fake `DedeUserID` at load time. That is only safe
+     * once the background has confirmed there is no session here: with a real
+     * (HttpOnly) DedeUserID present, a second cookie with the same name would
+     * disagree with SESSDATA and can break playback.
+     */
+    function ensureFakeUidCookie() {
+        if (fakeUidWritten || config.comments === false) return;
+        if (loginState() !== 'no') return;
+        fakeUidWritten = true;
+        if (document.cookie.includes('DedeUserID=')) return;
+        try {
             document.cookie = 'DedeUserID=' + fakeUid + '; path=/; domain=.bilibili.com; SameSite=Lax';
+        } catch (err) {
+            log.debug('fake uid cookie failed', err.message);
         }
     }
 
@@ -350,6 +464,9 @@
 
     function request1080p() {
         if (config.video1080p === false) return;
+        // The server already told us 1080P is not on offer for this session;
+        // asking again only produces a "清晰度不可用" toast every few seconds.
+        if (observed.capped) return;
         try {
             const player = window.player;
             if (!player || typeof player.requestQuality !== 'function') return;
@@ -360,16 +477,24 @@
         } catch (err) { /* player not ready */ }
     }
 
+    let lastHref = location.href;
+
     function loop() {
         readConfig();
+        if (location.href !== lastHref) {
+            lastHref = location.href;
+            resetQualityObservation();
+        }
         const video = document.querySelector('video');
         if (video) hookVideo(video);
 
-        if (!isLogin && config.autoplay && video && video.paused && !video.ended && !manualPaused &&
+        const loggedIn = isLoggedIn();
+        if (!loggedIn && config.autoplay && video && video.paused && !video.ended && !manualPaused &&
             video.readyState >= 2 && Date.now() - lastUserAction > 2000) {
             video.play().catch(() => {});
         }
-        if (!isLogin) {
+        if (!loggedIn) {
+            ensureFakeUidCookie();
             const confirm = document.querySelector('.bpx-player-toast-confirm-login');
             if (confirm) confirm.click();
             request1080p();
@@ -378,5 +503,5 @@
     }
 
     setInterval(loop, 2000);
-    log.debug('inject ready', { isLogin, incognito: isIncognito() });
+    log.debug('inject ready', { loginState: loginState(), incognito: isIncognito() });
 })();

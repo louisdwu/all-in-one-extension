@@ -63,5 +63,28 @@
         }
     }
 
-    AIO.bili = { TRACK_PARAMS, purifyUrl, purifyBilibili, isVideoPage };
+    /**
+     * Cookie pairs that carry a bilibili login.
+     *
+     * `SESSDATA` is what the server authenticates; `DedeUserID` is what the page
+     * uses to render the account. Both are HttpOnly on bilibili.com, so the only
+     * way to "log in" an incognito window without typing a password is to write
+     * them into its cookie store from the background (`chrome.cookies.set`).
+     *
+     * Pure: returns [] when no usable credential is stored.
+     *
+     * @param {{sessdata?: string, dedeUserId?: string}} cookies
+     * @returns {Array<{name: string, value: string}>}
+     */
+    function loginCookies(cookies) {
+        const source = cookies && typeof cookies === 'object' ? cookies : {};
+        const sessdata = String(source.sessdata == null ? '' : source.sessdata).trim();
+        if (!sessdata) return [];
+        const pairs = [{ name: 'SESSDATA', value: sessdata }];
+        const dedeUserId = String(source.dedeUserId == null ? '' : source.dedeUserId).trim();
+        if (dedeUserId) pairs.push({ name: 'DedeUserID', value: dedeUserId });
+        return pairs;
+    }
+
+    AIO.bili = { TRACK_PARAMS, purifyUrl, purifyBilibili, isVideoPage, loginCookies };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -37,3 +37,16 @@ test('isVideoPage recognises video, bangumi and list pages', () => {
     assert.equal(isVideoPage('https://example.com/video/BV1'), false);
     assert.equal(isVideoPage('garbage'), false);
 });
+
+test('loginCookies only emits pairs that can authenticate a session', () => {
+    const { loginCookies } = globalThis.AIO.bili;
+    assert.deepEqual(loginCookies({}), []);
+    assert.deepEqual(loginCookies(null), []);
+    assert.deepEqual(loginCookies({ sessdata: '  ' }), [], 'a blank SESSDATA is not a credential');
+    assert.deepEqual(loginCookies({ dedeUserId: '42' }), [], 'uid alone cannot log in');
+    assert.deepEqual(loginCookies({ sessdata: ' abc ' }), [{ name: 'SESSDATA', value: 'abc' }], 'value is trimmed');
+    assert.deepEqual(
+        loginCookies({ sessdata: 'abc', dedeUserId: ' 42 ' }),
+        [{ name: 'SESSDATA', value: 'abc' }, { name: 'DedeUserID', value: '42' }]
+    );
+});
