@@ -78,6 +78,9 @@ function guard(name, fn) {
 
 document.addEventListener('DOMContentLoaded', async () => {
     globalThis.AIO.i18n.apply();
+    globalThis.AIO.schema.load()
+        .then((settings) => globalThis.AIO.core.applyDebugSetting(settings))
+        .catch(() => {});
     const versionEl = document.getElementById('sidebar-version');
     if (versionEl) versionEl.textContent = 'v' + chrome.runtime.getManifest().version;
 

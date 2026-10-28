@@ -22,14 +22,37 @@
     /** @type {object|null} */
     let cache = null;
     let loading = null;
+    let subscribed = false;
     const watchers = new Set();
 
+    /**
+     * Subscribe only when this frame actually uses settings. The prelude is
+     * injected into every iframe; a dormant frame must not register a storage
+     * listener (it would re-read settings on every change, in every frame).
+     */
+    function ensureSubscribed() {
+        if (subscribed) return;
+        subscribed = true;
+        AIO.schema.subscribe((next) => {
+            cache = next;
+            for (const handler of watchers) {
+                try {
+                    handler(next);
+                } catch (err) {
+                    contentLog.error('settings watcher failed', err);
+                }
+            }
+        });
+    }
+
     function settings() {
+        ensureSubscribed();
         if (cache) return Promise.resolve(cache);
         if (!loading) {
             loading = AIO.schema.load().then((value) => {
                 cache = value;
                 loading = null;
+                AIO.core.applyDebugSetting(value);
                 return value;
             }, () => {
                 loading = null;
@@ -40,20 +63,10 @@
     }
 
     function onChange(handler) {
+        ensureSubscribed();
         watchers.add(handler);
         return () => watchers.delete(handler);
     }
-
-    AIO.schema.subscribe((next) => {
-        cache = next;
-        for (const handler of watchers) {
-            try {
-                handler(next);
-            } catch (err) {
-                contentLog.error('settings watcher failed', err);
-            }
-        }
-    });
 
     /* ------------------------------ toast ------------------------------ */
     const TOAST_CSS = `

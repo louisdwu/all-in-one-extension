@@ -96,9 +96,10 @@ async function initSpeeder(settings) {
 
     const render = () => {
         value.textContent = currentSpeed.toFixed(2) + 'x';
+        const dormant = !!(response && response.dormant);
         const active = response ? response.active !== false : AIO.rules.matches(tab ? tab.url : '', settings);
-        stateLabel.textContent = active ? '已接管' : '未启用（规则/开关）';
-        stateLabel.classList.toggle('off', !active);
+        stateLabel.textContent = dormant ? '此页暂无视频' : (active ? '已接管' : '未启用（规则/开关）');
+        stateLabel.classList.toggle('off', !dormant && !active);
         hint.textContent = '快捷键：' + Object.entries(settings.shortcuts)
             .map(([action2, combo]) => ({ increaseSpeed: '加速', decreaseSpeed: '减速', presetSpeed: '预设' }[action2] + ' ' + AIO.keys.display(combo)))
             .join(' · ');
@@ -229,6 +230,7 @@ async function boot() {
     document.getElementById('open-options').addEventListener('click', () => chrome.runtime.openOptionsPage());
 
     const settings = await AIO.schema.load();
+    AIO.core.applyDebugSetting(settings);
 
     const tabsToggle = document.getElementById('aio-tabs-toggle');
     tabsToggle.checked = settings.aioTabsEnabled !== false;
