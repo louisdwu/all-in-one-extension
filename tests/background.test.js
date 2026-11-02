@@ -126,23 +126,36 @@ test('bili:captureCookies skips the regular window store', async () => {
     // The regular window holds the user's MAIN account cookie: the endpoint
     // must never return it. Only the incognito store's dedicated account may
     // be captured.
+    const tabsQuery = globalThis.chrome.tabs.query;
     const cookiesByStore = {
         '0': [{ name: 'SESSDATA', value: 'MAIN-ACCOUNT-COOKIE' }, { name: 'DedeUserID', value: '999' }],
         '1': [{ name: 'SESSDATA', value: 'abc' }, { name: 'DedeUserID', value: '42' }]
     };
-    globalThis.chrome.cookies.getAllCookieStores = async () => [{ id: '0' }, { id: '1' }];
+    globalThis.chrome.cookies.getAllCookieStores = async () => [
+        { id: '0', tabIds: [11] },
+        { id: '1', tabIds: [21] }
+    ];
+    globalThis.chrome.tabs.query = async (query) => {
+        if (query && query.incognito === false) return [{ id: 11, incognito: false }];
+        if (query && query.incognito === true) return [{ id: 21, incognito: true }];
+        return [];
+    };
     globalThis.chrome.cookies.getAll = async (details) =>
         (cookiesByStore[details && details.storeId] || []);
 
-    const reply = await new Promise((resolve) => {
-        globalThis.chrome.runtime.onMessage.__listeners.forEach(
-            (fn) => fn({ type: 'bili:captureCookies' }, {}, resolve)
-        );
-    });
-    assert.notEqual(reply && reply.error, 'no_cookies', JSON.stringify(reply).slice(0, 120));
-    assert.equal(reply && reply.incognito, true, 'capture must flag the incognito store');
-    assert.equal(reply && reply.sessdata, 'abc', 'must capture the incognito account, not the main account');
-    assert.notEqual(reply && reply.sessdata, 'MAIN-ACCOUNT-COOKIE', 'the regular window must never be read');
+    try {
+        const reply = await new Promise((resolve) => {
+            globalThis.chrome.runtime.onMessage.__listeners.forEach(
+                (fn) => fn({ type: 'bili:captureCookies' }, {}, resolve)
+            );
+        });
+        assert.notEqual(reply && reply.error, 'no_cookies', JSON.stringify(reply).slice(0, 120));
+        assert.equal(reply && reply.incognito, true, 'capture must flag the incognito store');
+        assert.equal(reply && reply.sessdata, 'abc', 'must capture the incognito account, not the main account');
+        assert.notEqual(reply && reply.sessdata, 'MAIN-ACCOUNT-COOKIE', 'the regular window must never be read');
+    } finally {
+        globalThis.chrome.tabs.query = tabsQuery;
+    }
 });
 
 test('bili:reportLoginState drives the credential alert badge', async () => {
@@ -168,4 +181,94 @@ test('bili:reportLoginState drives the credential alert badge', async () => {
     action.__calls.length = 0;
     await send({ type: 'bili:reportLoginState', loggedIn: false }, { tab: { incognito: false } });
     assert.equal(action.__calls.length, 0, 'regular window reports must not touch the badge');
+});
+
+test('seed never writes the regular store, whatever its id', async () => {
+    // Regression for the store-classification bug: seeding used to treat
+    // "id !== '0'" as incognito, so on browsers whose regular store has a
+    // different id the dedicated account REPLACED the main account's session
+    // in the regular window. Classification must be structural (which tabs
+    // live in the store), never a string convention.
+    const syncGet = globalThis.chrome.storage.sync.get;
+    const tabsQuery = globalThis.chrome.tabs.query;
+    const cookiesSet = globalThis.chrome.cookies.set;
+    const cookiesGet = globalThis.chrome.cookies.get;
+    const storesGet = globalThis.chrome.cookies.getAllCookieStores;
+
+    // A fork where the regular store is '7' and the incognito one is '9'.
+    globalThis.chrome.cookies.getAllCookieStores = async () => [
+        { id: '7', tabIds: [11] },
+        { id: '9', tabIds: [22] }
+    ];
+    globalThis.chrome.tabs.query = async (query) => {
+        if (query && query.incognito === false) return [{ id: 11, incognito: false }];
+        if (query && query.incognito === true) return [{ id: 22, incognito: true }];
+        return [];
+    };
+    globalThis.chrome.cookies.get = async () => null; // no pre-existing SESSDATA
+    const writes = [];
+    globalThis.chrome.cookies.set = async (item) => { writes.push(item); };
+    globalThis.chrome.storage.sync.get = (keys, callback) => {
+        const value = {
+            biliIncognitoLogin: true,
+            biliCookies: { sessdata: 'incog', dedeUserId: '42', biliJct: 'jct', dedeUserIdCkMd5: 'md5' }
+        };
+        if (callback) callback(value);
+        return Promise.resolve(value);
+    };
+
+    try {
+        const bili = await import('../background/features/bilibili.js');
+
+        const results = await bili.seedAllIncognitoStores({ overwrite: true });
+        assert.deepEqual(results.map((r) => r && r.ok), [true], 'only the incognito store must be seeded');
+        assert.ok(writes.length >= 4, 'the credential cookies must be written');
+        for (const write of writes) {
+            assert.equal(write.storeId, '9', 'every write must target the store hosting incognito tabs');
+            assert.notEqual(write.storeId, '7', 'the regular store must never be written');
+        }
+
+        writes.length = 0;
+        const direct = await bili.seedIncognitoLogin('7', { overwrite: true });
+        assert.equal(direct && direct.ok, false, 'seeding the regular store directly must be refused');
+        assert.equal(direct && direct.reason, 'not_incognito_store');
+        assert.deepEqual(writes, [], 'a refused seed must not write any cookie');
+    } finally {
+        globalThis.chrome.storage.sync.get = syncGet;
+        globalThis.chrome.tabs.query = tabsQuery;
+        globalThis.chrome.cookies.set = cookiesSet;
+        globalThis.chrome.cookies.get = cookiesGet;
+        globalThis.chrome.cookies.getAllCookieStores = storesGet;
+    }
+});
+
+test('capture only reads stores that host incognito tabs', async () => {
+    const tabsQuery = globalThis.chrome.tabs.query;
+    const storesGet = globalThis.chrome.cookies.getAllCookieStores;
+    globalThis.chrome.cookies.getAllCookieStores = async () => [
+        { id: '7', tabIds: [11] },
+        { id: '9', tabIds: [22] }
+    ];
+    globalThis.chrome.tabs.query = async (query) => {
+        if (query && query.incognito === false) return [{ id: 11, incognito: false }];
+        if (query && query.incognito === true) return [{ id: 22, incognito: true }];
+        return [];
+    };
+    globalThis.chrome.cookies.getAll = async (details) =>
+        (details && details.storeId === '7'
+            ? [{ name: 'SESSDATA', value: 'MAIN-ACCOUNT-COOKIE' }]
+            : [{ name: 'SESSDATA', value: 'incog' }]);
+
+    try {
+        const reply = await new Promise((resolve) => {
+            globalThis.chrome.runtime.onMessage.__listeners.forEach(
+                (fn) => fn({ type: 'bili:captureCookies' }, {}, resolve)
+            );
+        });
+        assert.equal(reply && reply.sessdata, 'incog', 'must read the incognito store only');
+        assert.notEqual(reply && reply.sessdata, 'MAIN-ACCOUNT-COOKIE', 'the regular store must never be read even when its id is not 0');
+    } finally {
+        globalThis.chrome.tabs.query = tabsQuery;
+        globalThis.chrome.cookies.getAllCookieStores = storesGet;
+    }
 });

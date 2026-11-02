@@ -31,6 +31,55 @@ async function listStores() {
     }
 }
 
+/**
+ * Classify cookie stores by the tabs that actually live in them.
+ *
+ * Historical bug: the code assumed the desktop-Chromium convention
+ * `id === '0'` → regular / `id === '1'` → incognito. Chromium forks and
+ * special profiles do not keep it — there, `store.id !== '0'` matched the
+ * REGULAR store too, and every "seed incognito" write (fires on each
+ * credential save with overwrite:true) replaced the main account's session
+ * in the normal window. Stores are now classified structurally: any store
+ * hosting a regular tab is regular, anything not provably incognito is
+ * treated as regular (fail-safe — a missed seed is recoverable, a polluted
+ * regular jar is not).
+ */
+async function classifyStores() {
+    const stores = await listStores();
+    let regularTabs = [];
+    let incognitoTabs = [];
+    try { regularTabs = await chrome.tabs.query({ incognito: false }); } catch (err) { /* keep [] */ }
+    try { incognitoTabs = await chrome.tabs.query({ incognito: true }); } catch (err) { /* keep [] */ }
+    const regularTabIds = new Set(regularTabs.map((tab) => tab.id));
+    const incognitoTabIds = new Set(incognitoTabs.map((tab) => tab.id));
+    const regular = new Set();
+    const incognito = new Set();
+    for (const store of stores) {
+        const tabIds = store.tabIds || [];
+        if (tabIds.some((id) => regularTabIds.has(id))) regular.add(store.id);
+        if (tabIds.some((id) => incognitoTabIds.has(id))) incognito.add(store.id);
+    }
+    // Nothing to classify with (e.g. no open tabs reported): a single store
+    // must be the regular jar. Unclassified stores are treated as regular by
+    // the callers below.
+    if (!regularTabs.length && !incognitoTabs.length && stores.length === 1) {
+        regular.add(stores[0].id);
+    }
+    return { stores, regular, incognito };
+}
+
+/** May the dedicated account be written into this store? */
+async function isSafeIncognitoTarget(storeId) {
+    const { stores, regular, incognito } = await classifyStores();
+    if (regular.has(storeId)) return false;
+    if (incognito.has(storeId)) return true;
+    // Unclassified store (hosts no tabs right now): only acceptable when at
+    // least one OTHER store is provably the regular jar — i.e. this is an
+    // off-the-record jar entry whose tabs happen to be gone.
+    const store = stores.find((s) => s.id === storeId);
+    return !!store && regular.size > 0 && stores.length > 1;
+}
+
 /** Create the flag cookie when enabled, delete it when disabled. */
 export async function syncPlayNextCookie(enabled) {
     const stores = await listStores();
@@ -77,13 +126,23 @@ async function ensureCookieInStore(storeId) {
 
 export async function resolveStoreId(tab) {
     if (!tab) return undefined;
-    if (tab.cookieStoreId) return tab.cookieStoreId;
-    if (!tab.incognito) return '0';
-    try {
-        const stores = await listStores();
-        const matching = stores.find((s) => s.tabIds && s.tabIds.includes(tab.id));
-        if (matching) return matching.id;
-    } catch (err) { /* ignore */ }
+    if (tab.cookieStoreId) return tab.cookieStoreId; // Firefox
+    const stores = await listStores();
+    // Prefer the store that actually hosts this tab — no id conventions.
+    if (stores.length && tab.id !== undefined) {
+        const match = stores.find((store) => store.tabIds && store.tabIds.includes(tab.id));
+        if (match) return match.id;
+    }
+    if (!tab.incognito) {
+        const { regular } = await classifyStores();
+        if (regular.size) {
+            const regularStore = stores.find((store) => regular.has(store.id));
+            if (regularStore) return regularStore.id;
+        }
+        return stores.length ? stores[0].id : '0';
+    }
+    // Incognito fallback: '1' is Chromium's convention, but seedIncognitoLogin
+    // re-verifies the target structurally, so a wrong guess fails safe.
     return '1';
 }
 
@@ -140,6 +199,13 @@ export async function seedIncognitoLogin(storeId, options = {}) {
     const pairs = globalThis.AIO.bili.loginCookies(settings.biliCookies);
     if (!pairs.length) return { ok: false, reason: 'no_credential' };
 
+    // The guard that makes every caller safe: never write the dedicated
+    // account into a store that hosts (or may be) the regular window's jar.
+    if (typeof chrome !== 'undefined' && chrome.tabs && !(await isSafeIncognitoTarget(targetStoreId))) {
+        biliLog.warn('refusing to seed a non-incognito cookie store:', targetStoreId);
+        return { ok: false, reason: 'not_incognito_store' };
+    }
+
     if (!overwrite) {
         const existing = await chrome.cookies.get({ url: BILI_URL, name: 'SESSDATA', storeId: targetStoreId }).catch(() => null);
         if (existing && existing.value) return { ok: true, skipped: 'already_logged_in' };
@@ -183,10 +249,16 @@ export async function seedIncognitoLogin(storeId, options = {}) {
 
 /** Re-seed every incognito store that is currently alive. */
 export async function seedAllIncognitoStores(options) {
-    const stores = await listStores();
-    const incognitoStores = stores.filter((store) => store.id !== '0');
-    const targetIds = incognitoStores.length ? incognitoStores.map((s) => s.id) : ['1'];
-    return Promise.all(targetIds.map((id) => seedIncognitoLogin(id, options)));
+    const { stores, regular, incognito } = await classifyStores();
+    // Only stores that provably host incognito tabs. No id-based guessing and
+    // no '1' fallback: seeding nothing is always recoverable, seeding the
+    // regular jar is the bug this replaces.
+    const targets = stores.filter((store) => !regular.has(store.id) && incognito.has(store.id));
+    if (!targets.length) {
+        biliLog.debug('no live incognito store to seed');
+        return [];
+    }
+    return Promise.all(targets.map((store) => seedIncognitoLogin(store.id, options)));
 }
 
 export function registerBilibili() {
@@ -368,11 +440,10 @@ export function registerBilibili() {
      * without an open incognito window the call refuses (`no_incognito_store`).
      */
     handle('bili:captureCookies', async () => {
-        const stores = await listStores();
-        // Chrome labels the regular store '0' / incognito '1'; Firefox flags the
-        // store itself. Both shapes are covered: never read '0'.
-        const incognitoStores = stores.filter((store) =>
-            store.incognito === true || (store.id && store.id !== '0'));
+        const { stores, regular, incognito } = await classifyStores();
+        // Read from stores that PROVABLY host incognito tabs only — the same
+        // structural rule the write path uses, mirrored for reads.
+        const incognitoStores = stores.filter((store) => !regular.has(store.id) && incognito.has(store.id));
         if (!incognitoStores.length) return { ok: false, error: 'no_incognito_store' };
 
         for (const store of incognitoStores) {
