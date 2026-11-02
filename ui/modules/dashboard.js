@@ -11,6 +11,7 @@ const TOGGLES = {
     'db-speed-enable': 'globalEnabled',
     'db-hotkey-enable': 'hotkeyEnabled',
     'db-bili-enable': 'biliEnabled',
+    'db-screenshot-enable': 'screenshotEnabled',
     'db-hud-enable': 'hudEnabled'
 };
 
