@@ -110,19 +110,11 @@ test('options page has no duplicate element ids', () => {
     assert.equal(new Set(ids).size, ids.length);
 });
 
-test('host permissions are scoped and HA access is optional', () => {
+test('host permissions cover bilibili, waqi, and <all_urls>', () => {
     const hosts = manifest.host_permissions || [];
     assert.ok(hosts.some((pattern) => pattern.includes('bilibili.com')), 'cookies + webNavigation need bilibili origins');
     assert.ok(hosts.some((pattern) => pattern.includes('api.waqi.info')), 'the WAQI feed is fetched from the worker');
     assert.ok(hosts.includes('<all_urls>'), 'captureVisibleTab requires <all_urls> in host_permissions');
-    assert.equal(hosts.includes('*://*/*'), false, 'every-origin access must not be requested up front');
-
-    const optional = manifest.optional_host_permissions || [];
-    assert.ok(optional.includes('*://*/*'), 'user-configured Home Assistant origins are granted on demand');
-
-    const optionsSource = read('ui/modules/hud/index.js');
-    assert.equal(optionsSource.includes('chrome.permissions.request'), true,
-        'the on-demand origin must actually be requestable from the options page');
 });
 
 test('no unused permission is declared', () => {

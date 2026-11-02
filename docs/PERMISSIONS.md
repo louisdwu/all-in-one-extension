@@ -20,8 +20,7 @@
 ## `host_permissions`
 
 ```json
-"host_permissions": ["*://*.bilibili.com/*", "https://api.waqi.info/*", "<all_urls>"],
-"optional_host_permissions": ["*://*/*"]
+"host_permissions": ["*://*.bilibili.com/*", "https://api.waqi.info/*", "<all_urls>"]
 ```
 
 | 域名 | 为什么必须在声明期就拿到 |

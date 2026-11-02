@@ -110,7 +110,7 @@ async function triggerNow(statusEl) {
     if (statusEl) statusEl.textContent = '正在签到，请稍候…';
     try {
         const reply = await send('screenshot:trigger');
-        if (reply && reply.ok) {
+        if (reply && (reply.ok || reply.history)) {
             toast('签到完成');
             if (statusEl) statusEl.textContent = '签到完成';
             await renderHistory();
@@ -199,7 +199,7 @@ async function viewScreenshot(id) {
 async function deleteScreenshot(id) {
     try {
         const reply = await send('screenshot:deleteHistory', { ids: [id] });
-        if (!reply || !reply.ok) throw new Error((reply && reply.error) || '未知错误');
+        if (!reply || (!reply.ok && !reply.history)) throw new Error((reply && reply.error) || '未知错误');
         await renderHistory();
     } catch (err) {
         toast('删除失败：' + (err && err.message), 'error');

@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "__MSG_extName__",
-    "version": "1.2026.1102.1557",
+    "version": "1.2026.1102.1603",
     "description": "__MSG_extDescription__",
     "default_locale": "zh_CN",
     "permissions": [
@@ -17,9 +17,6 @@
         "*://*.bilibili.com/*",
         "https://api.waqi.info/*",
         "<all_urls>"
-    ],
-    "optional_host_permissions": [
-        "*://*/*"
     ],
     "background": {
         "service_worker": "background/index.js",

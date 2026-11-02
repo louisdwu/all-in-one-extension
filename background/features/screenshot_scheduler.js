@@ -331,11 +331,11 @@ export function registerScreenshotScheduler() {
         }
         await runScreenshot(settings);
         const history = await readHistory();
-        return { history };
+        return { ok: true, history };
     });
 
     handle('screenshot:getHistory', async () => {
-        return { history: await readHistory() };
+        return { ok: true, history: await readHistory() };
     });
 
     handle('screenshot:deleteHistory', async (message) => {
@@ -343,7 +343,7 @@ export function registerScreenshotScheduler() {
         const previous = await readHistory();
         const next = previous.filter((item) => !ids.includes(item.id));
         await AIO.core.storage.set('local', { [HISTORY_KEY]: next });
-        return { history: next };
+        return { ok: true, history: next };
     });
 
     if (typeof chrome === 'undefined' || !chrome.alarms) return; // Node test env
