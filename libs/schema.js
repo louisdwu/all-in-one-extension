@@ -88,7 +88,7 @@
         screenshotUrl: '',
         screenshotTime: '09:00',
         screenshotOffsetMin: 5,
-        screenshotWaitMs: 10000
+        screenshotWaitSec: 10
     };
 
     /** Storage keys that are written back to sync storage. */
@@ -280,7 +280,10 @@
             screenshotUrl: str(source.screenshotUrl, '').trim(),
             screenshotTime: normalizeClockTime(source.screenshotTime),
             screenshotOffsetMin: num(source.screenshotOffsetMin, DEFAULTS.screenshotOffsetMin, 0, 60),
-            screenshotWaitMs: num(source.screenshotWaitMs, DEFAULTS.screenshotWaitMs, 1000, 60000)
+            // Legacy `screenshotWaitMs` (ms, 1000–60000) converts to seconds.
+            screenshotWaitSec: source.screenshotWaitSec !== undefined
+                ? num(source.screenshotWaitSec, DEFAULTS.screenshotWaitSec, 0, 600)
+                : Math.round(num(source.screenshotWaitMs, DEFAULTS.screenshotWaitSec * 1000, 0, 600000) / 1000)
         };
     }
 
@@ -376,10 +379,14 @@
         const dirty = raw.aioSchemaVersion !== SCHEMA_VERSION ||
             raw.shortcutReference !== undefined ||
             raw.speederRememberSpeed !== undefined ||
+            raw.screenshotWaitMs !== undefined ||
             (raw.bilibiliSubtitles && raw.bilibiliSubtitles.autoEnableSubtitle !== raw.biliAutoSubtitle);
         if (raw.shortcutReference !== undefined) await c.storage.removeSync(['shortcutReference']);
         // The boolean is folded into speederSpeedMemory by normalize().
         if (raw.speederRememberSpeed !== undefined) await c.storage.removeSync(['speederRememberSpeed']);
+        // Milliseconds were replaced by seconds (screenshotWaitSec); normalize()
+        // already divides the legacy value by 1000, only the old key remains.
+        if (raw.screenshotWaitMs !== undefined) await c.storage.removeSync(['screenshotWaitMs']);
         if (!dirty) return false;
         const settings = normalize(raw);
         await c.storage.setSync(toStorage(settings));

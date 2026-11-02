@@ -323,9 +323,9 @@
                     <div class="help-text">在设定时间之后 0～N 分钟内随机触发，每天重新抽取，避免整点请求过于规律</div>
                 </div>
                 <div class="form-group">
-                    <label for="screenshot-wait">加载后等待（毫秒）</label>
-                    <input type="number" id="screenshot-wait" min="0" max="60000" step="500" value="10000">
-                    <div class="help-text">页面加载完成后额外等待多久再截图，给动态内容留渲染时间</div>
+                    <label for="screenshot-wait">加载后等待（秒）</label>
+                    <input type="number" id="screenshot-wait" min="0" max="600" step="1" value="10">
+                    <div class="help-text">页面加载完成后额外等待几秒再截图，给动态内容留渲染时间</div>
                 </div>
                 <div class="btn-group">
                     <button type="button" id="screenshot-save" class="primary">保存设置</button>

@@ -141,3 +141,29 @@ test('biliIncognitoLogin survives a save/load round-trip', async () => {
         assert.equal((await load()).biliIncognitoLogin, false);
     });
 });
+
+test('screenshotWaitMs converts to screenshotWaitSec in seconds', () => {
+    // normalize() handles both shapes: legacy ms values divide by 1000,
+    // new sec values are clamped as-is.
+    assert.equal(normalize({ screenshotWaitMs: 10000 }).screenshotWaitSec, 10);
+    assert.equal(normalize({ screenshotWaitMs: 1500 }).screenshotWaitSec, 2); // rounded
+    assert.equal(normalize({ screenshotWaitSec: 25 }).screenshotWaitSec, 25);
+    // A stale ms key must never win once the sec key exists.
+    assert.equal(normalize({ screenshotWaitSec: 5, screenshotWaitMs: 40000 }).screenshotWaitSec, 5);
+});
+
+test('migrate() removes the legacy screenshotWaitMs key', async () => {
+    const { migrate } = globalThis.AIO.schema;
+    const removed = [];
+    await withFakeStorage({ screenshotWaitMs: 20000, aioSchemaVersion: 1 }, async (store) => {
+        globalThis.chrome.storage.sync.remove = (keys, callback) => {
+            removed.push(...keys);
+            for (const key of keys) delete store[key];
+            if (callback) callback();
+        };
+        await migrate();
+        assert.ok(removed.includes('screenshotWaitMs'), 'legacy ms key must be removed');
+        assert.equal(store.screenshotWaitSec, 20, 'ms value must convert to seconds');
+        assert.equal(store.screenshotWaitMs, undefined);
+    });
+});

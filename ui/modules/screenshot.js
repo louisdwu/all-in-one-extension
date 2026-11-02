@@ -102,7 +102,7 @@ async function saveSettings(statusEl) {
         screenshotUrl: url,
         screenshotTime: timeEl.value || '09:00',
         screenshotOffsetMin: parseInt(offsetEl.value, 10) || 0,
-        screenshotWaitMs: parseInt(waitEl.value, 10) || 10000
+        screenshotWaitSec: parseInt(waitEl.value, 10) || 0
     });
     toast('签到设置已保存');
     if (statusEl) statusEl.textContent = '设置已保存，定时任务已更新';
@@ -237,7 +237,7 @@ export async function initScreenshot() {
     if (urlEl) urlEl.value = settings.screenshotUrl;
     if (timeEl) timeEl.value = settings.screenshotTime;
     if (offsetEl) offsetEl.value = settings.screenshotOffsetMin;
-    if (waitEl) waitEl.value = settings.screenshotWaitMs;
+    if (waitEl) waitEl.value = settings.screenshotWaitSec;
 
     const saveButton = document.getElementById('screenshot-save');
     if (saveButton) saveButton.addEventListener('click', () => saveSettings(document.getElementById('screenshot-status')));

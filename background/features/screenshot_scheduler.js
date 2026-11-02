@@ -263,7 +263,7 @@ async function runScreenshot(settings) {
         }
 
         await waitForTabComplete(tab.id);
-        await keepAliveSleep(settings.screenshotWaitMs);
+        await keepAliveSleep(settings.screenshotWaitSec * 1000);
 
         let image = null;
         let lastReason = '';

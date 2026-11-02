@@ -166,7 +166,7 @@ toast（`content/lib/content.js`）和速器 UI（`content/speeder.js`）都走�
 - 倍速：`globalEnabled`、`hideFloatingBall`、`includeRules`、`excludeRules`、`defaultSpeed`、`presetSpeed`、`shortcuts`、`speederStep`、`speederMinRate`、`speederMaxRate`、`speederSpeedMemory`（`off|global|site`，旧布尔 `speederRememberSpeed` 自动迁移）
 - B站：`biliEnabled`、`biliAutoSubtitle`、`bilibiliSubtitles`、`bilibili1080PEnabled`、`biliCommentsEnabled`、`biliAISubtitleEnabled`、`biliAutoPlay`、`biliPlayNextDisabled`、`biliCookies`、`biliIncognitoLogin`
 - HUD：`hudEnabled`、`hudIconRound`、`hudCarouselInterval`、`waqi*`、`ha*`
-- 定时签到：`screenshotEnabled`、`screenshotUrl`、`screenshotTime`（HH:MM）、`screenshotOffsetMin`（0–60）、`screenshotWaitMs`（0–60000）
+- 定时签到：`screenshotEnabled`、`screenshotUrl`、`screenshotTime`（HH:MM）、`screenshotOffsetMin`（0–60）、`screenshotWaitSec`（秒，0–600；旧 `screenshotWaitMs` 自动换算迁移）
 - 元信息：`aioDebug`、`aioSchemaVersion`
 
 运行态在 `chrome.storage.local`：`hudState`、`hudQueueKeys`、`hudCarouselIndex`、`hudLastSuccessWaqi`、`hudLastSuccessHa`、`hudLastWaqiPubV/S`、`hudLastWaqiLag`、`speederLastSpeed`（全局模式）、`speederSpeeds`（按站点模式，最多 200 条）、`aioScreenshotHistory`（定时签到记录，图片内嵌，最多 20 条）。
