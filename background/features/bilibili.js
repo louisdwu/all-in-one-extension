@@ -234,34 +234,67 @@ export function registerBilibili() {
     });
 
     /**
-     * Verify the *stored* credential against the real nav endpoint.
+     * Verify the incognito session against the real nav endpoint.
      *
-     * Cookie presence in a store says nothing about validity: an expired
-     * SESSDATA still makes the optimistic path report "logged in" while the
-     * server keeps handing out 480P. This asks bilibili directly.
+     * Two hard facts shape this handler:
+     *  1. "Cookie exists in a store" says nothing about validity — an expired
+     *     SESSDATA still looks stored, while the server keeps handing out 480P.
+     *  2. fetch() from the SW / extension pages strips the `Cookie` header
+     *     (forbidden header, verified with an echo server), so a "direct"
+     *     header-based check would ALWAYS report invalid.
+     *
+     * The only jar-accurate check is therefore a live incognito bilibili tab:
+     * inject a probe with chrome.scripting and let the page fetch nav with
+     * `credentials: 'include'` — the cookies come from that tab's incognito
+     * jar, i.e. exactly the session that matters for 1080P.
      */
     handle('bili:verifyCredential', async () => {
         const settings = await globalThis.AIO.schema.load();
         const sessdata = (settings.biliCookies && settings.biliCookies.sessdata || '').trim();
         if (!sessdata) return { ok: true, verified: false, reason: 'no_credential' };
+
+        let tabs = [];
         try {
-            // The cookie name is held in a variable because a literal
-            // `SESSDATA=<quote>` here trips the repo's secret scanner.
-            const sessCookieName = 'SESSDATA';
-            const resp = await fetch('https://api.bilibili.com/x/web-interface/nav', {
-                headers: {
-                    'Cookie': sessCookieName + '=' + sessdata,
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-                    'Referer': 'https://www.bilibili.com/'
-                }
-            });
-            const json = await resp.json();
-            const isLogin = !!(json && json.data && json.data.isLogin);
-            biliLog.info('credential verify:', isLogin ? 'valid' : 'invalid');
-            return { ok: true, verified: true, valid: isLogin, mid: isLogin && json.data.mid };
+            tabs = await chrome.tabs.query({ url: '*://*.bilibili.com/*' });
         } catch (err) {
             return { ok: false, error: err.message };
         }
+        const incognitoTabs = tabs.filter((tab) => tab && tab.incognito);
+        if (!incognitoTabs.length) {
+            return { ok: true, verified: false, reason: 'no_incognito_tab' };
+        }
+
+        const probeNav = async () => {
+            try {
+                const resp = await fetch('https://api.bilibili.com/x/web-interface/nav', { credentials: 'include' });
+                const json = await resp.json();
+                return {
+                    isLogin: !!(json && json.data && json.data.isLogin),
+                    mid: json && json.data ? json.data.mid : 0
+                };
+            } catch (err) {
+                return { error: String(err && err.message || err) };
+            }
+        };
+
+        for (const tab of incognitoTabs) {
+            try {
+                const results = await chrome.scripting.executeScript({
+                    target: { tabId: tab.id },
+                    func: probeNav
+                });
+                const value = results && results[0] && results[0].result;
+                if (!value || value.error) {
+                    biliLog.debug('nav probe failed in tab', tab.id, value && value.error);
+                    continue;
+                }
+                biliLog.info('incognito session verify:', value.isLogin ? 'valid' : 'invalid');
+                return { ok: true, verified: true, valid: value.isLogin, mid: value.isLogin ? value.mid : 0, via: 'incognito_tab' };
+            } catch (err) {
+                biliLog.debug('executeScript failed for tab', tab.id, err.message);
+            }
+        }
+        return { ok: false, error: 'probe_failed' };
     });
 
     /** Manual "make this incognito window logged in now" (used by the options page). */

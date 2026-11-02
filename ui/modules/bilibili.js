@@ -131,20 +131,25 @@ export async function initBilibili() {
     document.getElementById('bili-verify-credential')?.addEventListener('click', async (event) => {
         const button = event.currentTarget;
         button.disabled = true;
-        toast('正在向 B站验证 SESSDATA…');
-        const result = await core.sendMessage({ type: 'bili:verifyCredential' }, 15000);
+        toast('正在实测无痕会话（向 B站查询登录状态）…');
+        const result = await core.sendMessage({ type: 'bili:verifyCredential' }, 20000);
         button.disabled = false;
         if (!result || !result.ok) {
-            toast('验证请求失败：' + ((result && result.error) || '后台无响应'), 'error');
+            const reason = result && result.error;
+            toast(reason === 'probe_failed'
+                ? '验证失败：探测脚本无法在无痕 B站标签页中执行（请刷新该无痕窗口里的 B站页面后重试）'
+                : '验证请求失败：' + (reason || '后台无响应（若刚更新过扩展，请到 chrome://extensions 刷新一次）'), 'error');
             return;
         }
         if (!result.verified) {
-            toast('尚未保存 SESSDATA，无法验证', 'error');
+            toast(result.reason === 'no_incognito_tab'
+                ? '没有已打开的无痕 B站标签页：请先在无痕窗口打开任意 bilibili.com 页面再验证'
+                : '尚未保存 SESSDATA，无法验证', 'error');
             return;
         }
         toast(result.valid
-            ? '✅ SESSDATA 有效（UID ' + result.mid + '），无痕窗口可看 1080P'
-            : '❌ SESSDATA 已失效：请在无痕窗口重新登录专用账号，再点「从无痕窗口读取专用账号」', result.valid ? 'success' : 'error');
+            ? '✅ 无痕会话有效（UID ' + result.mid + '），可看 1080P'
+            : '❌ 无痕会话已失效：请在无痕窗口重新登录专用账号，再点「从无痕窗口读取专用账号」', result.valid ? 'success' : 'error');
     });
 
     document.getElementById('bili-seed-incognito')?.addEventListener('click', async (event) => {
