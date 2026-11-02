@@ -10,7 +10,14 @@ import assert from 'node:assert/strict';
  */
 
 function makeEvent() {
-    return { addListener() {}, removeListener() {}, hasListener: () => false };
+    const listeners = [];
+    return {
+        addListener(fn) { listeners.push(fn); },
+        removeListener(fn) { const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); },
+        hasListener: (fn) => listeners.includes(fn),
+        /** Test hook: registered listeners, so tests can drive the router. */
+        __listeners: listeners
+    };
 }
 
 function makeArea() {
@@ -106,4 +113,27 @@ test('settings normalize to a usable object without storage', async () => {
     const settings = AIO.schema.normalize({});
     assert.equal(settings.globalEnabled, true);
     assert.equal(AIO.schema.presetList(settings).length > 0, true);
+});
+
+test('bili:captureCookies skips the regular window store', async () => {
+    // The regular window holds the user's MAIN account cookie: the endpoint
+    // must never return it. Only the incognito store's dedicated account may
+    // be captured.
+    const cookiesByStore = {
+        '0': [{ name: 'SESSDATA', value: 'MAIN-ACCOUNT-COOKIE' }, { name: 'DedeUserID', value: '999' }],
+        '1': [{ name: 'SESSDATA', value: 'abc' }, { name: 'DedeUserID', value: '42' }]
+    };
+    globalThis.chrome.cookies.getAllCookieStores = async () => [{ id: '0' }, { id: '1' }];
+    globalThis.chrome.cookies.getAll = async (details) =>
+        (cookiesByStore[details && details.storeId] || []);
+
+    const reply = await new Promise((resolve) => {
+        globalThis.chrome.runtime.onMessage.__listeners.forEach(
+            (fn) => fn({ type: 'bili:captureCookies' }, {}, resolve)
+        );
+    });
+    assert.notEqual(reply && reply.error, 'no_cookies', JSON.stringify(reply).slice(0, 120));
+    assert.equal(reply && reply.incognito, true, 'capture must flag the incognito store');
+    assert.equal(reply && reply.sessdata, 'abc', 'must capture the incognito account, not the main account');
+    assert.notEqual(reply && reply.sessdata, 'MAIN-ACCOUNT-COOKIE', 'the regular window must never be read');
 });

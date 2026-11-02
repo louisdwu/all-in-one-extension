@@ -263,21 +263,22 @@
 
             <div class="section">
                 <h3 style="margin-top:0">🔑 账号 Cookie（可选，1080P 必需）</h3>
-                <p class="help-text">B站只给已登录的客户端下发 1080P。填入一个专用账号的 SESSDATA 后，无痕窗口会在打开 B站时自动带上它（仅在该无痕会话内有效，窗口关闭即清除），无需在无痕窗口里重复登录。Cookie 只保存在本机扩展存储中，不会上传到任何服务器。</p>
+                <p class="help-text">B站只给已登录的客户端下发 1080P。推荐流程：打开一个无痕窗口 → 在里面登录专用账号 → 回到这里点「从无痕窗口读取专用账号」。扩展只读取无痕窗口里的 Cookie（普通窗口的主账号 Cookie 永远不会被读取），保存后无痕窗口打开 B站时会自动带上它（仅在该无痕会话内有效，窗口关闭即清除）。Cookie 只保存在本机扩展存储中，不会上传到任何服务器。</p>
                 <div class="form-group">
                     <label for="bili-sessdata">SESSDATA</label>
-                    <input type="password" id="bili-sessdata" placeholder="粘贴 SESSDATA" autocomplete="off">
+                    <input type="password" id="bili-sessdata" placeholder="从无痕窗口读取，或手动粘贴" autocomplete="off">
                 </div>
                 <div class="form-group">
                     <label for="bili-dede-userid">DedeUserID</label>
-                    <input type="text" id="bili-dede-userid" placeholder="粘贴 DedeUserID" autocomplete="off">
+                    <input type="text" id="bili-dede-userid" placeholder="从无痕窗口读取，或手动粘贴" autocomplete="off">
                 </div>
                 <div class="toggle-container">
                     <span class="label">无痕窗口沿用此账号（1080P 必需）</span>
                     <label class="toggle"><input type="checkbox" id="bili-incognito-login" aria-label="无痕沿用账号"><span class="slider"></span></label>
                 </div>
                 <div class="btn-group">
-                    <button type="button" id="bili-fetch-cookies" class="secondary">从浏览器读取当前登录账号</button>
+                    <button type="button" id="bili-fetch-cookies" class="secondary">从无痕窗口读取专用账号</button>
+                    <button type="button" id="bili-verify-credential" class="secondary">验证 SESSDATA 是否有效</button>
                     <button type="button" id="bili-seed-incognito" class="secondary">立即写入已打开的无痕窗口</button>
                 </div>
                 <p class="help-text" id="bili-cookie-status">正在检查…</p>

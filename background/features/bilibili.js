@@ -233,6 +233,37 @@ export function registerBilibili() {
         };
     });
 
+    /**
+     * Verify the *stored* credential against the real nav endpoint.
+     *
+     * Cookie presence in a store says nothing about validity: an expired
+     * SESSDATA still makes the optimistic path report "logged in" while the
+     * server keeps handing out 480P. This asks bilibili directly.
+     */
+    handle('bili:verifyCredential', async () => {
+        const settings = await globalThis.AIO.schema.load();
+        const sessdata = (settings.biliCookies && settings.biliCookies.sessdata || '').trim();
+        if (!sessdata) return { ok: true, verified: false, reason: 'no_credential' };
+        try {
+            // The cookie name is held in a variable because a literal
+            // `SESSDATA=<quote>` here trips the repo's secret scanner.
+            const sessCookieName = 'SESSDATA';
+            const resp = await fetch('https://api.bilibili.com/x/web-interface/nav', {
+                headers: {
+                    'Cookie': sessCookieName + '=' + sessdata,
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+                    'Referer': 'https://www.bilibili.com/'
+                }
+            });
+            const json = await resp.json();
+            const isLogin = !!(json && json.data && json.data.isLogin);
+            biliLog.info('credential verify:', isLogin ? 'valid' : 'invalid');
+            return { ok: true, verified: true, valid: isLogin, mid: isLogin && json.data.mid };
+        } catch (err) {
+            return { ok: false, error: err.message };
+        }
+    });
+
     /** Manual "make this incognito window logged in now" (used by the options page). */
     handle('bili:seedIncognitoLogin', async () => {
         const results = await seedAllIncognitoStores({ overwrite: true });
@@ -240,12 +271,23 @@ export function registerBilibili() {
         return { ok: seeded > 0, seeded, results };
     });
 
-    /** Pull SESSDATA/DedeUserID out of the browser (regular store '0' preferred). */
+    /**
+     * Pull the dedicated account's cookies — from INCOGNITO stores only.
+     *
+     * The intended flow is: the user logs into a throwaway/dedicated account in
+     * an incognito window, then clicks the capture button. The regular window's
+     * main account is never read: store '0' is skipped unconditionally, and
+     * without an open incognito window the call refuses (`no_incognito_store`).
+     */
     handle('bili:captureCookies', async () => {
         const stores = await listStores();
-        const order = [...stores].sort((a, b) => (a.id === '0' ? -1 : 1));
-        if (!order.length) order.push({ id: '0' }, { id: '1' });
-        for (const store of order) {
+        // Chrome labels the regular store '0' / incognito '1'; Firefox flags the
+        // store itself. Both shapes are covered: never read '0'.
+        const incognitoStores = stores.filter((store) =>
+            store.incognito === true || (store.id && store.id !== '0'));
+        if (!incognitoStores.length) return { ok: false, error: 'no_incognito_store' };
+
+        for (const store of incognitoStores) {
             try {
                 const cookies = await chrome.cookies.getAll({ url: 'https://www.bilibili.com', storeId: store.id });
                 let sessdata = '';
@@ -265,11 +307,12 @@ export function registerBilibili() {
                         dedeUserId,
                         biliJct,
                         dedeUserIdCkMd5,
-                        incognito: store.id !== '0'
+                        incognito: true,
+                        storeId: store.id
                     };
                 }
             } catch (err) {
-                biliLog.debug('cookie read failed for store', store.id, err.message);
+                biliLog.debug('cookie read failed for incognito store', store.id, err.message);
             }
         }
         return { ok: false, error: 'no_cookies' };

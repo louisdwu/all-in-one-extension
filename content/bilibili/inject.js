@@ -220,13 +220,24 @@
                 if (data.wbi_img.img_url) nativeSetItem('wbi_img_url', data.wbi_img.img_url);
                 if (data.wbi_img.sub_url) nativeSetItem('wbi_sub_url', data.wbi_img.sub_url);
             }
-            if (data.isLogin || isLoggedIn()) {
-                if (data.isLogin) {
-                    try {
-                        document.documentElement.setAttribute('data-aio-bili-login', 'true');
-                    } catch (e) { /* ignore */ }
-                }
+            if (data.isLogin) {
+                try {
+                    document.documentElement.setAttribute('data-aio-bili-login', 'true');
+                } catch (e) { /* ignore */ }
                 return text; // a real session appeared: hands off
+            }
+            // The server answered isLogin:false while the optimistic attribute
+            // said "yes" — the seeded SESSDATA exists but is expired/invalid.
+            // Correct it so the logged-out path (cap hint, playurl resign)
+            // starts working again instead of a silent 480P.
+            if (loginState() === 'yes') {
+                try {
+                    document.documentElement.setAttribute('data-aio-bili-login', 'false');
+                } catch (e) { /* ignore */ }
+                log.warn('SESSDATA 无效：服务端判定未登录（凭据可能已过期，请在设置页更新）');
+            }
+            if (isLoggedIn()) {
+                return text;
             }
             return JSON.stringify(mockNav(data));
         }

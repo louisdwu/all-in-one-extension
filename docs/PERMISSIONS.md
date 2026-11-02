@@ -11,7 +11,7 @@
 | `storage` | `libs/schema.js`、HUD | 保存配置（sync）与运行态数据（local） |
 | `alarms` | `background/features/hud/index.js` | Service Worker 被挂起后重新拉起 HUD 调度（MV3 无长驻后台） |
 | `idle` | `background/features/hud/index.js` | 系统唤醒/解锁后立即刷新数据，避免展示过期数值 |
-| `cookies` | `background/features/bilibili.js` | ① 读取你自己登录的 SESSDATA（需你手动点击按钮）② 把这份「专用账号」写成无痕会话的 cookie（B站只给登录用户下发 1080P；写的是会话 cookie，无痕窗口关闭即消失）③ 维护 `aio_pnd` 开关 cookie（仅功能开启时存在） |
+| `cookies` | `background/features/bilibili.js` | ① 读取**无痕窗口**中登录的专用账号 SESSDATA（需你手动点击按钮；普通窗口的 store `'0'` 一律不读）② 把这份「专用账号」写成无痕会话的 cookie（B站只给登录用户下发 1080P；写的是会话 cookie，无痕窗口关闭即消失）③ 维护 `aio_pnd` 开关 cookie（仅功能开启时存在） |
 | `webNavigation` | `background/features/bilibili.js` | 进入 bilibili 页面时：给无痕标签写入登录态、把开关 cookie 同步到该标签所在的 cookie store |
 
 > 已删除的历史权限：`scripting`、`notifications`、`activeTab`（代码中从未使用）。
@@ -45,7 +45,7 @@
 
 | 数据 | 存放位置 | 备注 |
 |------|---------|------|
-| B站 SESSDATA / DedeUserID | `chrome.storage.sync`（本机，随账号同步） | 仅在用户点击"从浏览器读取"或手动填写时保存；设置页以密码框显示；诊断信息中打码 |
+| B站 SESSDATA / DedeUserID | `chrome.storage.sync`（本机，随账号同步） | 仅在用户点击"从无痕窗口读取专用账号"（只读无痕窗口 store，普通窗口一律不读）或手动填写时保存；设置页以密码框显示；诊断信息中打码 |
 | HA 长期令牌 / WAQI Token | `chrome.storage.sync` | 设置页以密码框显示；诊断信息中打码 |
 | HUD 拉取到的数值 | `chrome.storage.local` | 仅数值，不含原始响应体 |
 | 访问过的 URL | **不存储** | 只在内存中用于规则匹配，页面关闭即丢弃 |

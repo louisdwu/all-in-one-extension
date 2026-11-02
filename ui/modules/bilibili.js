@@ -105,8 +105,12 @@ export async function initBilibili() {
         button.disabled = true;
         const result = await core.sendMessage({ type: 'bili:captureCookies' });
         button.disabled = false;
+        if (result && result.error === 'no_incognito_store') {
+            toast('未检测到无痕窗口：请先打开一个无痕窗口并登录专用账号，再点此按钮', 'error');
+            return;
+        }
         if (!result || !result.ok) {
-            toast('未读取到 B站 Cookie：请先在浏览器中登录 bilibili.com（无痕窗口需已允许扩展运行）', 'error');
+            toast('无痕窗口里没有读到登录 Cookie：请先在该无痕窗口登录专用账号再试', 'error');
             return;
         }
         document.getElementById('bili-sessdata').value = result.sessdata || '';
@@ -121,7 +125,26 @@ export async function initBilibili() {
             })
         });
         refreshStatus();
-        toast('已读取并保存 Cookie' + (result.incognito ? '（来自无痕窗口）' : '（来自常规窗口）'));
+        toast('已从无痕窗口读取并保存专用账号 Cookie');
+    });
+
+    document.getElementById('bili-verify-credential')?.addEventListener('click', async (event) => {
+        const button = event.currentTarget;
+        button.disabled = true;
+        toast('正在向 B站验证 SESSDATA…');
+        const result = await core.sendMessage({ type: 'bili:verifyCredential' }, 15000);
+        button.disabled = false;
+        if (!result || !result.ok) {
+            toast('验证请求失败：' + ((result && result.error) || '后台无响应'), 'error');
+            return;
+        }
+        if (!result.verified) {
+            toast('尚未保存 SESSDATA，无法验证', 'error');
+            return;
+        }
+        toast(result.valid
+            ? '✅ SESSDATA 有效（UID ' + result.mid + '），无痕窗口可看 1080P'
+            : '❌ SESSDATA 已失效：请在无痕窗口重新登录专用账号，再点「从无痕窗口读取专用账号」', result.valid ? 'success' : 'error');
     });
 
     document.getElementById('bili-seed-incognito')?.addEventListener('click', async (event) => {
