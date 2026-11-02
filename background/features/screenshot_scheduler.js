@@ -80,14 +80,21 @@ function isValidHttpUrl(value) {
 }
 
 /**
- * captureVisibleTab requires host permission for the captured page. The
- * options page grants it via a user-gesture prompt; the background can only
- * CHECK it here (no gesture) — so we fail fast with guidance instead of
+ * captureVisibleTab requires host permission for the page being captured.
+ * Per-origin grants are NOT enough in practice: the sign-in page often
+ * redirects to another domain (SSO, www-apex, error pages), and the capture
+ * check runs against the URL shown at capture time — Chrome then rejects
+ * with "Either the '<all_urls>' or 'activeTab' permission is required".
+ * So we ask the options page to request the ALL-SITES pattern (declared in
+ * optional_host_permissions) inside its click gesture; the per-origin grant
+ * is still honoured for users who already have it. The background can only
+ * CHECK here (no gesture) — so we fail fast with guidance instead of
  * opening a window for nothing.
  */
 async function hasHostPermission(url) {
     if (typeof chrome === 'undefined' || !chrome.permissions) return true; // Node test env
     try {
+        if (await chrome.permissions.contains({ origins: ['*://*/*'] })) return true;
         return await chrome.permissions.contains({ origins: [new URL(url).origin + '/*'] });
     } catch (err) {
         logFn.debug('permission check failed:', err && err.message);
@@ -227,7 +234,7 @@ async function runScreenshot(settings) {
     // Fail fast (no window churn) when the origin was never granted — the
     // prompt can only be answered from an extension page, not from here.
     if (!(await hasHostPermission(settings.screenshotUrl))) {
-        throw new Error('缺少该站点的截图权限：请在设置页点一次「保存设置」或「立即签到」，在弹出的授权框中允许');
+        throw new Error('缺少截图权限：请在设置页点一次「保存设置」或「立即签到」，在弹出的授权框中允许（签到页可能跳转到其他域名，需授予所有网站）');
     }
 
     let windowId = null;
@@ -297,8 +304,11 @@ async function runScreenshot(settings) {
         }
 
         if (!image) {
+            const needsAllSites = /<all_urls>|activeTab/.test(lastReason);
             throw new Error('签到失败：无法截取网页画面 —— ' + (lastReason || '未知原因') +
-                '。常见原因：站点权限未授予（设置页保存时授权）、页面加载失败、窗口渲染被系统暂停');
+                (needsAllSites
+                    ? '。请到设置页点「立即签到」重新授权（弹框中允许；站点可能跳转到其他域名，需覆盖所有网站）'
+                    : '。常见原因：站点权限未授予、页面加载失败、窗口渲染被系统暂停'));
         }
 
         await appendHistory({

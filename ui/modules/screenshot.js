@@ -12,18 +12,21 @@ import { schema, core, toast, uiLog, formatTime } from './shared.js';
 
 const escapeHtml = (value) => core.dom.escapeHtml(value);
 
-/** Ask Chrome for host access to the capture target; must run inside the click gesture. */
-async function requestOriginPermission(url) {
+/**
+ * Ask Chrome for host access needed by captureVisibleTab.
+ *
+ * Per-origin grants are NOT enough in practice: the sign-in page often
+ * redirects to another domain (SSO, www-apex, error pages), and the capture
+ * check runs against the URL shown at capture time — Chrome then rejects
+ * with "Either the '<all_urls>' or 'activeTab' permission is required".
+ * So we request the ALL-SITES pattern (declared in optional_host_permissions)
+ * inside the click gesture; the help text explains why the prompt is broad.
+ */
+async function requestOriginPermission() {
     if (typeof chrome === 'undefined' || !chrome.permissions) return true;
-    let origin;
     try {
-        origin = new URL(url).origin + '/*';
-    } catch (err) {
-        return false;
-    }
-    try {
-        const granted = await chrome.permissions.request({ origins: [origin] });
-        if (!granted) uiLog.warn('host permission denied for', origin);
+        const granted = await chrome.permissions.request({ origins: ['*://*/*'] });
+        if (!granted) uiLog.warn('all-sites host permission denied');
         return !!granted;
     } catch (err) {
         // Already-granted requests resolve true; failures here mean the call
@@ -33,26 +36,31 @@ async function requestOriginPermission(url) {
     }
 }
 
-/** Reflect whether Chrome has granted host access for the URL in the field. */
+/** Reflect whether Chrome has granted host access for captures. */
 async function renderPermissionStatus() {
     const el = document.getElementById('screenshot-perm-status');
     if (!el) return;
-    const input = document.getElementById('screenshot-url');
-    const url = ((input && input.value) || '').trim();
-    if (!/^https?:\/\//.test(url)) {
-        el.textContent = '';
-        return;
-    }
-    let granted = false;
+    const granted = await hasCapturePermission();
+    el.textContent = granted
+        ? '✅ 已拥有截图所需的站点权限'
+        : '⚠️ 尚未授予截图权限：「保存设置」或「立即签到」时会弹出授权请求（覆盖所有网站，因为签到页可能跳转到其他域名）';
+    el.style.color = granted ? '' : 'var(--warning)';
+}
+
+async function hasCapturePermission() {
+    if (typeof chrome === 'undefined' || !chrome.permissions) return true;
     try {
-        granted = await chrome.permissions.contains({ origins: [new URL(url).origin + '/*'] });
+        if (await chrome.permissions.contains({ origins: ['*://*/*'] })) return true;
+        const input = document.getElementById('screenshot-url');
+        const url = ((input && input.value) || '').trim();
+        if (/^https?:\/\//.test(url)) {
+            return await chrome.permissions.contains({ origins: [new URL(url).origin + '/*'] });
+        }
+        return false;
     } catch (err) {
         uiLog.debug('permission contains failed:', err && err.message);
+        return false;
     }
-    el.textContent = granted
-        ? '✅ 已拥有该站点的截图权限'
-        : '⚠️ 尚未授予该站点截图权限：「保存设置」或「立即签到」时会弹出授权请求';
-    el.style.color = granted ? '' : 'var(--warning)';
 }
 
 function send(type, payload = {}) {
@@ -87,7 +95,7 @@ async function saveSettings(statusEl) {
 
     // Chrome requires permissions.request to run inside the click gesture —
     // before any other await.
-    if (url && enabledEl && enabledEl.checked) await requestOriginPermission(url);
+    if (url && enabledEl && enabledEl.checked) await requestOriginPermission();
 
     await schema.save({
         screenshotEnabled: enabledEl ? enabledEl.checked : false,
@@ -106,11 +114,10 @@ async function triggerNow(statusEl) {
     try {
         // The click gesture is the last reliable chance to request the host
         // permission; the scheduled path relies on a previously granted one.
-        const urlEl = document.getElementById('screenshot-url');
-        const url = (urlEl && urlEl.value.trim()) || (await schema.load()).screenshotUrl;
-        if (url && /^https?:\/\//.test(url)) {
-            const granted = await requestOriginPermission(url);
-            if (!granted) throw new Error('未授予该站点截图权限（授权弹框被拒绝或未弹出）');
+        const granted = await hasCapturePermission();
+        if (!granted) {
+            const ok = await requestOriginPermission();
+            if (!ok) throw new Error('未授予截图权限（授权弹框被拒绝或未弹出，可在 chrome://extensions 扩展详情的「网站访问权限」里补授）');
         }
         const reply = await send('screenshot:trigger');
         if (reply && reply.ok) {
