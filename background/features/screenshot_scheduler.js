@@ -203,10 +203,13 @@ async function runScreenshot(settings) {
     logFn.info('capturing', settings.screenshotUrl);
     let windowId = null;
     try {
+        // chrome.windows.create rejects `state: 'minimized'`
+        // ("Invalid value for state") — only windows.update may minimize. So
+        // create an unfocused popup first and minimize it as a second,
+        // best-effort step.
         const win = await chrome.windows.create({
             url: settings.screenshotUrl,
             type: 'popup',
-            state: 'minimized',
             focused: false,
             width: 1280,
             height: 900
@@ -214,6 +217,14 @@ async function runScreenshot(settings) {
         windowId = win && win.id;
         const tab = win && win.tabs && win.tabs[0];
         if (!tab || tab.id === undefined) throw new Error('browser did not return a tab');
+
+        try {
+            await chrome.windows.update(windowId, { state: 'minimized' });
+        } catch (err) {
+            // Minimize is cosmetic: worst case the popup stays visible for a
+            // few seconds (it never took focus), which still works.
+            logFn.debug('minimize not applied:', err && err.message);
+        }
 
         await waitForTabComplete(tab.id);
         await keepAliveSleep(settings.screenshotWaitMs);
@@ -224,7 +235,11 @@ async function runScreenshot(settings) {
             // capture). Restore without stealing focus, give the compositor a
             // moment, then retry once.
             logFn.debug('retrying with window restored (no focus)');
-            await chrome.windows.update(windowId, { state: 'normal', focused: false });
+            try {
+                await chrome.windows.update(windowId, { state: 'normal', focused: false });
+            } catch (err) {
+                logFn.debug('restore failed:', err && err.message);
+            }
             await keepAliveSleep(800);
             image = await captureVisible(windowId);
         }
