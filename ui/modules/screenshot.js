@@ -33,6 +33,28 @@ async function requestOriginPermission(url) {
     }
 }
 
+/** Reflect whether Chrome has granted host access for the URL in the field. */
+async function renderPermissionStatus() {
+    const el = document.getElementById('screenshot-perm-status');
+    if (!el) return;
+    const input = document.getElementById('screenshot-url');
+    const url = ((input && input.value) || '').trim();
+    if (!/^https?:\/\//.test(url)) {
+        el.textContent = '';
+        return;
+    }
+    let granted = false;
+    try {
+        granted = await chrome.permissions.contains({ origins: [new URL(url).origin + '/*'] });
+    } catch (err) {
+        uiLog.debug('permission contains failed:', err && err.message);
+    }
+    el.textContent = granted
+        ? '✅ 已拥有该站点的截图权限'
+        : '⚠️ 尚未授予该站点截图权限：「保存设置」或「立即签到」时会弹出授权请求';
+    el.style.color = granted ? '' : 'var(--warning)';
+}
+
 function send(type, payload = {}) {
     return new Promise((resolve, reject) => {
         try {
@@ -76,11 +98,20 @@ async function saveSettings(statusEl) {
     });
     toast('签到设置已保存');
     if (statusEl) statusEl.textContent = '设置已保存，定时任务已更新';
+    await renderPermissionStatus();
 }
 
 async function triggerNow(statusEl) {
     if (statusEl) statusEl.textContent = '正在签到，请稍候…';
     try {
+        // The click gesture is the last reliable chance to request the host
+        // permission; the scheduled path relies on a previously granted one.
+        const urlEl = document.getElementById('screenshot-url');
+        const url = (urlEl && urlEl.value.trim()) || (await schema.load()).screenshotUrl;
+        if (url && /^https?:\/\//.test(url)) {
+            const granted = await requestOriginPermission(url);
+            if (!granted) throw new Error('未授予该站点截图权限（授权弹框被拒绝或未弹出）');
+        }
         const reply = await send('screenshot:trigger');
         if (reply && reply.ok) {
             toast('签到完成');
@@ -92,6 +123,8 @@ async function triggerNow(statusEl) {
     } catch (err) {
         toast('签到失败：' + (err && err.message), 'error');
         if (statusEl) statusEl.textContent = '签到失败：' + (err && err.message);
+    } finally {
+        await renderPermissionStatus();
     }
 }
 
@@ -206,5 +239,6 @@ export async function initScreenshot() {
     if (triggerButton) triggerButton.addEventListener('click', () => triggerNow(document.getElementById('screenshot-status')));
 
     await renderHistory();
+    await renderPermissionStatus();
     uiLog.debug('screenshot panel ready');
 }

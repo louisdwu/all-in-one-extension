@@ -34,7 +34,7 @@ const HISTORY_KEY = 'aioScreenshotHistory';
 const HISTORY_CAP = 20;
 
 /** Above this a capture is considered real content; below it is likely a blank frame. */
-const BLANK_CAPTURE_BYTES = 15000;
+const BLANK_CAPTURE_BYTES = 8000;
 
 /** Hard cap for the page load phase, independent of the user's settle time. */
 const LOAD_TIMEOUT_MS = 30000;
@@ -75,6 +75,22 @@ function isValidHttpUrl(value) {
         const url = new URL(value);
         return url.protocol === 'http:' || url.protocol === 'https:';
     } catch (err) {
+        return false;
+    }
+}
+
+/**
+ * captureVisibleTab requires host permission for the captured page. The
+ * options page grants it via a user-gesture prompt; the background can only
+ * CHECK it here (no gesture) — so we fail fast with guidance instead of
+ * opening a window for nothing.
+ */
+async function hasHostPermission(url) {
+    if (typeof chrome === 'undefined' || !chrome.permissions) return true; // Node test env
+    try {
+        return await chrome.permissions.contains({ origins: [new URL(url).origin + '/*'] });
+    } catch (err) {
+        logFn.debug('permission check failed:', err && err.message);
         return false;
     }
 }
@@ -188,19 +204,32 @@ function waitForTabComplete(tabId, timeoutMs = LOAD_TIMEOUT_MS) {
     });
 }
 
-/** One capture attempt; returns a data URL or null. */
+/** One capture attempt; returns { image, error } — image null when failed. */
 async function captureVisible(windowId) {
     try {
         const dataUrl = await chrome.tabs.captureVisibleTab(windowId, { format: 'jpeg', quality: 70 });
-        return typeof dataUrl === 'string' && dataUrl.length > BLANK_CAPTURE_BYTES ? dataUrl : null;
+        if (typeof dataUrl !== 'string' || dataUrl.length <= BLANK_CAPTURE_BYTES) {
+            return { image: null, error: '疑似空白帧（' + (dataUrl ? dataUrl.length : 0) + ' 字节）' };
+        }
+        return { image: dataUrl, error: null };
     } catch (err) {
-        logFn.debug('capture attempt failed:', err && err.message);
-        return null;
+        const message = String((err && err.message) || err);
+        // WARN so the raw Chrome reason lands in the diagnostics log ring —
+        // "missing host permission", "Cannot access contents of url …" etc.
+        logFn.warn('capture failed:', message);
+        return { image: null, error: message };
     }
 }
 
 async function runScreenshot(settings) {
     logFn.info('capturing', settings.screenshotUrl);
+
+    // Fail fast (no window churn) when the origin was never granted — the
+    // prompt can only be answered from an extension page, not from here.
+    if (!(await hasHostPermission(settings.screenshotUrl))) {
+        throw new Error('缺少该站点的截图权限：请在设置页点一次「保存设置」或「立即签到」，在弹出的授权框中允许');
+    }
+
     let windowId = null;
     try {
         // chrome.windows.create rejects `state: 'minimized'`
@@ -229,21 +258,48 @@ async function runScreenshot(settings) {
         await waitForTabComplete(tab.id);
         await keepAliveSleep(settings.screenshotWaitMs);
 
-        let image = await captureVisible(windowId);
+        let image = null;
+        let lastReason = '';
+
+        // Attempt 1: as-is (usually minimized → rendering often suspended).
+        const first = await captureVisible(windowId);
+        image = first.image;
+        lastReason = first.error || '';
+
+        // Attempt 2: restore without stealing focus, let the compositor resume.
         if (!image) {
-            // Minimized windows often suspend rendering (blank / rejected
-            // capture). Restore without stealing focus, give the compositor a
-            // moment, then retry once.
             logFn.debug('retrying with window restored (no focus)');
             try {
                 await chrome.windows.update(windowId, { state: 'normal', focused: false });
             } catch (err) {
                 logFn.debug('restore failed:', err && err.message);
             }
-            await keepAliveSleep(800);
-            image = await captureVisible(windowId);
+            await keepAliveSleep(600);
+            const second = await captureVisible(windowId);
+            image = second.image;
+            if (second.error) lastReason = second.error;
         }
-        if (!image) throw new Error('签到失败：无法截取网页画面（可能缺少站点权限）');
+
+        // Attempt 3 (last resort): briefly take focus — the one state where
+        // the compositor is guaranteed to paint. The window closes right
+        // after, so the focus steal lasts well under a second.
+        if (!image) {
+            logFn.debug('retrying with window focused');
+            try {
+                await chrome.windows.update(windowId, { focused: true });
+            } catch (err) {
+                logFn.debug('focus failed:', err && err.message);
+            }
+            await keepAliveSleep(600);
+            const third = await captureVisible(windowId);
+            image = third.image;
+            if (third.error) lastReason = third.error;
+        }
+
+        if (!image) {
+            throw new Error('签到失败：无法截取网页画面 —— ' + (lastReason || '未知原因') +
+                '。常见原因：站点权限未授予（设置页保存时授权）、页面加载失败、窗口渲染被系统暂停');
+        }
 
         await appendHistory({
             id: Date.now(),
@@ -251,7 +307,7 @@ async function runScreenshot(settings) {
             timestamp: Date.now(),
             image
         });
-        logFn.info('screenshot saved');
+        logFn.info('screenshot saved,', image.length, 'bytes');
         return { ok: true };
     } catch (err) {
         logFn.error('screenshot failed:', err);
