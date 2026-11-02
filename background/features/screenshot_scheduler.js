@@ -81,17 +81,13 @@ function isValidHttpUrl(value) {
 
 /**
  * captureVisibleTab requires host permission for the page being captured.
- * Per-origin grants are NOT enough in practice: the sign-in page often
- * redirects to another domain (SSO, www-apex, error pages), and the capture
- * check runs against the URL shown at capture time — Chrome then rejects
- * with "Either the '<all_urls>' or 'activeTab' permission is required".
- * Therefore capture requires the all-sites pattern (declared in
- * optional_host_permissions). The background can only CHECK here (no gesture) —
- * so we fail fast with guidance instead of opening a window for nothing.
+ * In Chromium, background captureVisibleTab specifically requires the `<all_urls>`
+ * host permission (declared in host_permissions).
  */
 export async function hasHostPermission(url) {
     if (typeof chrome === 'undefined' || !chrome.permissions) return true; // Node test env
     try {
+        if (await chrome.permissions.contains({ origins: ['<all_urls>'] })) return true;
         return await chrome.permissions.contains({ origins: ['*://*/*'] });
     } catch (err) {
         logFn.debug('permission check failed:', err && err.message);
@@ -231,7 +227,7 @@ async function runScreenshot(settings) {
     // Fail fast (no window churn) when the origin was never granted — the
     // prompt can only be answered from an extension page, not from here.
     if (!(await hasHostPermission(settings.screenshotUrl))) {
-        throw new Error('缺少截图权限：请在设置页点击「授权所有网站」或「立即签到」，在弹出的授权框中允许（签到页可能跳转到其他域名，需覆盖所有网站）');
+        throw new Error('缺少网页访问权限：请在 chrome://extensions 确认扩展已启用且具有网站访问权限');
     }
 
     let windowId = null;
@@ -301,11 +297,8 @@ async function runScreenshot(settings) {
         }
 
         if (!image) {
-            const needsAllSites = /<all_urls>|activeTab/.test(lastReason);
             throw new Error('无法截取网页画面 —— ' + (lastReason || '未知原因') +
-                (needsAllSites
-                    ? '。请到设置页点击「授权所有网站」或「立即签到」重新授权（弹框中允许；站点可能跳转到其他域名，需覆盖所有网站）'
-                    : '。常见原因：页面加载失败、或窗口渲染被系统暂停'));
+                '。常见原因：页面加载失败或窗口渲染被系统暂停');
         }
 
         await appendHistory({

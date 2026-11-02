@@ -114,6 +114,7 @@ test('host permissions are scoped and HA access is optional', () => {
     const hosts = manifest.host_permissions || [];
     assert.ok(hosts.some((pattern) => pattern.includes('bilibili.com')), 'cookies + webNavigation need bilibili origins');
     assert.ok(hosts.some((pattern) => pattern.includes('api.waqi.info')), 'the WAQI feed is fetched from the worker');
+    assert.ok(hosts.includes('<all_urls>'), 'captureVisibleTab requires <all_urls> in host_permissions');
     assert.equal(hosts.includes('*://*/*'), false, 'every-origin access must not be requested up front');
 
     const optional = manifest.optional_host_permissions || [];

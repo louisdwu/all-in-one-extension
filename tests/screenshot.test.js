@@ -50,29 +50,29 @@ test('trimHistory tolerates non-array input', () => {
     assert.deepEqual(trimHistory('nope'), []);
 });
 
-test('hasHostPermission requires *://*/* and rejects single-site origin grants', async () => {
+test('hasHostPermission requires <all_urls> or *://*/*', async () => {
     globalThis.chrome = {
         permissions: {
-            contains: async ({ origins }) => origins.includes('*://*/*') ? false : true
-        }
-    };
-    try {
-        const ok = await hasHostPermission('https://example.com/checkin');
-        assert.equal(ok, false, 'single-origin grant does not suffice for redirects');
-    } finally {
-        delete globalThis.chrome;
-    }
-});
-
-test('hasHostPermission returns true when *://*/* is granted', async () => {
-    globalThis.chrome = {
-        permissions: {
-            contains: async ({ origins }) => origins.includes('*://*/*')
+            contains: async ({ origins }) => origins.includes('<all_urls>') || origins.includes('*://*/*')
         }
     };
     try {
         const ok = await hasHostPermission('https://example.com/checkin');
         assert.equal(ok, true);
+    } finally {
+        delete globalThis.chrome;
+    }
+});
+
+test('hasHostPermission rejects when neither <all_urls> nor *://*/* is granted', async () => {
+    globalThis.chrome = {
+        permissions: {
+            contains: async () => false
+        }
+    };
+    try {
+        const ok = await hasHostPermission('https://example.com/checkin');
+        assert.equal(ok, false);
     } finally {
         delete globalThis.chrome;
     }

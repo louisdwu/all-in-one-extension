@@ -43,11 +43,11 @@ async function renderPermissionStatus() {
     if (!el) return;
     const granted = await hasCapturePermission();
     if (granted) {
-        el.textContent = '✅ 已拥有截图权限（所有网站已授权）';
+        el.textContent = '✅ 已拥有截图权限（已支持所有网站）';
         el.style.color = '';
         if (grantBtn) grantBtn.style.display = 'none';
     } else {
-        el.textContent = '⚠️ 尚未授予「所有网站」访问权限：签到页可能跳转到其他域名，Chrome 截屏必须覆盖所有网站。';
+        el.textContent = '⚠️ 尚未授予「所有网站」访问权限：可在 chrome://extensions 扩展详情的「网站访问权限」里开启。';
         el.style.color = 'var(--warning)';
         if (grantBtn) grantBtn.style.display = 'inline-block';
     }
@@ -56,6 +56,7 @@ async function renderPermissionStatus() {
 async function hasCapturePermission() {
     if (typeof chrome === 'undefined' || !chrome.permissions) return true;
     try {
+        if (await chrome.permissions.contains({ origins: ['<all_urls>'] })) return true;
         return await chrome.permissions.contains({ origins: ['*://*/*'] });
     } catch (err) {
         uiLog.debug('permission contains failed:', err && err.message);
@@ -93,10 +94,6 @@ async function saveSettings(statusEl) {
         return;
     }
 
-    // Chrome requires permissions.request to run inside the click gesture —
-    // before any other await.
-    if (url && enabledEl && enabledEl.checked) await requestOriginPermission();
-
     await schema.save({
         screenshotEnabled: enabledEl ? enabledEl.checked : false,
         screenshotUrl: url,
@@ -112,13 +109,6 @@ async function saveSettings(statusEl) {
 async function triggerNow(statusEl) {
     if (statusEl) statusEl.textContent = '正在签到，请稍候…';
     try {
-        // Request *://*/* directly inside the user gesture.
-        // If already granted, resolves true immediately without prompt.
-        // If not yet granted, displays the browser permission dialog.
-        const granted = await requestOriginPermission();
-        if (!granted) {
-            throw new Error('未授予截图权限：请在弹出的授权框中点击「允许」（站点跳转需要所有网站权限）。若未弹出，可在 chrome://extensions 扩展详情的「网站访问权限」里开启');
-        }
         const reply = await send('screenshot:trigger');
         if (reply && reply.ok) {
             toast('签到完成');

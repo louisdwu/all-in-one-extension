@@ -20,7 +20,7 @@
 ## `host_permissions`
 
 ```json
-"host_permissions": ["*://*.bilibili.com/*", "https://api.waqi.info/*"],
+"host_permissions": ["*://*.bilibili.com/*", "https://api.waqi.info/*", "<all_urls>"],
 "optional_host_permissions": ["*://*/*"]
 ```
 
@@ -28,6 +28,7 @@
 |------|------------------------|
 | `*://*.bilibili.com/*` | `chrome.cookies` 读写 `aio_pnd` / 读取 SESSDATA；`chrome.webNavigation` 事件需要对应 host 权限才会触发 |
 | `https://api.waqi.info/*` | 后台直接抓取空气质量数据（跨域 fetch 需要 host 权限） |
+| `<all_urls>` | 定时签到（`chrome.tabs.captureVisibleTab`）后台自动截屏；Chromium 截屏 API 严格要求 `<all_urls>` 匹配模式 |
 
 **Home Assistant 走「按需授权」**：它的地址是你自己填的（通常还是内网地址），
 不可能预先声明。流程是：
