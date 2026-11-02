@@ -1,5 +1,5 @@
 /**
- * Screenshot scheduler — run a daily headless-ish capture of one page.
+ * Screenshot scheduler — 定时签到：run a daily headless-ish capture of one page.
  *
  * Flow: a daily alarm fires at the configured HH:MM → a one-shot "jitter"
  * alarm is scheduled 0..offsetMin minutes later (the random offset the user
@@ -228,7 +228,7 @@ async function runScreenshot(settings) {
             await keepAliveSleep(800);
             image = await captureVisible(windowId);
         }
-        if (!image) throw new Error('截图失败：无法捕获窗口内容（可能缺少站点权限）');
+        if (!image) throw new Error('签到失败：无法截取网页画面（可能缺少站点权限）');
 
         await appendHistory({
             id: Date.now(),

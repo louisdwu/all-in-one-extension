@@ -8,7 +8,7 @@
 }
 
 .screenshot-history:empty::before {
-    content: '暂无截图记录';
+    content: '暂无签到记录';
     color: var(--text-secondary);
     text-align: center;
     padding: 24px;

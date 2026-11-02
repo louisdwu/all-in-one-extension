@@ -74,24 +74,24 @@ async function saveSettings(statusEl) {
         screenshotOffsetMin: parseInt(offsetEl.value, 10) || 0,
         screenshotWaitMs: parseInt(waitEl.value, 10) || 10000
     });
-    toast('截图设置已保存');
+    toast('签到设置已保存');
     if (statusEl) statusEl.textContent = '设置已保存，定时任务已更新';
 }
 
 async function triggerNow(statusEl) {
-    if (statusEl) statusEl.textContent = '正在截图，请稍候…';
+    if (statusEl) statusEl.textContent = '正在签到，请稍候…';
     try {
         const reply = await send('screenshot:trigger');
         if (reply && reply.ok) {
-            toast('截图完成');
-            if (statusEl) statusEl.textContent = '截图完成';
+            toast('签到完成');
+            if (statusEl) statusEl.textContent = '签到完成';
             await renderHistory();
         } else {
             throw new Error((reply && reply.error) || '未知错误');
         }
     } catch (err) {
-        toast('截图失败：' + (err && err.message), 'error');
-        if (statusEl) statusEl.textContent = '截图失败：' + (err && err.message);
+        toast('签到失败：' + (err && err.message), 'error');
+        if (statusEl) statusEl.textContent = '签到失败：' + (err && err.message);
     }
 }
 
@@ -108,7 +108,7 @@ async function renderHistory() {
     }
 
     if (!history.length) {
-        container.innerHTML = '<p class="help-text">暂无截图记录</p>';
+        container.innerHTML = '<p class="help-text">暂无签到记录</p>';
         return;
     }
 
@@ -117,7 +117,7 @@ async function renderHistory() {
         const shortUrl = url.length > 60 ? url.slice(0, 57) + '…' : url;
         return `
             <div class="screenshot-item">
-                <img src="${item.image}" class="screenshot-preview" alt="截图 ${formatTime(item.timestamp)}" loading="lazy">
+                <img src="${item.image}" class="screenshot-preview" alt="签到 ${formatTime(item.timestamp)}" loading="lazy">
                 <div class="screenshot-info">
                     <div class="screenshot-url" title="${url}">${shortUrl}</div>
                     <div class="screenshot-time">${formatTime(item.timestamp)}</div>
@@ -144,7 +144,7 @@ async function viewScreenshot(id) {
         const reply = await send('screenshot:getHistory');
         const item = ((reply && reply.history) || []).find((entry) => entry.id === id);
         if (!item || !item.image) {
-            toast('找不到这条截图', 'error');
+            toast('找不到这条记录', 'error');
             return;
         }
         // Chrome blocks top-level data: navigation, so wrap the image in a
