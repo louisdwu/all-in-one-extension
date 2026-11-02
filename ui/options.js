@@ -15,6 +15,7 @@ import { initAioTabs } from './modules/aiotabs.js';
 import { initIncognito } from './modules/incognito.js';
 import { initSpeeder } from './modules/speeder.js';
 import { initBilibili } from './modules/bilibili.js';
+import { initScreenshot } from './modules/screenshot.js';
 import { initHotkeys } from './modules/hotkeys.js';
 import { initHud } from './modules/hud/index.js';
 import { initBackup } from './modules/backup.js';
@@ -91,6 +92,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     guard('incognito', initIncognito);
     guard('speeder', initSpeeder);
     guard('bilibili', initBilibili);
+    guard('screenshot', initScreenshot);
     guard('hotkeys', initHotkeys);
     guard('hud', initHud);
     guard('backup', initBackup);

@@ -18,6 +18,7 @@
             <li><button type="button" role="tab" data-target="tab-general">🕵️ 无痕按键</button></li>
             <li><button type="button" role="tab" data-target="tab-speeder">🎬 视频倍速</button></li>
             <li><button type="button" role="tab" data-target="tab-bilibili">📺 B站增强</button></li>
+            <li><button type="button" role="tab" data-target="tab-screenshot">📸 定时截图</button></li>
             <li><button type="button" role="tab" data-target="tab-hotkey">🎹 快捷键映射</button></li>
             <li><button type="button" role="tab" data-target="tab-hud">🖥️ HUD 监控</button></li>
             <li><button type="button" role="tab" data-target="tab-backup">💾 备份与恢复</button></li>
@@ -282,6 +283,55 @@
                     <button type="button" id="bili-seed-incognito" class="secondary">立即写入已打开的无痕窗口</button>
                 </div>
                 <p class="help-text" id="bili-cookie-status">正在检查…</p>
+            </div>
+        </section>
+
+        <!-- ============================ Screenshot Scheduler ============================ -->
+        <section id="tab-screenshot" class="tab-pane" role="tabpanel">
+            <div class="section">
+                <h2>📸 定时截图</h2>
+                <p class="lede">每天定时打开指定网页，截图保存后自动关闭。页面在最小化的独立窗口中加载，不会打断当前浏览。</p>
+                <div class="toggle-container">
+                    <span class="label">启用功能</span>
+                    <label class="toggle"><input type="checkbox" id="screenshot-enabled" aria-label="启用定时截图"><span class="slider"></span></label>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3 style="margin-top:0">⚙️ 设置</h3>
+                <div class="form-group">
+                    <label for="screenshot-url">目标网页 URL</label>
+                    <input type="url" id="screenshot-url" placeholder="https://example.com" autocomplete="off">
+                    <div class="help-text">截图的网页地址，必须以 http:// 或 https:// 开头。保存时会请求该站点的访问权限（截图 API 的要求）。</div>
+                </div>
+                <div class="form-group">
+                    <label for="screenshot-time">执行时间</label>
+                    <input type="time" id="screenshot-time" value="09:00">
+                    <div class="help-text">每天执行的具体时间（24 小时制）</div>
+                </div>
+                <div class="form-group">
+                    <label for="screenshot-offset">随机偏移（分钟）</label>
+                    <input type="number" id="screenshot-offset" min="0" max="60" value="5">
+                    <div class="help-text">在设定时间之后 0～N 分钟内随机触发，每天重新抽取，避免整点请求过于规律</div>
+                </div>
+                <div class="form-group">
+                    <label for="screenshot-wait">加载后等待（毫秒）</label>
+                    <input type="number" id="screenshot-wait" min="0" max="60000" step="500" value="10000">
+                    <div class="help-text">页面加载完成后额外等待多久再截图，给动态内容留渲染时间</div>
+                </div>
+                <div class="btn-group">
+                    <button type="button" id="screenshot-save" class="primary">保存设置</button>
+                    <button type="button" id="screenshot-trigger" class="secondary">立即截图</button>
+                </div>
+                <p class="help-text" id="screenshot-status">改动需点击「保存设置」才会生效</p>
+            </div>
+
+            <div class="section">
+                <h3 style="margin-top:0">📸 截图历史</h3>
+                <p class="help-text">最多保存最近 20 条记录，按时间倒序；超出自动淘汰最旧的。截图数据只存在本机（storage.local）。</p>
+                <div id="screenshot-history" class="screenshot-history">
+                    <p class="help-text">暂无截图记录</p>
+                </div>
             </div>
         </section>
 

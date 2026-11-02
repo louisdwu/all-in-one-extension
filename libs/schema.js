@@ -81,7 +81,14 @@
         haUrl: '',
         haToken: '',
         haRefreshRate: 1,
-        haEntities: []
+        haEntities: [],
+
+        // ---- screenshot scheduler ----
+        screenshotEnabled: false,
+        screenshotUrl: '',
+        screenshotTime: '09:00',
+        screenshotOffsetMin: 5,
+        screenshotWaitMs: 10000
     };
 
     /** Storage keys that are written back to sync storage. */
@@ -187,6 +194,17 @@
         return out;
     }
 
+    /** "09:00" stays, junk falls back to the default so alarms never parse NaN. */
+    function normalizeClockTime(value) {
+        const raw = str(value, DEFAULTS.screenshotTime).trim();
+        const match = raw.match(/^([0-9]{1,2}):([0-9]{1,2})$/);
+        if (!match) return DEFAULTS.screenshotTime;
+        const hours = parseInt(match[1], 10);
+        const minutes = parseInt(match[2], 10);
+        if (hours > 23 || minutes > 59) return DEFAULTS.screenshotTime;
+        return String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0');
+    }
+
     /** Coerce any raw storage snapshot into a fully typed, valid settings object. */
     function normalize(raw) {
         const source = raw && typeof raw === 'object' ? raw : {};
@@ -256,7 +274,13 @@
             haUrl: str(source.haUrl, '').trim().replace(/\/+$/, ''),
             haToken: str(source.haToken, '').trim(),
             haRefreshRate: num(source.haRefreshRate, DEFAULTS.haRefreshRate, 0.25, 10),
-            haEntities: normalizeEntities(source.haEntities)
+            haEntities: normalizeEntities(source.haEntities),
+
+            screenshotEnabled: bool(source.screenshotEnabled, DEFAULTS.screenshotEnabled),
+            screenshotUrl: str(source.screenshotUrl, '').trim(),
+            screenshotTime: normalizeClockTime(source.screenshotTime),
+            screenshotOffsetMin: num(source.screenshotOffsetMin, DEFAULTS.screenshotOffsetMin, 0, 60),
+            screenshotWaitMs: num(source.screenshotWaitMs, DEFAULTS.screenshotWaitMs, 1000, 60000)
         };
     }
 

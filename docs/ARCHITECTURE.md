@@ -147,6 +147,9 @@ toast（`content/lib/content.js`）和速器 UI（`content/speeder.js`）都走�
 | `bili:incognitoStatus` | 设置页 → 后台 | → `{ allowed, loginEnabled, hasCredential }`（无痕权限 / 开关 / 是否存了 SESSDATA） |
 | `bili:seedIncognitoLogin` | 设置页 → 后台 | 把「专用账号」写进所有活着的无痕 cookie store → `{ ok, seeded }` |
 | `hud:refresh` / `hud:updateConfig` / `hud:getState` | 页面 → 后台 | 抓取结果 / 状态（`reason: 'needs_permission'` 表示 HA 地址未授权） |
+| `screenshot:trigger` | 设置页 → 后台 | 立即执行一次截图 → `{ history }` |
+| `screenshot:getHistory` | 设置页 → 后台 | → `{ history }`（storage.local，最近 20 条） |
+| `screenshot:deleteHistory` | 设置页 → 后台 | `{ ids }` → `{ history }` |
 | `diag:snapshot` / `diag:clearLog` / `diag:ping` | 设置页 → 后台 | 消息统计、日志环、存储占用、健康检查 |
 | `aio:settingsChanged` | 后台 → 所有标签页 | `{ keys }`（页面自行重读 schema） |
 | `aio:toast` | 后台 → 指定标签页 | `{ message, level }` |
@@ -163,9 +166,10 @@ toast（`content/lib/content.js`）和速器 UI（`content/speeder.js`）都走�
 - 倍速：`globalEnabled`、`hideFloatingBall`、`includeRules`、`excludeRules`、`defaultSpeed`、`presetSpeed`、`shortcuts`、`speederStep`、`speederMinRate`、`speederMaxRate`、`speederSpeedMemory`（`off|global|site`，旧布尔 `speederRememberSpeed` 自动迁移）
 - B站：`biliEnabled`、`biliAutoSubtitle`、`bilibiliSubtitles`、`bilibili1080PEnabled`、`biliCommentsEnabled`、`biliAISubtitleEnabled`、`biliAutoPlay`、`biliPlayNextDisabled`、`biliCookies`、`biliIncognitoLogin`
 - HUD：`hudEnabled`、`hudIconRound`、`hudCarouselInterval`、`waqi*`、`ha*`
+- 定时截图：`screenshotEnabled`、`screenshotUrl`、`screenshotTime`（HH:MM）、`screenshotOffsetMin`（0–60）、`screenshotWaitMs`（0–60000）
 - 元信息：`aioDebug`、`aioSchemaVersion`
 
-运行态在 `chrome.storage.local`：`hudState`、`hudQueueKeys`、`hudCarouselIndex`、`hudLastSuccessWaqi`、`hudLastSuccessHa`、`hudLastWaqiPubV/S`、`hudLastWaqiLag`、`speederLastSpeed`（全局模式）、`speederSpeeds`（按站点模式，最多 200 条）。
+运行态在 `chrome.storage.local`：`hudState`、`hudQueueKeys`、`hudCarouselIndex`、`hudLastSuccessWaqi`、`hudLastSuccessHa`、`hudLastWaqiPubV/S`、`hudLastWaqiLag`、`speederLastSpeed`（全局模式）、`speederSpeeds`（按站点模式，最多 200 条）、`aioScreenshotHistory`（定时截图历史，图片内嵌，最多 20 条）。
 
 ## 5.1 样式表结构
 
@@ -177,6 +181,7 @@ ui/options.css          @import 顺序表
   styles/base.css       页面骨架：重置、body、侧边栏、内容列、排版、卡片、响应式
   styles/components.css 控件：表单、按钮、开关、toast、列表、诊断表格
   styles/panels.css     面板专用：仪表盘网格、HUD、关于页
+  styles/screenshot.css 截图历史网格/卡片
 ```
 
 顺序即级联顺序。`tools/smoke.mjs` 会断言若干 **计算样式**（body 背景、侧边栏宽度、
