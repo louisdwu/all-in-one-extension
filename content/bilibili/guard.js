@@ -40,9 +40,31 @@
             } catch (err) {
                 guardLog.debug('login state publish failed', err.message);
             }
+            reportLoginState(res.loggedIn);
         });
     }
+
+    /**
+     * Forward login-state transitions to the background so it can raise the
+     * credential alert badge when a seeded incognito session turns invalid.
+     * The MAIN world (inject.js) flips the attribute from the live nav
+     * response; this observer turns that signal into one background message.
+     */
+    let lastReported = null;
+    function reportLoginState(loggedIn) {
+        if (lastReported === loggedIn) return;
+        lastReported = loggedIn;
+        AIO.core.post({ type: 'bili:reportLoginState', loggedIn });
+    }
     publishLoginState();
+    try {
+        new MutationObserver(() => {
+            const raw = document.documentElement.getAttribute('data-aio-bili-login');
+            if (raw === 'true' || raw === 'false') reportLoginState(raw === 'true');
+        }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-aio-bili-login'] });
+    } catch (err) {
+        guardLog.debug('login observer failed', err.message);
+    }
 
     const POPUP_SELECTORS = [
         '.bili-mini-mask', '.bili-mini-login-wrapper', '.bili-mini-login', '.bili-mini-login-right-wp',

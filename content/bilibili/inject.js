@@ -553,84 +553,23 @@
         } catch (err) { /* player not ready */ }
     }
 
-    /**
-     * Checks if 1080P (or higher) video stream has been successfully acquired.
-     * Only meaningful in incognito: normal windows show quality state in the
-     * player itself, the tag exists to signal "the seeded login worked".
-     */
-    function getAcquiredQualityTag() {
-        if (!isIncognito()) return '';
-        if (config.video1080p === false) return '';
-        let qn = 0;
-        try {
-            const player = window.player;
-            if (player && typeof player.getQuality === 'function') {
-                const current = player.getQuality();
-                qn = (current && (current.nowQ || current.quality)) || Number(current) || 0;
-            }
-        } catch (err) { /* player not ready */ }
-        if (!qn && observed.granted >= 80) qn = observed.granted;
-
-        if (qn >= 80 || observed.height >= 1080) {
-            if (qn === 120 || observed.height >= 2160) return '4K';
-            if (qn === 116) return '1080P60';
-            if (qn === 112) return '1080P+';
-            return '1080P';
-        }
-        return '';
-    }
-
-    let updatingTitle = false;
-
-    function updatePageTitle(tag) {
-        if (updatingTitle) return;
-        try {
-            updatingTitle = true;
-            const text = document.title || '';
-            const clean = text.replace(/^【(?:1080P\+?|1080P60|\d+P|4K|8K)】\s*/i, '');
-            if (tag) {
-                const desired = '【' + tag + '】' + clean;
-                if (document.title !== desired) {
-                    document.title = desired;
-                }
-            } else if (text !== clean) {
-                document.title = clean;
-            }
-        } catch (err) {
-            /* ignore */
-        } finally {
-            updatingTitle = false;
-        }
-    }
-
-    try {
-        const titleEl = document.querySelector('title');
-        if (titleEl) {
-            new MutationObserver(() => {
-                if (updatingTitle) return;
-                const tag = getAcquiredQualityTag();
-                if (tag) updatePageTitle(tag);
-            }).observe(titleEl, { childList: true, characterData: true, subtree: true });
-        }
-    } catch (err) { /* ignore */ }
-
-    // Fast initial check on page load or navigation to acquire 1080P quickly.
+    // Fast initial burst on page load or SPA navigation: keep asking the
+    // player for 1080P until the server actually grants it (or tells us it
+    // can't), then stop. Pure player interaction, no DOM side effects.
     let fastPollTimer = null;
+    function stopFastPoll() {
+        if (fastPollTimer) {
+            clearInterval(fastPollTimer);
+            fastPollTimer = null;
+        }
+    }
     function startFastPoll() {
-        if (fastPollTimer) clearInterval(fastPollTimer);
+        stopFastPoll();
         let attempts = 0;
         fastPollTimer = setInterval(() => {
             attempts += 1;
             request1080p();
-            const tag = getAcquiredQualityTag();
-            if (tag) {
-                updatePageTitle(tag);
-                clearInterval(fastPollTimer);
-                fastPollTimer = null;
-            } else if (attempts >= 30) {
-                clearInterval(fastPollTimer);
-                fastPollTimer = null;
-            }
+            if (observed.granted >= 80 || observed.capped || userChoseQuality || attempts >= 30) stopFastPoll();
         }, 300);
     }
 
@@ -642,7 +581,6 @@
             lastHref = location.href;
             resetQualityObservation();
             userChoseQuality = false;
-            updatePageTitle('');
             startFastPoll();
         }
         const video = document.querySelector('video');
@@ -664,7 +602,6 @@
             if (confirm) confirm.click();
         }
         request1080p();
-        updatePageTitle(getAcquiredQualityTag());
         if (shouldLockPlayNext()) syncPlaybackSettings();
     }
 

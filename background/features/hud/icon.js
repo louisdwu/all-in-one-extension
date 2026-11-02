@@ -65,6 +65,15 @@ function imageDataFor(text, color) {
     return entry;
 }
 
+/** Clear the badge unless an alert ('!') is active — alerts survive HUD ticks. */
+async function clearBadgeUnlessAlert() {
+    try {
+        const current = await chrome.action.getBadgeText({});
+        if (current && current.text === '!') return; // credential alert owns the badge
+    } catch (err) { /* ignore */ }
+    try { chrome.action.setBadgeText({ text: '' }); } catch (err) { /* ignore */ }
+}
+
 /** Draw `text` on `color` and push it to the toolbar icon. */
 export function setIcon(name, text, color) {
     const label = String(text == null ? '--' : text);
@@ -78,7 +87,7 @@ export function setIcon(name, text, color) {
             chrome.action.setTitle({ title });
             lastTitle = title;
         }
-        chrome.action.setBadgeText({ text: '' });
+        void clearBadgeUnlessAlert();
     } catch (err) {
         iconLog.warn('setIcon failed', err.message);
     }
@@ -89,7 +98,7 @@ export function resetIcon(title) {
     lastKey = 'default';
     try {
         chrome.action.setIcon({ path: DEFAULT_ICONS });
-        chrome.action.setBadgeText({ text: '' });
+        void clearBadgeUnlessAlert();
         chrome.action.setTitle({ title: title || 'All in One Extension' });
         lastTitle = title || '';
     } catch (err) {

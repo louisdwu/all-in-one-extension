@@ -88,6 +88,37 @@ export async function resolveStoreId(tab) {
 }
 
 /**
+ * Credential alert badge. When a seeded incognito session turns out to be
+ * invalid (server says "not logged in" while we believe it is), the toolbar
+ * icon shows a red `!` until the credential is fixed. HUD icon updates
+ * cooperate: hud/icon.js never clears a '!' badge.
+ */
+const ALERT_COLOR = '#d93025';
+const credentialAlert = { on: false };
+
+async function applyCredentialAlert(on) {
+    if (credentialAlert.on === on) return;
+    credentialAlert.on = on;
+    try {
+        if (!chrome.action || !chrome.action.setBadgeText) return;
+        await chrome.action.setBadgeBackgroundColor({ color: ALERT_COLOR });
+        await chrome.action.setBadgeText({ text: on ? '!' : '' });
+    } catch (err) {
+        biliLog.warn('credential alert badge failed', err.message);
+    }
+    biliLog.info('credential alert', on ? 'raised' : 'cleared');
+}
+
+/** Badge state lives in the browser across SW restarts; re-learn it on boot. */
+async function restoreCredentialAlert() {
+    try {
+        if (!chrome.action || !chrome.action.getBadgeText) return;
+        const { text } = await chrome.action.getBadgeText({});
+        credentialAlert.on = text === '!';
+    } catch (err) { /* ignore */ }
+}
+
+/**
  * Write the stored 「专用账号」 login into an incognito cookie store.
  *
  * Why this exists: bilibili stopped serving >480P streams to logged-out clients
@@ -141,7 +172,12 @@ export async function seedIncognitoLogin(storeId, options = {}) {
         await chrome.cookies.remove({ url: BILI_URL, name: 'DedeUserID', storeId: targetStoreId }).catch(() => {});
     }
 
-    if (written) biliLog.info('incognito session seeded with', written, 'cookie(s) into store', targetStoreId);
+    if (written) {
+        biliLog.info('incognito session seeded with', written, 'cookie(s) into store', targetStoreId);
+        // A successful seed means the credential works again (or at least is
+        // fresh); the page will re-report if the server still rejects it.
+        await applyCredentialAlert(false);
+    }
     return { ok: written > 0, written };
 }
 
@@ -305,6 +341,25 @@ export function registerBilibili() {
     });
 
     /**
+     * guard.js reports login transitions observed in incognito bilibili tabs
+     * (background answer + live nav responses relayed via the DOM attribute).
+     * `loggedIn:false` while the feature is on means the stored credential is
+     * expired/rejected → raise the toolbar alert; `true` clears it.
+     */
+    handle('bili:reportLoginState', async (message, sender) => {
+        const tab = sender && sender.tab;
+        if (!tab || !tab.incognito) return { ok: true, ignored: 'not_incognito' };
+        const settings = await globalThis.AIO.schema.load();
+        if (!settings.biliIncognitoLogin) return { ok: true, ignored: 'disabled' };
+        if (message.loggedIn === false) {
+            await applyCredentialAlert(true);
+        } else if (message.loggedIn === true) {
+            await applyCredentialAlert(false);
+        }
+        return { ok: true };
+    });
+
+    /**
      * Pull the dedicated account's cookies — from INCOGNITO stores only.
      *
      * The intended flow is: the user logs into a throwaway/dedicated account in
@@ -352,17 +407,21 @@ export function registerBilibili() {
     }, ['FETCH_BILI_COOKIES']);
 
     // Keep the cookie aligned with the stored setting.
-    chrome.storage.onChanged.addListener((changes, area) => {
+    chrome.storage.onChanged.addListener(async (changes, area) => {
         if (area !== 'sync') return;
         if (changes.biliPlayNextDisabled) {
             syncPlayNextCookie(!!changes.biliPlayNextDisabled.newValue);
         }
         // A freshly saved/captured credential (or a toggled switch) must reach
-        // incognito windows that are already open.
+        // incognito windows that are already open. A new credential is assumed
+        // good; the alert badge goes away (pages will re-report if not).
+        if (changes.biliCookies) await applyCredentialAlert(false);
         if (changes.biliCookies || changes.biliIncognitoLogin) {
             seedAllIncognitoStores({ overwrite: true });
         }
     });
+
+    void restoreCredentialAlert();
 
     // Preemptively seed when an incognito tab is created.
     if (chrome.tabs && chrome.tabs.onCreated) {

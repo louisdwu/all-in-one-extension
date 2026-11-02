@@ -67,11 +67,18 @@ globalThis.chrome = {
         set: async () => {},
         remove: async () => {}
     },
+    action: {
+        __calls: [],
+        async setBadgeText(details) { this.__calls.push(['text', details && details.text]); },
+        async setBadgeBackgroundColor() {},
+        async getBadgeText() { return { text: '' }; },
+        async setIcon() {},
+        async setTitle() {}
+    },
     alarms: { create() {}, clear() {}, getAll: async () => [], onAlarm: makeEvent() },
     idle: { onStateChanged: makeEvent() },
     webNavigation: { onBeforeNavigate: makeEvent() },
     commands: { onCommand: makeEvent() },
-    action: { setIcon() {}, setTitle() {}, setBadgeText() {} },
     extension: { isAllowedIncognitoAccess: (cb) => cb(true) }
 };
 
@@ -136,4 +143,29 @@ test('bili:captureCookies skips the regular window store', async () => {
     assert.equal(reply && reply.incognito, true, 'capture must flag the incognito store');
     assert.equal(reply && reply.sessdata, 'abc', 'must capture the incognito account, not the main account');
     assert.notEqual(reply && reply.sessdata, 'MAIN-ACCOUNT-COOKIE', 'the regular window must never be read');
+});
+
+test('bili:reportLoginState drives the credential alert badge', async () => {
+    const action = globalThis.chrome.action;
+    action.__calls.length = 0;
+
+    const send = (message, sender) => new Promise((resolve) => {
+        globalThis.chrome.runtime.onMessage.__listeners.forEach(
+            (fn) => fn(message, sender, resolve)
+        );
+    });
+
+    // Incognito page reports the seeded session was rejected -> raise '!'
+    const bad = await send({ type: 'bili:reportLoginState', loggedIn: false }, { tab: { incognito: true } });
+    assert.equal(bad && bad.ok, true, JSON.stringify(bad));
+    assert.deepEqual(action.__calls.at(-1), ['text', '!'], 'invalid session must raise the ! badge');
+
+    // Session becomes valid again -> badge cleared
+    await send({ type: 'bili:reportLoginState', loggedIn: true }, { tab: { incognito: true } });
+    assert.deepEqual(action.__calls.at(-1), ['text', ''], 'valid session must clear the badge');
+
+    // Regular-window reports are ignored (alert is incognito-specific)
+    action.__calls.length = 0;
+    await send({ type: 'bili:reportLoginState', loggedIn: false }, { tab: { incognito: false } });
+    assert.equal(action.__calls.length, 0, 'regular window reports must not touch the badge');
 });
