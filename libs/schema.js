@@ -66,7 +66,7 @@
         biliAISubtitleEnabled: true,
         biliAutoPlay: false,
         biliPlayNextDisabled: false,
-        biliCookies: { sessdata: '', dedeUserId: '' },
+        biliCookies: { sessdata: '', dedeUserId: '', biliJct: '', dedeUserIdCkMd5: '' },
         /** 无痕窗口里把上面这份「专用账号」登录态写进无痕 cookie store。 */
         biliIncognitoLogin: true,
 
@@ -177,10 +177,12 @@
     }
 
     function normalizeCookies(value) {
-        const out = { sessdata: '', dedeUserId: '' };
+        const out = { sessdata: '', dedeUserId: '', biliJct: '', dedeUserIdCkMd5: '' };
         if (value && typeof value === 'object') {
             out.sessdata = str(value.sessdata, '').trim();
             out.dedeUserId = str(value.dedeUserId, '').trim();
+            out.biliJct = str(value.biliJct, '').trim();
+            out.dedeUserIdCkMd5 = str(value.dedeUserIdCkMd5, '').trim();
         }
         return out;
     }

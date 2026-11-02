@@ -88,11 +88,12 @@ export async function initBilibili() {
     refreshStatus();
 
     const saveCookies = core.debounce(async () => {
+        const current = await schema.load();
         await schema.save({
-            biliCookies: {
+            biliCookies: Object.assign({}, current.biliCookies, {
                 sessdata: (document.getElementById('bili-sessdata')?.value || '').trim(),
                 dedeUserId: (document.getElementById('bili-dede-userid')?.value || '').trim()
-            }
+            })
         });
         refreshStatus();
     }, 500);
@@ -110,7 +111,16 @@ export async function initBilibili() {
         }
         document.getElementById('bili-sessdata').value = result.sessdata || '';
         document.getElementById('bili-dede-userid').value = result.dedeUserId || '';
-        await saveCookies();
+        const current = await schema.load();
+        await schema.save({
+            biliCookies: Object.assign({}, current.biliCookies, {
+                sessdata: (result.sessdata || '').trim(),
+                dedeUserId: (result.dedeUserId || '').trim(),
+                biliJct: (result.biliJct || '').trim(),
+                dedeUserIdCkMd5: (result.dedeUserIdCkMd5 || '').trim()
+            })
+        });
+        refreshStatus();
         toast('已读取并保存 Cookie' + (result.incognito ? '（来自无痕窗口）' : '（来自常规窗口）'));
     });
 

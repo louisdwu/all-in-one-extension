@@ -31,7 +31,7 @@
      * injector treats a missing attribute as "unknown" and stays careful.
      */
     function publishLoginState() {
-        AIO.core.sendMessage({ type: 'bili:loginState' }, 2000).then((res) => {
+        AIO.core.sendMessage({ type: 'bili:loginState' }, 5000).then((res) => {
             // No answer (worker asleep / timed out) leaves the attribute unset,
             // which the injector reads as "unknown" — never assume logged out.
             if (!res || typeof res.loggedIn !== 'boolean') return;

@@ -2,8 +2,10 @@
  * "Open link in incognito" backend.
  */
 import '../../libs/core.js';
+import '../../libs/schema.js';
 import '../../libs/bili.js';
 import { handle, notifySender } from '../router.js';
+import { seedIncognitoLogin, resolveStoreId } from './bilibili.js';
 
 const { log } = globalThis.AIO.core;
 const incogLog = log('incognito');
@@ -36,7 +38,27 @@ export function registerIncognito() {
         }
 
         try {
-            await chrome.windows.create({ url: cleanUrl, incognito: true, focused: true, state: 'maximized' });
+            const isBili = cleanUrl.includes('bilibili.com');
+            const settings = isBili ? await globalThis.AIO.schema.load() : null;
+            const needsSeed = isBili && settings && settings.biliIncognitoLogin;
+
+            if (needsSeed) {
+                // Open window to about:blank first, seed cookie store, then navigate.
+                // This eliminates the navigation race where initial page requests
+                // are dispatched before the session cookies are written.
+                const win = await chrome.windows.create({ url: 'about:blank', incognito: true, focused: true, state: 'maximized' });
+                const tabs = win && win.tabs && win.tabs.length ? win.tabs : (await chrome.tabs.query({ windowId: win.id }));
+                const tab = tabs && tabs[0];
+                const storeId = tab ? await resolveStoreId(tab) : '1';
+                await seedIncognitoLogin(storeId);
+                if (tab) {
+                    await chrome.tabs.update(tab.id, { url: cleanUrl });
+                } else {
+                    await chrome.tabs.create({ windowId: win.id, url: cleanUrl });
+                }
+            } else {
+                await chrome.windows.create({ url: cleanUrl, incognito: true, focused: true, state: 'maximized' });
+            }
             incogLog.debug('opened', cleanUrl);
             return { ok: true, url: cleanUrl };
         } catch (err) {

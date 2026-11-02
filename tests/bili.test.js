@@ -49,4 +49,13 @@ test('loginCookies only emits pairs that can authenticate a session', () => {
         loginCookies({ sessdata: 'abc', dedeUserId: ' 42 ' }),
         [{ name: 'SESSDATA', value: 'abc' }, { name: 'DedeUserID', value: '42' }]
     );
+    assert.deepEqual(
+        loginCookies({ sessdata: 'abc', dedeUserId: '42', biliJct: 'csrf123', dedeUserIdCkMd5: 'md5abc' }),
+        [
+            { name: 'SESSDATA', value: 'abc' },
+            { name: 'DedeUserID', value: '42' },
+            { name: 'bili_jct', value: 'csrf123' },
+            { name: 'DedeUserID__ckMd5', value: 'md5abc' }
+        ]
+    );
 });

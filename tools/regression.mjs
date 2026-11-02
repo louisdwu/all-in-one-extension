@@ -506,7 +506,7 @@ async function main() {
         '  }',
         '  return realFetch(input, init);',
         '};',
-        'document.documentElement.setAttribute("data-aio-bili-login", "no");',
+        'document.documentElement.setAttribute("data-aio-bili-login", "false");',
         'true'
     ].join('\n'));
     await biliInject.main(readFileSync(join(EXT_DIR, 'libs/md5.js'), 'utf8'));
@@ -524,6 +524,21 @@ async function main() {
     check('a server-side downgrade stops the repeated 1080P requests', settled === capped.calls,
         'before=' + settled + ' after=' + capped.calls);
     check('the cap is explained to the user', !!capped.hint && capped.hint.indexOf('480P') >= 0, capped.hint || 'no hint');
+
+    // 1080P acquired updates the document title with 【1080P】 — incognito only
+    await biliInject.main([
+        'window.player.getQuality = function () { return { nowQ: 80 }; };',
+        'document.title = "测试视频标题_哔哩哔哩_bilibili";',
+        'true'
+    ].join('\n'));
+    await wait(2200); // allow loop tick to observe the page is not incognito
+    const plainTitle = await biliInject.main('document.title');
+    check('normal window never gets the 【1080P】 title tag', !plainTitle.startsWith('【'), plainTitle);
+
+    await biliInject.main('document.documentElement.setAttribute("data-aio-incognito", "true"); true');
+    await wait(2200); // allow loop tick to apply title
+    const taggedTitle = await biliInject.main('document.title');
+    check('incognito 1080P acquired puts 【1080P】 tag into document title', taggedTitle.startsWith('【1080P】'), taggedTitle);
 
     // cleanup state so the profile is not left with test mappings/speeds
     await page1.iso('AIO.schema.save({ hotkeyMappings: {}, speederSpeedMemory: "site" })').catch(() => {});

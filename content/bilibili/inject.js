@@ -64,8 +64,8 @@
     function isLoggedIn() {
         const state = loginState();
         if (state !== 'unknown') return state === 'yes';
-        // Legacy fallback for sessions whose ckMd5 is not HttpOnly.
-        return !!document.cookie.match(/DedeUserID__ckMd5=([^;]+)/);
+        // Fallback for sessions whose DedeUserID or ckMd5 is in document.cookie.
+        return !!document.cookie.match(/DedeUserID__ckMd5=([^;]+)/) || !!document.cookie.match(/DedeUserID=([^;]+)/);
     }
 
     const shouldLockPlayNext = () => {
@@ -110,6 +110,15 @@
             const profile = raw ? JSON.parse(raw) : {};
             let changed = false;
 
+            if (config.video1080p !== false) {
+                if (!profile.media) profile.media = {};
+                // In incognito localStorage starts empty, so the player defaults
+                // to a low quality.  Always ensure 1080P is the preferred level.
+                if (!profile.media.quality || profile.media.quality < 80) {
+                    profile.media.quality = 80;
+                    changed = true;
+                }
+            }
             if (config.autoplay !== undefined) {
                 if (!profile.media) profile.media = {};
                 const desired = !!config.autoplay;
@@ -132,6 +141,13 @@
         }
     }
     syncPlaybackSettings();
+
+    try {
+        new MutationObserver(() => {
+            readConfig();
+            syncPlaybackSettings();
+        }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-aio-bili-config'] });
+    } catch (err) { /* ignore */ }
 
     /* --------------------------- logged-out patches --------------------------- */
     const fakeUid = Math.floor(Math.random() * 100000000) + 100000000;
@@ -176,8 +192,12 @@
 
     function needsPatch(url) {
         if (!url) return false;
-        return url.includes('/x/web-interface/nav') ||
-            url.includes('/x/player/wbi/v2') ||
+        if (url.includes('/x/web-interface/nav')) return true;
+        // If the user is logged in with real credentials, never mock user relation/account APIs.
+        if (isLoggedIn()) {
+            return false;
+        }
+        return url.includes('/x/player/wbi/v2') ||
             url.includes('/x/v2/reply') ||
             url.includes('/x/web-interface/relation') ||
             url.includes('/x/web-interface/archive/relation') ||
@@ -200,8 +220,20 @@
                 if (data.wbi_img.img_url) nativeSetItem('wbi_img_url', data.wbi_img.img_url);
                 if (data.wbi_img.sub_url) nativeSetItem('wbi_sub_url', data.wbi_img.sub_url);
             }
-            if (data.isLogin) return text; // a real session appeared: hands off
+            if (data.isLogin || isLoggedIn()) {
+                if (data.isLogin) {
+                    try {
+                        document.documentElement.setAttribute('data-aio-bili-login', 'true');
+                    } catch (e) { /* ignore */ }
+                }
+                return text; // a real session appeared: hands off
+            }
             return JSON.stringify(mockNav(data));
+        }
+
+        // If logged in, do not mock any other APIs (comments, relations, etc.)
+        if (isLoggedIn()) {
+            return text;
         }
 
         if (url.includes('/x/player/wbi/v2') && config.aiSubtitle !== false) {
@@ -261,6 +293,19 @@
         return typeof url === 'string' && url.includes('api.bilibili.com/x/player/wbi/playurl') && config.video1080p !== false;
     }
 
+    function shouldResignPlayurl(url) {
+        if (!isPlayurl(url)) return false;
+        // Never mutate or resign playurl for authenticated sessions.
+        if (isLoggedIn()) return false;
+        // In incognito when login state is not yet known, the cookie may have
+        // been seeded already; the server will accept qn=80 with a valid
+        // SESSDATA, and resign won't hurt if the session is absent (the server
+        // just hands out whatever it grants).  Only skip for non-incognito
+        // unknown state (those are likely real browsing sessions).
+        if (loginState() === 'unknown' && !isIncognito()) return false;
+        return true;
+    }
+
     /* ------------------- quality observation (server-side cap) ------------------- */
     const QUALITY_LABELS = {
         127: '8K', 126: '杜比视界', 125: 'HDR', 120: '4K', 116: '1080P60',
@@ -276,6 +321,8 @@
      */
     const observed = { granted: 0, height: 0, accept: [], capped: false };
     let hintSent = false;
+    /** Tracks the last known login state so we can react to transitions. */
+    let prevLoginState = loginState();
 
     function resetQualityObservation() {
         observed.granted = 0;
@@ -317,7 +364,12 @@
                     if (height > observed.height) observed.height = height;
                 }
             }
-            observed.capped = observed.accept.indexOf(80) >= 0 && observed.granted > 0 && observed.granted < 80;
+            // Quality cap only applies when *confirmed* unlogged. While login
+            // state is still unknown (service worker booting / guard hasn't
+            // received a reply yet), the first playurl may arrive before the
+            // cookie was seeded, yielding a false positive; don't lock out.
+            const confirmedUnlogged = loginState() === 'no';
+            observed.capped = confirmedUnlogged && observed.accept.indexOf(80) >= 0 && observed.granted > 0 && observed.granted < 80;
             if (observed.capped) sendCapHint();
         } catch (err) {
             log.debug('playurl body is not json', err.message);
@@ -332,7 +384,7 @@
         if (typeof url === 'string' && (url.includes('/x/v2/reply/wbi/main') || url.includes('/x/v2/reply/reply'))) {
             try { this.withCredentials = false; } catch (err) { /* ignore */ }
         }
-        if (isPlayurl(url)) {
+        if (shouldResignPlayurl(url)) {
             const rewritten = resignPlayurl(url);
             if (rewritten) {
                 arguments[1] = rewritten;
@@ -384,8 +436,8 @@
         let url = typeof input === 'string' ? input : (input && input.url) || '';
         let nextInput = input;
 
-        // Rewrite playurl requests (never mutate the caller's init object).
-        if (isPlayurl(url)) {
+        // Rewrite playurl requests for unlogged users (never mutate logged-in requests).
+        if (shouldResignPlayurl(url)) {
             const rewritten = resignPlayurl(url);
             if (rewritten) {
                 url = rewritten;
@@ -462,11 +514,24 @@
         video.addEventListener('play', () => { if (Date.now() - lastUserAction < 500) manualPaused = false; });
     }
 
+    let userChoseQuality = false;
+
+    document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (target && target.closest && (
+            target.closest('.bpx-player-ctrl-quality') ||
+            target.closest('.squirtle-quality-wrap') ||
+            target.closest('.bilibili-player-video-btn-quality')
+        )) {
+            userChoseQuality = true;
+        }
+    }, true);
+
     function request1080p() {
         if (config.video1080p === false) return;
-        // The server already told us 1080P is not on offer for this session;
-        // asking again only produces a "清晰度不可用" toast every few seconds.
-        if (observed.capped) return;
+        // The server already told us 1080P is not on offer for this session,
+        // or the user manually selected another quality; do not fight either.
+        if (observed.capped || userChoseQuality) return;
         try {
             const player = window.player;
             if (!player || typeof player.requestQuality !== 'function') return;
@@ -477,6 +542,87 @@
         } catch (err) { /* player not ready */ }
     }
 
+    /**
+     * Checks if 1080P (or higher) video stream has been successfully acquired.
+     * Only meaningful in incognito: normal windows show quality state in the
+     * player itself, the tag exists to signal "the seeded login worked".
+     */
+    function getAcquiredQualityTag() {
+        if (!isIncognito()) return '';
+        if (config.video1080p === false) return '';
+        let qn = 0;
+        try {
+            const player = window.player;
+            if (player && typeof player.getQuality === 'function') {
+                const current = player.getQuality();
+                qn = (current && (current.nowQ || current.quality)) || Number(current) || 0;
+            }
+        } catch (err) { /* player not ready */ }
+        if (!qn && observed.granted >= 80) qn = observed.granted;
+
+        if (qn >= 80 || observed.height >= 1080) {
+            if (qn === 120 || observed.height >= 2160) return '4K';
+            if (qn === 116) return '1080P60';
+            if (qn === 112) return '1080P+';
+            return '1080P';
+        }
+        return '';
+    }
+
+    let updatingTitle = false;
+
+    function updatePageTitle(tag) {
+        if (updatingTitle) return;
+        try {
+            updatingTitle = true;
+            const text = document.title || '';
+            const clean = text.replace(/^【(?:1080P\+?|1080P60|\d+P|4K|8K)】\s*/i, '');
+            if (tag) {
+                const desired = '【' + tag + '】' + clean;
+                if (document.title !== desired) {
+                    document.title = desired;
+                }
+            } else if (text !== clean) {
+                document.title = clean;
+            }
+        } catch (err) {
+            /* ignore */
+        } finally {
+            updatingTitle = false;
+        }
+    }
+
+    try {
+        const titleEl = document.querySelector('title');
+        if (titleEl) {
+            new MutationObserver(() => {
+                if (updatingTitle) return;
+                const tag = getAcquiredQualityTag();
+                if (tag) updatePageTitle(tag);
+            }).observe(titleEl, { childList: true, characterData: true, subtree: true });
+        }
+    } catch (err) { /* ignore */ }
+
+    // Fast initial check on page load or navigation to acquire 1080P quickly.
+    let fastPollTimer = null;
+    function startFastPoll() {
+        if (fastPollTimer) clearInterval(fastPollTimer);
+        let attempts = 0;
+        fastPollTimer = setInterval(() => {
+            attempts += 1;
+            request1080p();
+            const tag = getAcquiredQualityTag();
+            if (tag) {
+                updatePageTitle(tag);
+                clearInterval(fastPollTimer);
+                fastPollTimer = null;
+            } else if (attempts >= 30) {
+                clearInterval(fastPollTimer);
+                fastPollTimer = null;
+            }
+        }, 300);
+    }
+
     let lastHref = location.href;
 
     function loop() {
@@ -484,6 +630,9 @@
         if (location.href !== lastHref) {
             lastHref = location.href;
             resetQualityObservation();
+            userChoseQuality = false;
+            updatePageTitle('');
+            startFastPoll();
         }
         const video = document.querySelector('video');
         if (video) hookVideo(video);
@@ -493,15 +642,44 @@
             video.readyState >= 2 && Date.now() - lastUserAction > 2000) {
             video.play().catch(() => {});
         }
+        // Auto-resume playback if paused by Bilibili's unlogged login dialog
+        if (config.video1080p !== false && video && video.paused && !video.ended && !manualPaused &&
+            video.currentTime > 0 && video.readyState >= 2 && Date.now() - lastUserAction > 1500) {
+            video.play().catch(() => {});
+        }
         if (!loggedIn) {
             ensureFakeUidCookie();
             const confirm = document.querySelector('.bpx-player-toast-confirm-login');
             if (confirm) confirm.click();
-            request1080p();
         }
+        request1080p();
+        updatePageTitle(getAcquiredQualityTag());
         if (shouldLockPlayNext()) syncPlaybackSettings();
     }
 
     setInterval(loop, 2000);
+    startFastPoll();
+
+    /**
+     * Watch for login state transitions. When the background (via guard.js) or
+     * the nav interceptor confirms a real login, any earlier cap observation
+     * was from a stale/unauthenticated request and must be discarded; we then
+     * immediately request 1080P.
+     */
+    try {
+        new MutationObserver(() => {
+            const newState = loginState();
+            if (newState === prevLoginState) return;
+            const wasLoggedIn = prevLoginState === 'yes';
+            prevLoginState = newState;
+            if (newState === 'yes' && !wasLoggedIn) {
+                log.debug('login state changed to yes — resetting quality cap');
+                resetQualityObservation();
+                syncPlaybackSettings();
+                request1080p();
+            }
+        }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-aio-bili-login'] });
+    } catch (err) { /* ignore */ }
+
     log.debug('inject ready', { loginState: loginState(), incognito: isIncognito() });
 })();

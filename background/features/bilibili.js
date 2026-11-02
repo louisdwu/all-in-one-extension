@@ -75,6 +75,18 @@ async function ensureCookieInStore(storeId) {
     }
 }
 
+export async function resolveStoreId(tab) {
+    if (!tab) return undefined;
+    if (tab.cookieStoreId) return tab.cookieStoreId;
+    if (!tab.incognito) return '0';
+    try {
+        const stores = await listStores();
+        const matching = stores.find((s) => s.tabIds && s.tabIds.includes(tab.id));
+        if (matching) return matching.id;
+    } catch (err) { /* ignore */ }
+    return '1';
+}
+
 /**
  * Write the stored 「专用账号」 login into an incognito cookie store.
  *
@@ -87,9 +99,9 @@ async function ensureCookieInStore(storeId) {
  * No `expirationDate` on purpose: these are session cookies, so the credential
  * dies with the incognito session instead of lingering on disk.
  */
-async function seedIncognitoLogin(storeId, options = {}) {
+export async function seedIncognitoLogin(storeId, options = {}) {
     const overwrite = options.overwrite === true;
-    if (!storeId) return { ok: false, reason: 'no_store' };
+    const targetStoreId = storeId || '1';
 
     const settings = await globalThis.AIO.schema.load();
     if (!settings.biliIncognitoLogin) return { ok: false, reason: 'disabled' };
@@ -98,7 +110,7 @@ async function seedIncognitoLogin(storeId, options = {}) {
     if (!pairs.length) return { ok: false, reason: 'no_credential' };
 
     if (!overwrite) {
-        const existing = await chrome.cookies.get({ url: BILI_URL, name: 'SESSDATA', storeId }).catch(() => null);
+        const existing = await chrome.cookies.get({ url: BILI_URL, name: 'SESSDATA', storeId: targetStoreId }).catch(() => null);
         if (existing && existing.value) return { ok: true, skipped: 'already_logged_in' };
     }
 
@@ -112,13 +124,13 @@ async function seedIncognitoLogin(storeId, options = {}) {
                 domain: COOKIE_DOMAIN,
                 path: '/',
                 secure: true,
-                httpOnly: true,
+                httpOnly: pair.name === 'SESSDATA',
                 sameSite: 'lax',
-                storeId
+                storeId: targetStoreId
             });
             written += 1;
         } catch (err) {
-            biliLog.debug('incognito login cookie failed for', pair.name, err.message);
+            biliLog.warn('incognito login cookie failed for', pair.name, err.message);
         }
     }
 
@@ -126,18 +138,19 @@ async function seedIncognitoLogin(storeId, options = {}) {
     // from the page. With only SESSDATA stored that fake would survive and
     // disagree with the real session, so drop it.
     if (written && !pairs.some((pair) => pair.name === 'DedeUserID')) {
-        await chrome.cookies.remove({ url: BILI_URL, name: 'DedeUserID', storeId }).catch(() => {});
+        await chrome.cookies.remove({ url: BILI_URL, name: 'DedeUserID', storeId: targetStoreId }).catch(() => {});
     }
 
-    if (written) biliLog.info('incognito session seeded with', written, 'cookie(s)');
+    if (written) biliLog.info('incognito session seeded with', written, 'cookie(s) into store', targetStoreId);
     return { ok: written > 0, written };
 }
 
 /** Re-seed every incognito store that is currently alive. */
-async function seedAllIncognitoStores(options) {
+export async function seedAllIncognitoStores(options) {
     const stores = await listStores();
-    return Promise.all(stores.filter((store) => store.incognito)
-        .map((store) => seedIncognitoLogin(store.id, options)));
+    const incognitoStores = stores.filter((store) => store.id !== '0');
+    const targetIds = incognitoStores.length ? incognitoStores.map((s) => s.id) : ['1'];
+    return Promise.all(targetIds.map((id) => seedIncognitoLogin(id, options)));
 }
 
 export function registerBilibili() {
@@ -194,8 +207,14 @@ export function registerBilibili() {
      */
     handle('bili:loginState', async (message, sender) => {
         const tab = sender && sender.tab;
-        const storeId = tab ? tab.cookieStoreId : undefined;
-        const cookie = await chrome.cookies.get({ url: BILI_URL, name: 'SESSDATA', storeId }).catch(() => null);
+        const storeId = await resolveStoreId(tab);
+        let cookie = await chrome.cookies.get({ url: BILI_URL, name: 'SESSDATA', storeId }).catch(() => null);
+        if ((!cookie || !cookie.value) && tab && tab.incognito) {
+            const seedRes = await seedIncognitoLogin(storeId);
+            if (seedRes && seedRes.ok) {
+                cookie = await chrome.cookies.get({ url: BILI_URL, name: 'SESSDATA', storeId }).catch(() => null);
+            }
+        }
         return {
             ok: true,
             loggedIn: !!(cookie && cookie.value),
@@ -221,21 +240,34 @@ export function registerBilibili() {
         return { ok: seeded > 0, seeded, results };
     });
 
-    /** Pull SESSDATA/DedeUserID out of the browser (incognito store preferred). */
+    /** Pull SESSDATA/DedeUserID out of the browser (regular store '0' preferred). */
     handle('bili:captureCookies', async () => {
         const stores = await listStores();
-        const preferred = stores.find((store) => store.incognito) || stores[0];
-        const order = preferred ? [preferred, ...stores.filter((store) => store !== preferred)] : stores;
+        const order = [...stores].sort((a, b) => (a.id === '0' ? -1 : 1));
+        if (!order.length) order.push({ id: '0' }, { id: '1' });
         for (const store of order) {
             try {
                 const cookies = await chrome.cookies.getAll({ url: 'https://www.bilibili.com', storeId: store.id });
                 let sessdata = '';
                 let dedeUserId = '';
+                let biliJct = '';
+                let dedeUserIdCkMd5 = '';
                 for (const cookie of cookies) {
                     if (cookie.name === 'SESSDATA') sessdata = cookie.value;
                     if (cookie.name === 'DedeUserID') dedeUserId = cookie.value;
+                    if (cookie.name === 'bili_jct') biliJct = cookie.value;
+                    if (cookie.name === 'DedeUserID__ckMd5') dedeUserIdCkMd5 = cookie.value;
                 }
-                if (sessdata || dedeUserId) return { ok: true, sessdata, dedeUserId, incognito: !!store.incognito };
+                if (sessdata || dedeUserId) {
+                    return {
+                        ok: true,
+                        sessdata,
+                        dedeUserId,
+                        biliJct,
+                        dedeUserIdCkMd5,
+                        incognito: store.id !== '0'
+                    };
+                }
             } catch (err) {
                 biliLog.debug('cookie read failed for store', store.id, err.message);
             }
@@ -256,6 +288,27 @@ export function registerBilibili() {
         }
     });
 
+    // Preemptively seed when an incognito tab is created.
+    if (chrome.tabs && chrome.tabs.onCreated) {
+        chrome.tabs.onCreated.addListener(async (tab) => {
+            if (!tab || !tab.incognito) return;
+            const settings = await globalThis.AIO.schema.load();
+            if (!settings.biliIncognitoLogin) return;
+            const storeId = await resolveStoreId(tab);
+            await seedIncognitoLogin(storeId);
+        });
+    }
+
+    // Also seed when an incognito window is created.
+    if (chrome.windows && chrome.windows.onCreated) {
+        chrome.windows.onCreated.addListener(async (win) => {
+            if (!win || !win.incognito) return;
+            const settings = await globalThis.AIO.schema.load();
+            if (!settings.biliIncognitoLogin) return;
+            await seedAllIncognitoStores();
+        });
+    }
+
     // Cookie work runs per navigation: seed the incognito login (1080P needs a
     // real session) and keep the play-next flag cookie in the tab's store.
     chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
@@ -263,9 +316,10 @@ export function registerBilibili() {
         const settings = await globalThis.AIO.schema.load();
         if (!settings.biliIncognitoLogin && !settings.biliPlayNextDisabled) return;
         const tab = await chrome.tabs.get(details.tabId).catch(() => null);
-        if (!tab || !tab.cookieStoreId) return;
-        if (tab.incognito && settings.biliIncognitoLogin) await seedIncognitoLogin(tab.cookieStoreId);
-        if (settings.biliPlayNextDisabled) await ensureCookieInStore(tab.cookieStoreId);
+        if (!tab) return;
+        const storeId = await resolveStoreId(tab);
+        if (tab.incognito && settings.biliIncognitoLogin) await seedIncognitoLogin(storeId);
+        if (settings.biliPlayNextDisabled) await ensureCookieInStore(storeId);
     }, { url: [{ hostSuffix: 'bilibili.com' }] });
 
     // Align once on worker start.
