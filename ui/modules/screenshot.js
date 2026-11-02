@@ -39,24 +39,24 @@ async function requestOriginPermission() {
 /** Reflect whether Chrome has granted host access for captures. */
 async function renderPermissionStatus() {
     const el = document.getElementById('screenshot-perm-status');
+    const grantBtn = document.getElementById('screenshot-grant');
     if (!el) return;
     const granted = await hasCapturePermission();
-    el.textContent = granted
-        ? '✅ 已拥有截图所需的站点权限'
-        : '⚠️ 尚未授予截图权限：「保存设置」或「立即签到」时会弹出授权请求（覆盖所有网站，因为签到页可能跳转到其他域名）';
-    el.style.color = granted ? '' : 'var(--warning)';
+    if (granted) {
+        el.textContent = '✅ 已拥有截图权限（所有网站已授权）';
+        el.style.color = '';
+        if (grantBtn) grantBtn.style.display = 'none';
+    } else {
+        el.textContent = '⚠️ 尚未授予「所有网站」访问权限：签到页可能跳转到其他域名，Chrome 截屏必须覆盖所有网站。';
+        el.style.color = 'var(--warning)';
+        if (grantBtn) grantBtn.style.display = 'inline-block';
+    }
 }
 
 async function hasCapturePermission() {
     if (typeof chrome === 'undefined' || !chrome.permissions) return true;
     try {
-        if (await chrome.permissions.contains({ origins: ['*://*/*'] })) return true;
-        const input = document.getElementById('screenshot-url');
-        const url = ((input && input.value) || '').trim();
-        if (/^https?:\/\//.test(url)) {
-            return await chrome.permissions.contains({ origins: [new URL(url).origin + '/*'] });
-        }
-        return false;
+        return await chrome.permissions.contains({ origins: ['*://*/*'] });
     } catch (err) {
         uiLog.debug('permission contains failed:', err && err.message);
         return false;
@@ -112,12 +112,12 @@ async function saveSettings(statusEl) {
 async function triggerNow(statusEl) {
     if (statusEl) statusEl.textContent = '正在签到，请稍候…';
     try {
-        // The click gesture is the last reliable chance to request the host
-        // permission; the scheduled path relies on a previously granted one.
-        const granted = await hasCapturePermission();
+        // Request *://*/* directly inside the user gesture.
+        // If already granted, resolves true immediately without prompt.
+        // If not yet granted, displays the browser permission dialog.
+        const granted = await requestOriginPermission();
         if (!granted) {
-            const ok = await requestOriginPermission();
-            if (!ok) throw new Error('未授予截图权限（授权弹框被拒绝或未弹出，可在 chrome://extensions 扩展详情的「网站访问权限」里补授）');
+            throw new Error('未授予截图权限：请在弹出的授权框中点击「允许」（站点跳转需要所有网站权限）。若未弹出，可在 chrome://extensions 扩展详情的「网站访问权限」里开启');
         }
         const reply = await send('screenshot:trigger');
         if (reply && reply.ok) {
@@ -128,8 +128,9 @@ async function triggerNow(statusEl) {
             throw new Error((reply && reply.error) || '未知错误');
         }
     } catch (err) {
-        toast('签到失败：' + (err && err.message), 'error');
-        if (statusEl) statusEl.textContent = '签到失败：' + (err && err.message);
+        const msg = (err && err.message) || String(err);
+        toast(msg, 'error');
+        if (statusEl) statusEl.textContent = msg.startsWith('签到失败') ? msg : ('签到失败：' + msg);
     } finally {
         await renderPermissionStatus();
     }
@@ -244,6 +245,19 @@ export async function initScreenshot() {
 
     const triggerButton = document.getElementById('screenshot-trigger');
     if (triggerButton) triggerButton.addEventListener('click', () => triggerNow(document.getElementById('screenshot-status')));
+
+    const grantButton = document.getElementById('screenshot-grant');
+    if (grantButton) {
+        grantButton.addEventListener('click', async () => {
+            const ok = await requestOriginPermission();
+            if (ok) {
+                toast('已成功授权所有网站访问权限');
+            } else {
+                toast('授权未完成（弹框被取消或拒绝）', 'error');
+            }
+            await renderPermissionStatus();
+        });
+    }
 
     await renderHistory();
     await renderPermissionStatus();

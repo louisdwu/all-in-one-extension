@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { nextOccurrence, trimHistory } from '../background/features/screenshot_scheduler.js';
+import { nextOccurrence, trimHistory, hasHostPermission } from '../background/features/screenshot_scheduler.js';
 
 test('nextOccurrence returns today when the time is still ahead', () => {
     const now = new Date('2026-11-02T08:00:00');
@@ -48,4 +48,32 @@ test('trimHistory keeps the newest entries and drops junk', () => {
 test('trimHistory tolerates non-array input', () => {
     assert.deepEqual(trimHistory(null), []);
     assert.deepEqual(trimHistory('nope'), []);
+});
+
+test('hasHostPermission requires *://*/* and rejects single-site origin grants', async () => {
+    globalThis.chrome = {
+        permissions: {
+            contains: async ({ origins }) => origins.includes('*://*/*') ? false : true
+        }
+    };
+    try {
+        const ok = await hasHostPermission('https://example.com/checkin');
+        assert.equal(ok, false, 'single-origin grant does not suffice for redirects');
+    } finally {
+        delete globalThis.chrome;
+    }
+});
+
+test('hasHostPermission returns true when *://*/* is granted', async () => {
+    globalThis.chrome = {
+        permissions: {
+            contains: async ({ origins }) => origins.includes('*://*/*')
+        }
+    };
+    try {
+        const ok = await hasHostPermission('https://example.com/checkin');
+        assert.equal(ok, true);
+    } finally {
+        delete globalThis.chrome;
+    }
 });

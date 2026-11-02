@@ -311,6 +311,7 @@
                     <input type="url" id="screenshot-url" placeholder="https://example.com" autocomplete="off">
                     <div class="help-text">要打开的网页地址，必须以 http:// 或 https:// 开头。截图 API 要求站点访问权限，而签到页常会跳转到其他域名（登录跳转、www/apex 切换等），因此授权弹框会请求「所有网站」的数据访问——这是 Chrome 截图接口的要求。</div>
                     <p class="help-text" id="screenshot-perm-status"></p>
+                    <button type="button" id="screenshot-grant" class="secondary" style="display:none;margin-top:6px;font-size:12px;padding:4px 10px;">立即授权所有网站</button>
                 </div>
                 <div class="form-group">
                     <label for="screenshot-time">执行时间</label>
