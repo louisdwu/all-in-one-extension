@@ -1,6 +1,6 @@
 # All in One Extension (AIO)
 
-![Version](https://img.shields.io/badge/version-1.2026.1102.1603-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2026.1105.0749-blue.svg)
 ![Chrome](https://img.shields.io/badge/browser-Chrome-orange.svg)
 ![Manifest](https://img.shields.io/badge/manifest-v3-green.svg)
 

@@ -349,15 +349,16 @@
         return qualityLabel(observed.granted);
     }
 
-    function sendCapHint() {
-        if (hintSent) return;
-        hintSent = true;
-        const message = 'B站未登录最高只有 ' + observedLabel() +
-            '。在设置页填入账号 SESSDATA 并勾选「无痕窗口沿用此账号」后即可看 1080P。';
-        try {
-            document.documentElement.setAttribute('data-aio-bili-hint', JSON.stringify({ reason: 'quality_capped', message }));
-        } catch (err) { /* ignore */ }
-    }
+    // Disabled: no longer show quality cap hint to users
+    // function sendCapHint() {
+    //     if (hintSent) return;
+    //     hintSent = true;
+    //     const message = 'B站未登录最高只有 ' + observedLabel() +
+    //         '。在设置页填入账号 SESSDATA 并勾选「无痕窗口沿用此账号」后即可看 1080P。';
+    //     try {
+    //         document.documentElement.setAttribute('data-aio-bili-hint', JSON.stringify({ reason: 'quality_capped', message }));
+    //     } catch (err) { /* ignore */ }
+    // }
 
     function observePlayurl(text) {
         try {

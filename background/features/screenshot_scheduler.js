@@ -146,7 +146,17 @@ async function onAlarm(alarm) {
         // The daily alarm only arms the jittered follow-up, so the random
         // offset is re-drawn every day instead of being frozen at save time.
         const delayMs = Math.random() * settings.screenshotOffsetMin * 60000;
-        await chrome.alarms.create(JITTER_ALARM, { when: Date.now() + Math.max(1000, delayMs) });
+        const jitterTime = Date.now() + Math.max(1000, delayMs);
+        
+        // 如果已经过了 JITTER_ALARM 时间，立即签到（错过时间后自动补签）
+        if (Date.now() > jitterTime) {
+            logFn.info('missed jitter alarm, triggering immediately');
+            await runScreenshot(settings);
+            return;
+        }
+        
+        // 否则创建新的 JITTER_ALARM
+        await chrome.alarms.create(JITTER_ALARM, { when: jitterTime });
         logFn.debug('jitter armed for', Math.round(delayMs / 1000), 's');
         return;
     }
