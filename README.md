@@ -1,6 +1,6 @@
 # All in One Extension (AIO)
 
-![Version](https://img.shields.io/badge/version-1.2026.1105.0749-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2026.1105.0940-blue.svg)
 ![Chrome](https://img.shields.io/badge/browser-Chrome-orange.svg)
 ![Manifest](https://img.shields.io/badge/manifest-v3-green.svg)
 
@@ -19,7 +19,7 @@
 | 🎬 视频倍速 | 接管页面 `<video>` 倍速（含对抗站点重置），悬浮球 + 页面内快捷键 + 站点规则 + 按网站记住速度；跨站 iframe（嵌入播放器）跟随顶层帧。页面没有视频时脚本完全休眠（不读配置、不建 UI） |
 | 🎹 快捷键映射 | 按站点把某个按键的行为迁移到另一个键（例如 F → H） |
 | 📺 B站增强 | 自动中文字幕、字幕热键、评论区加载、AI 字幕解锁、播完暂停；1080P 需要登录态（B站已对未登录限到 480P），在设置页存一个账号后无痕窗口会自动沿用 |
-| 📅 定时签到 | 每天定时（含随机偏移）在最小化窗口中打开指定网页打卡，加载后截图存档并自动关闭；设置页可浏览/删除签到记录（保留最近 20 条） |
+| 📅 定时签到 | 每天定时（含随机偏移）在最小化窗口中打开指定网页打卡，加载后截图存档并自动关闭；错过时间（如电脑睡眠中）唤醒后立即补签；设置页可浏览/删除签到记录（保留最近 20 条） |
 | 🖥️ HUD 监控 | 在扩展图标上轮播 WAQI 空气质量与 Home Assistant 实体数值，支持阈值变色 |
 | 🔍 诊断面板 | 消息处理器统计、最近告警/错误、存储占用、配置快照（无需 DevTools） |
 

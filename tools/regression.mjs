@@ -523,7 +523,10 @@ async function main() {
     const capped = await biliInject.main('({ calls: window.__qualityCalls.length, hint: document.documentElement.getAttribute("data-aio-bili-hint") })');
     check('a server-side downgrade stops the repeated 1080P requests', settled === capped.calls,
         'before=' + settled + ' after=' + capped.calls);
-    check('the cap is explained to the user', !!capped.hint && capped.hint.indexOf('480P') >= 0, capped.hint || 'no hint');
+    // The quality-cap hint was deliberately retired (inject.js sendCapHint is
+    // disabled; the cookie badge alert replaced user-facing quality markers).
+    // Nothing may re-introduce the data-aio-bili-hint attribute silently.
+    check('the quality cap hint stays retired', !capped.hint, capped.hint || 'no hint attribute');
 
     // The page title must never be touched by the quality logic (feature was
     // replaced by the toolbar credential alert).

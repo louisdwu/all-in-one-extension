@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { nextOccurrence, trimHistory, hasHostPermission } from '../background/features/screenshot_scheduler.js';
+import { nextOccurrence, trimHistory, hasHostPermission, planBaseAlarmRun } from '../background/features/screenshot_scheduler.js';
 
 test('nextOccurrence returns today when the time is still ahead', () => {
     const now = new Date('2026-11-02T08:00:00');
@@ -31,6 +31,35 @@ test('nextOccurrence normalizes single-digit and junk input', () => {
     const junk = new Date(nextOccurrence('not-a-time', now));
     assert.equal(junk.getHours(), 9);
     assert.equal(junk.getMinutes(), 0);
+});
+
+test('planBaseAlarmRun keeps the jitter while fired on time', () => {
+    const scheduled = Date.parse('2026-11-05T09:00:00');
+    const plan = planBaseAlarmRun(scheduled + 2000, scheduled, 5);
+    assert.deepEqual(plan, { mode: 'jitter', maxDelayMs: 5 * 60000 });
+});
+
+test('planBaseAlarmRun keeps the jitter while still inside the offset window', () => {
+    const scheduled = Date.parse('2026-11-05T09:00:00');
+    // Fired 3 minutes late with a 5-minute window: the missed time has not
+    // fully passed yet, so the random offset still applies.
+    const plan = planBaseAlarmRun(scheduled + 3 * 60000, scheduled, 5);
+    assert.deepEqual(plan, { mode: 'jitter', maxDelayMs: 5 * 60000 });
+});
+
+test('planBaseAlarmRun signs in immediately after the offset window passed', () => {
+    const scheduled = Date.parse('2026-11-05T09:00:00');
+    // Sleep/wake replay: Chrome fires the missed alarm 30 minutes after its
+    // original scheduledTime — catch up right away, no new jitter.
+    const plan = planBaseAlarmRun(scheduled + 30 * 60000, scheduled, 5);
+    assert.deepEqual(plan, { mode: 'immediate' });
+});
+
+test('planBaseAlarmRun always signs in immediately without jitter', () => {
+    const scheduled = Date.parse('2026-11-05T09:00:00');
+    assert.deepEqual(planBaseAlarmRun(scheduled + 1000, scheduled, 0), { mode: 'immediate' });
+    assert.deepEqual(planBaseAlarmRun(scheduled + 1000, scheduled, undefined), { mode: 'immediate' });
+    assert.deepEqual(planBaseAlarmRun(scheduled + 1000, scheduled, -3), { mode: 'immediate' });
 });
 
 test('trimHistory keeps the newest entries and drops junk', () => {

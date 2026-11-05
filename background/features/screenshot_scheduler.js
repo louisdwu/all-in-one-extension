@@ -8,6 +8,14 @@
  * append the image to the history in `chrome.storage.local` and close the
  * window again.
  *
+ * Missed alarms (typical: the computer slept through the scheduled time and
+ * was woken later — the browser keeps running across sleep/wake): Chrome
+ * replays a missed alarm once on wake with its original `scheduledTime`. A
+ * BASE alarm arriving after the whole jitter window has passed signs in
+ * immediately instead of arming another jitter, so waking the machine catches
+ * up the day's check-in right away. A missed JITTER alarm replays straight
+ * into the capture path.
+ *
  * Why a minimized window instead of an inactive background tab:
  * `chrome.tabs.captureVisibleTab` can only capture the *visible* tab of a
  * window — a background tab in the user's window is never captureable. A
@@ -59,6 +67,25 @@ export function nextOccurrence(timeStr, now = new Date()) {
     target.setHours(hours, minutes, 0, 0);
     if (target.getTime() <= now.getTime()) target.setDate(target.getDate() + 1);
     return target.getTime();
+}
+
+/**
+ * Decide how a fired BASE alarm should run.
+ *
+ * - Fired on time (or still inside the random-offset window): keep drawing a
+ *   fresh 0..offsetMin jitter, same as before.
+ * - Fired after the whole jitter window has passed — the machine slept
+ *   through the scheduled time and Chrome replayed the alarm on wake, or the
+ *   worker was revived unusually late: sign in immediately ("错过即补签").
+ * - No jitter configured: always immediate.
+ */
+export function planBaseAlarmRun(nowMs, scheduledTimeMs, offsetMin) {
+    const offsetMs = Math.max(0, Number(offsetMin) || 0) * 60000;
+    const latenessMs = nowMs - scheduledTimeMs;
+    if (offsetMs > 0 && latenessMs <= offsetMs) {
+        return { mode: 'jitter', maxDelayMs: offsetMs };
+    }
+    return { mode: 'immediate' };
 }
 
 /** Newest-first, capped history; tolerates junk entries. */
@@ -142,23 +169,23 @@ async function onAlarm(alarm) {
     const settings = await AIO.schema.load();
     if (!settings.screenshotEnabled || !isValidHttpUrl(settings.screenshotUrl)) return;
 
-    if (alarm.name === BASE_ALARM && settings.screenshotOffsetMin > 0) {
-        // The daily alarm only arms the jittered follow-up, so the random
-        // offset is re-drawn every day instead of being frozen at save time.
-        const delayMs = Math.random() * settings.screenshotOffsetMin * 60000;
-        const jitterTime = Date.now() + Math.max(1000, delayMs);
-        
-        // 如果已经过了 JITTER_ALARM 时间，立即签到（错过时间后自动补签）
-        if (Date.now() > jitterTime) {
-            logFn.info('missed jitter alarm, triggering immediately');
-            await runScreenshot(settings);
+    if (alarm.name === BASE_ALARM) {
+        const plan = planBaseAlarmRun(Date.now(), alarm.scheduledTime, settings.screenshotOffsetMin);
+        if (plan.mode === 'jitter') {
+            // The daily alarm only arms the jittered follow-up, so the random
+            // offset is re-drawn every day instead of being frozen at save time.
+            const delayMs = Math.random() * plan.maxDelayMs;
+            await chrome.alarms.create(JITTER_ALARM, { when: Date.now() + Math.max(1000, delayMs) });
+            logFn.debug('jitter armed for', Math.round(delayMs / 1000), 's');
             return;
         }
-        
-        // 否则创建新的 JITTER_ALARM
-        await chrome.alarms.create(JITTER_ALARM, { when: jitterTime });
-        logFn.debug('jitter armed for', Math.round(delayMs / 1000), 's');
-        return;
+        if ((Number(settings.screenshotOffsetMin) || 0) > 0) {
+            // Fired after the whole jitter window had passed — e.g. the machine
+            // slept through the scheduled time and Chrome is replaying the
+            // alarm on wake. Sign in right away; warn so it lands in the
+            // diagnostics log ring without enabling debug output.
+            logFn.warn('base alarm is', Math.round((Date.now() - alarm.scheduledTime) / 60000), 'min late — signing in immediately');
+        }
     }
     await runScreenshot(settings);
 }
