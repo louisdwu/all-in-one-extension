@@ -24,8 +24,20 @@
     "popupTabsToggle": {
         "message": "右键 + 滚轮切换标签页"
     },
-    "popupTabsHint": {
-        "message": "按住鼠标右键并滚动滚轮呼出标签列表。"
+    "popupTabsHint1": {
+        "message": "按住"
+    },
+    "popupTabsHint2": {
+        "message": "鼠标右键"
+    },
+    "popupTabsHint3": {
+        "message": "并"
+    },
+    "popupTabsHint4": {
+        "message": "滚动滚轮"
+    },
+    "popupTabsHint5": {
+        "message": "呼出标签列表。"
     },
     "popupSpeeder": {
         "message": "🎬 视频倍速"
@@ -35,6 +47,33 @@
     },
     "popupSpeedState": {
         "message": "当前标签页"
+    },
+    "popupSpeedStateDormant": {
+        "message": "此页暂无视频"
+    },
+    "popupSpeedStateActive": {
+        "message": "已接管"
+    },
+    "popupSpeedStateInactive": {
+        "message": "未启用（规则/开关）"
+    },
+    "popupSpeedHintPrefix": {
+        "message": "快捷键："
+    },
+    "popupSpeedActionIncrease": {
+        "message": "加速"
+    },
+    "popupSpeedActionDecrease": {
+        "message": "减速"
+    },
+    "popupSpeedActionPreset": {
+        "message": "预设"
+    },
+    "popupHotkeyUnsupported": {
+        "message": "当前页面不支持（chrome:// 或扩展页）"
+    },
+    "popupHotkeyDelete": {
+        "message": "删除"
     },
     "popupSpeedDown": {
         "message": "− 减速"

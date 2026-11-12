@@ -18,7 +18,13 @@
 
     function compile(pattern) {
         if (typeof pattern !== 'string' || !pattern) return null;
-        if (cache.has(pattern)) return cache.get(pattern);
+        if (cache.has(pattern)) {
+            // Refresh insertion order so frequently used rules survive eviction.
+            const hit = cache.get(pattern);
+            cache.delete(pattern);
+            cache.set(pattern, hit);
+            return hit;
+        }
         let regex = null;
         try {
             regex = new RegExp(pattern);
@@ -29,7 +35,13 @@
                 (log.warn || console.warn)('ignoring invalid rule:', pattern, err.message);
             }
         }
-        if (cache.size >= MAX_CACHE) cache.clear();
+        // Evict the oldest entry instead of dropping every compiled regex.
+        // `cache.clear()` here used to invalidate all patterns once the 200th
+        // distinct rule appeared, so a long-lived page recompiled on every hit.
+        if (cache.size >= MAX_CACHE) {
+            const oldest = cache.keys().next().value;
+            if (oldest !== undefined) cache.delete(oldest);
+        }
         cache.set(pattern, regex);
         return regex;
     }

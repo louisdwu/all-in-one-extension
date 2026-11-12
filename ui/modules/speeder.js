@@ -180,7 +180,7 @@ function initShortcutEditor(initial) {
             input.value = current[action] || '';
             input.setAttribute('aria-label', label + ' 快捷键');
             input.addEventListener('focus', () => startRecording(action, input, badge));
-            input.addEventListener('blur', () => stopRecording(input));
+            input.addEventListener('blur', () => stopRecording());
             group.appendChild(input);
 
             item.append(head, group);
@@ -198,7 +198,7 @@ function initShortcutEditor(initial) {
         document.addEventListener('keydown', captureKey, true);
     }
 
-    function stopRecording(input) {
+    function stopRecording() {
         if (!recording) return;
         recording.input.classList.remove('recording');
         recording.input.value = current[recording.action] || '';
@@ -208,21 +208,27 @@ function initShortcutEditor(initial) {
 
     function captureKey(event) {
         if (!recording) return;
-        event.preventDefault();
-        event.stopPropagation();
-        if (event.key === 'Escape') {
+        try {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.key === 'Escape') {
+                stopRecording();
+                return;
+            }
+            const combo = globalThis.AIO.keys.serialize(event);
+            if (!globalThis.AIO.keys.isValid(combo)) {
+                toast('必须包含至少一个修饰键（Ctrl / Alt / Shift / Meta）', 'error');
+                return;
+            }
+            current[recording.action] = combo;
+            recording.badge.textContent = combo;
             stopRecording();
-            return;
+            renderSummary();
+        } catch (err) {
+            // A missing shared lib must not leave a document-level listener behind.
+            stopRecording();
+            uiLog.error('shortcut capture failed', err);
         }
-        const combo = globalThis.AIO.keys.serialize(event);
-        if (!globalThis.AIO.keys.isValid(combo)) {
-            toast('必须包含至少一个修饰键（Ctrl / Alt / Shift / Meta）', 'error');
-            return;
-        }
-        current[recording.action] = combo;
-        recording.badge.textContent = combo;
-        stopRecording();
-        renderSummary();
     }
 
     document.getElementById('shortcuts-saveBtn')?.addEventListener('click', async () => {

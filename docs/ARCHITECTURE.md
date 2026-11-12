@@ -22,7 +22,6 @@ Chrome 把扩展代码隔离在多个世界里，**跨世界不能直接共享�
 | `data-aio-bili-config` | content/bilibili/guard.js | bilibili/inject.js | B站功能开关快照 |
 | `data-aio-incognito` | guard.js（同步） | inject.js（同步） | 是否无痕上下文 |
 | `data-aio-bili-login` | guard.js（异步，问后台） | inject.js | 当前 cookie store 里有没有真实登录（`SESSDATA` 是 HttpOnly，页面读不到） |
-| `data-aio-bili-hint` | inject.js | guard.js | 需要提示用户的一句话（如「未登录最高 480P」），读完即删 |
 
 > 为什么不注入 `<script>`：内联脚本受页面 CSP 约束，bilibili 这类站点可能直接拦截。
 > 为什么不广播事件：MAIN 与 ISOLATED 同时监听时存在注册时序竞争，属性没有这个问题。
@@ -84,7 +83,7 @@ fetchWaqi / fetchHa → runtime.state 合并 → rebuildQueue → setIcon
 
 ### 3.0 内容脚本 bundle 与开销
 
-`manifest.json` 现在是 5 个 bundle，按"注入范围"分层，避免把重的东西放进每个帧：
+`manifest.json` 现在是 5 个 bundle，按"注入范围"分层，避免把重的东西放进每个帧（其中 2 个是 MAIN 世界）：
 
 | # | 范围 | 内容 | 说明 |
 |---|------|------|------|
@@ -92,7 +91,7 @@ fetchWaqi / fetchHa → runtime.state 合并 → rebuildQueue → setIcon
 | 2 | **所有帧（MAIN）** | `hotkey_inject.js` + `speeder_inject.js`（合并，无共享层） | 轻量：只改原型/监听，不读存储 |
 | 3 | **所有帧（ISOLATED）** | 共享层 + 内容运行时 + 速器 | 懒启动：出现 `<video>` 才读配置 |
 | 4 | bilibili 视频页 | 共享层 + 守卫/字幕 | 页面级 |
-| 5 | bilibili 视频页（MAIN） | 共享层 + md5/wbi + 注入器 | 页面级 |
+| 5 | bilibili 视频页（MAIN） | md5/wbi + 注入器（**不含共享层**） | 页面级 |
 
 两条硬约束：
 - **MAIN 世界 bundle 不要引共享层**（`libs/core.js` 在 MAIN 里用不到，白付解析成本）；

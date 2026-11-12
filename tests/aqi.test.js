@@ -15,7 +15,7 @@ test('concentration breakpoints map exactly', () => {
 });
 
 test('linear interpolation inside a band', () => {
-    // IAQI 75 sits halfway through the 50..100 band → 75% of the way to 75 μg/m³
+    // IAQI 75 sits halfway through the 50..100 band → halfway from 35 to 75 μg/m³
     assert.equal(toConcentration(75, 'pm25'), 55);
 });
 

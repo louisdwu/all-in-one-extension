@@ -3,7 +3,7 @@
  */
 import '../../libs/core.js';
 import '../../libs/schema.js';
-import { schema, core, toast, uiLog } from './shared.js';
+import { schema, toast, uiLog } from './shared.js';
 
 const TOGGLES = {
     'db-aiotabs-enable': 'aioTabsEnabled',
@@ -28,11 +28,9 @@ export async function initDashboard() {
         });
     }
 
-    // Keep the dashboard in sync when another surface (popup) changes a switch.
-    core.onMessage((message) => {
-        if (message && message.type === 'aio:settingsChanged') syncFromStorage();
-        return undefined;
-    });
+    // storage.onChanged covers saves from every surface (this page, popup,
+    // background). The background's aio:settingsChanged broadcast would only
+    // duplicate the same re-read, so do not register a second channel here.
     chrome.storage.onChanged.addListener((changes, area) => {
         if (area === 'sync') syncFromStorage();
     });

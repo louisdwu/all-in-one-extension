@@ -78,7 +78,8 @@ export function registerSpeeder() {
     handle('speeder:saveSettings', async (message) => {
         const patch = message.settings || message.patch || {};
         const settings = await globalThis.AIO.schema.save(patch);
-        await broadcast({ type: 'speeder:settingsChanged', settings: { presetSpeed: settings.presetSpeed, defaultSpeed: settings.defaultSpeed } }, {});
+        // schema.save writes sync storage; schema.subscribe in every frame
+        // re-applies the new settings. No extra broadcast needed.
         return { ok: true, success: true, settings };
     }, ['saveSpeederSettings', 'importSettings']);
 
@@ -89,7 +90,6 @@ export function registerSpeeder() {
 
     handle('speeder:setShortcuts', async (message) => {
         const settings = await globalThis.AIO.schema.save({ shortcuts: message.shortcuts || {} });
-        await broadcast({ type: 'speeder:shortcutsChanged', shortcuts: settings.shortcuts }, {});
         return { ok: true, shortcuts: settings.shortcuts };
     }, ['updateSpeederShortcuts']);
 

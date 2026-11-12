@@ -6,7 +6,7 @@
  */
 import '../../libs/core.js';
 import '../../libs/schema.js';
-import { handle, broadcast } from '../router.js';
+import { handle } from '../router.js';
 
 const { log } = globalThis.AIO.core;
 const hkLog = log('hotkeys');
@@ -37,14 +37,8 @@ async function writeMappings(hostname, mappings) {
     return all;
 }
 
-async function notifyHost(hostname) {
-    if (!hostname) return;
-    const enabledSites = (await globalThis.AIO.core.storage.getSync(['enabledSites'])).enabledSites || {};
-    await broadcast(
-        { type: 'hotkeys:changed', hostname, enabled: enabledSites[hostname] !== false },
-        { url: ['*://' + hostname + '/*'] }
-    );
-}
+/** Settings writes already fire schema.subscribe in every live frame; the
+ *  legacy `hotkeys:changed` broadcast had no listener anywhere and is gone. */
 
 export function registerHotkeys() {
     handle('hotkeys:context', async (message, sender) => {
@@ -65,7 +59,6 @@ export function registerHotkeys() {
         const cleaned = globalThis.AIO.schema.normalize({ hotkeyMappings: { [hostname]: message.mappings || {} } }).hotkeyMappings;
         const all = await writeMappings(hostname, cleaned[hostname] || {});
         hkLog.debug('saved mappings for', hostname, Object.keys(cleaned[hostname] || {}).length);
-        await notifyHost(hostname);
         return { ok: true, mappings: (all[hostname]) || {} };
     }, ['SAVE_MAPPINGS']);
 
@@ -79,7 +72,6 @@ export function registerHotkeys() {
             if (!Object.keys(all[hostname]).length) delete all[hostname];
             await globalThis.AIO.core.storage.setSync({ hotkeyMappings: all });
         }
-        await notifyHost(hostname);
         return { ok: true, mappings: all[hostname] || {} };
     }, ['DELETE_MAPPING']);
 
@@ -87,7 +79,6 @@ export function registerHotkeys() {
         const hostname = message.hostname;
         if (!hostname) return { ok: false, error: 'missing hostname' };
         await writeMappings(hostname, {});
-        await notifyHost(hostname);
         return { ok: true, mappings: {} };
     }, ['CLEAR_ALL_MAPPINGS']);
 
@@ -99,7 +90,6 @@ export function registerHotkeys() {
         if (message.enabled === false) sites[hostname] = false;
         else delete sites[hostname];
         await globalThis.AIO.core.storage.setSync({ enabledSites: sites });
-        await notifyHost(hostname);
         return { ok: true, enabled: message.enabled !== false };
     }, ['SET_SITE_ENABLED']);
 }

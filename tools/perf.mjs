@@ -84,24 +84,28 @@ async function runOnce(withExtension) {
     for (let i = 0; i < 100; i++) {
         try { version = await (await fetch('http://127.0.0.1:' + PORT + '/json/version')).json(); break; } catch (e) { await wait(100); }
     }
+    if (!version) throw new Error('chromium did not expose a debugging port on ' + PORT);
     const cdp = new Cdp(version.webSocketDebuggerUrl);
     await cdp.connect();
 
     const { targetId } = await cdp.send('Target.createTarget', { url });
     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
     await cdp.send('Runtime.enable', {}, sessionId);
-    await cdp.send('Performance.enable', {}, sessionId).catch(() => {});
+    // A failure here must fail the run: silently treating missing metrics as 0
+    // would report "the extension costs nothing" and hide a broken probe.
+    await cdp.send('Performance.enable', {}, sessionId);
     await wait(3000); // let every frame finish injecting and the page settle
 
     const evalIn = async (expression) => {
         const r = await cdp.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId);
         return r.result && r.result.value;
     };
-    const metrics = await cdp.send('Performance.getMetrics', {}, sessionId).catch(() => ({ metrics: [] }));
+    const metrics = await cdp.send('Performance.getMetrics', {}, sessionId);
     const metric = (name) => {
         const found = (metrics.metrics || []).find((m) => m.name === name);
         return found ? found.value : null;
     };
+    if (metric('TaskDuration') === null) throw new Error('Performance.getMetrics returned no TaskDuration — probe is broken');
     const loadEnd = await evalIn('(function(){var n=performance.getEntriesByType("navigation")[0];return n?n.loadEventEnd:n;})()');
     const frames = await evalIn('document.querySelectorAll("iframe").length');
 

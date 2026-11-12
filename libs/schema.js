@@ -358,7 +358,7 @@
         if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.onChanged) return () => {};
         const handler = async (changes, area) => {
             if (area !== 'sync') return;
-            const touched = Object.keys(changes).filter((key) => key !== 'hs');
+            const touched = Object.keys(changes).filter((key) => PERSISTED_KEYS.includes(key));
             if (!touched.length) return;
             listener(await load(), changes);
         };

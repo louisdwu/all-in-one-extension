@@ -6,12 +6,14 @@
  * "do the three trickiest features still actually work?":
  *
  *   A. tab switcher: right-mouse-down + wheel opens the overlay, mouseup closes it
- *   B. speeder gating: turning the switch off releases the page's own playback rate
- *      and removes the UI; turning it back on re-locks
- *   C. hotkey remap: pressing the mapped key is delivered to the page as the
- *      original key, and the original key is swallowed
- *   D. per-site speed memory: a speed chosen on a site is stored and restored
- *      when the same site is opened again
+ *   B. speeder gating: off releases the page's own rate and removes the UI; on re-locks
+ *   C. hotkey remap: mapped key delivered as the original, original swallowed
+ *   D. per-site speed memory: chosen speed stored and restored on revisit
+ *   E. sub-frame speed: late/cross-origin iframes adopt the top-frame speed
+ *   F. fullscreen: the speed toast stays visible when a <video> is fullscreen
+ *   G. bilibili subtitles: auto-enable / official Chinese track / live toggle-off
+ *   H. bilibili 1080P: one request on a logged-out page, no repeat after a
+ *      server-side downgrade, and no title rewriting
  *
  * Usage: node tools/regression.mjs [--ext=path] [--port=9444]
  */
@@ -373,7 +375,7 @@ async function main() {
         const restored = await page3.main('document.getElementById("v1").playbackRate');
         check('remembered speed is restored on the next visit', restored === 2, 'rate=' + restored);
     } else {
-        check('speed command reaches the content script', false, 'could not resolve extension id / tab id');
+        check('speed command reached the content script (fallback)', false, 'could not resolve extension id / tab id');
     }
 
 
@@ -489,6 +491,9 @@ async function main() {
     const biliInject = await openPage(base + 'bili?inject=1');
     await biliInject.main([
         'window.__qualityCalls = [];',
+        'window.__biliErrors = [];',
+        'window.addEventListener("error", function (e) { window.__biliErrors.push(String(e.message)); });',
+        'window.addEventListener("unhandledrejection", function (e) { window.__biliErrors.push(String(e.reason)); });',
         'window.player = {',
         '  requestQuality: function (q) { window.__qualityCalls.push(q); },',
         '  getSupportedQualityList: function () { return [80, 64, 32, 16]; },',
@@ -520,13 +525,15 @@ async function main() {
     await wait(600);
     const settled = await biliInject.main('window.__qualityCalls.length');
     await wait(4500); // more than two 2s ticks
-    const capped = await biliInject.main('({ calls: window.__qualityCalls.length, hint: document.documentElement.getAttribute("data-aio-bili-hint") })');
-    check('a server-side downgrade stops the repeated 1080P requests', settled === capped.calls,
-        'before=' + settled + ' after=' + capped.calls);
-    // The quality-cap hint was deliberately retired (inject.js sendCapHint is
-    // disabled; the cookie badge alert replaced user-facing quality markers).
-    // Nothing may re-introduce the data-aio-bili-hint attribute silently.
+    const capped = await biliInject.main('({ calls: window.__qualityCalls.length, hint: document.documentElement.getAttribute("data-aio-bili-hint"), errors: window.__biliErrors || [] })');
+    // The retired hint channel must stay retired AND the downgrade path must
+    // not throw (an older build called a deleted sendCapHint() here, which was
+    // swallowed by the playurl try/catch and silently broke cap observation).
+    check('a server-side downgrade stops the repeated 1080P requests',
+        firstRound.indexOf(80) >= 0 && settled > 0 && settled === capped.calls,
+        'first=' + JSON.stringify(firstRound) + ' before=' + settled + ' after=' + capped.calls);
     check('the quality cap hint stays retired', !capped.hint, capped.hint || 'no hint attribute');
+    check('downgrade path throws no page errors', Array.isArray(capped.errors) && capped.errors.length === 0, JSON.stringify(capped.errors));
 
     // The page title must never be touched by the quality logic (feature was
     // replaced by the toolbar credential alert).

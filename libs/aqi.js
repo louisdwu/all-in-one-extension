@@ -50,8 +50,4 @@
     }
 
     AIO.aqi = { IAQI_BREAKS, CONCENTRATION_BREAKS, toConcentration };
-
-    // Backward-compatibility alias for the legacy classic background loader.
-    // Removed once background/ is fully module-based (see docs/IMPROVEMENT_PLAN.md).
-    if (!root.AQI_CONVERTER) root.AQI_CONVERTER = AIO.aqi;
 })(typeof globalThis !== 'undefined' ? globalThis : self);

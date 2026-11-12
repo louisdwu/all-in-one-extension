@@ -79,29 +79,47 @@ test('trimHistory tolerates non-array input', () => {
     assert.deepEqual(trimHistory('nope'), []);
 });
 
-test('hasHostPermission requires <all_urls> or *://*/*', async () => {
+test('hasHostPermission accepts a granted <all_urls> origin and calls the API', async () => {
+    const queried = [];
     globalThis.chrome = {
         permissions: {
-            contains: async ({ origins }) => origins.includes('<all_urls>') || origins.includes('*://*/*')
+            // Fixed stub: grant ONLY <all_urls>, so a false positive from the
+            // second `*://*/*` query is impossible.
+            contains: async ({ origins }) => {
+                queried.push(origins[0]);
+                return origins[0] === '<all_urls>';
+            }
         }
     };
     try {
-        const ok = await hasHostPermission('https://example.com/checkin');
-        assert.equal(ok, true);
+        assert.equal(await hasHostPermission('https://example.com/checkin'), true);
+        assert.deepEqual(queried, ['<all_urls>'], 'must short-circuit on the first grant');
     } finally {
         delete globalThis.chrome;
     }
 });
 
-test('hasHostPermission rejects when neither <all_urls> nor *://*/* is granted', async () => {
+test('hasHostPermission falls back to *://*/* then rejects when neither is granted', async () => {
+    const queried = [];
     globalThis.chrome = {
         permissions: {
-            contains: async () => false
+            contains: async ({ origins }) => { queried.push(origins[0]); return false; }
         }
     };
     try {
-        const ok = await hasHostPermission('https://example.com/checkin');
-        assert.equal(ok, false);
+        assert.equal(await hasHostPermission('https://example.com/checkin'), false);
+        assert.deepEqual(queried, ['<all_urls>', '*://*/*'], 'must try both patterns');
+    } finally {
+        delete globalThis.chrome;
+    }
+});
+
+test('hasHostPermission survives a permissions API error', async () => {
+    globalThis.chrome = {
+        permissions: { contains: async () => { throw new Error('no API'); } }
+    };
+    try {
+        assert.equal(await hasHostPermission('https://example.com/checkin'), false);
     } finally {
         delete globalThis.chrome;
     }

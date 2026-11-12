@@ -98,10 +98,17 @@ async function initSpeeder(settings) {
         value.textContent = currentSpeed.toFixed(2) + 'x';
         const dormant = !!(response && response.dormant);
         const active = response ? response.active !== false : AIO.rules.matches(tab ? tab.url : '', settings);
-        stateLabel.textContent = dormant ? '此页暂无视频' : (active ? '已接管' : '未启用（规则/开关）');
+        stateLabel.textContent = dormant
+            ? AIO.i18n.t('popupSpeedStateDormant', '此页暂无视频')
+            : (active ? AIO.i18n.t('popupSpeedStateActive', '已接管') : AIO.i18n.t('popupSpeedStateInactive', '未启用（规则/开关）'));
         stateLabel.classList.toggle('off', !dormant && !active);
-        hint.textContent = '快捷键：' + Object.entries(settings.shortcuts)
-            .map(([action2, combo]) => ({ increaseSpeed: '加速', decreaseSpeed: '减速', presetSpeed: '预设' }[action2] + ' ' + AIO.keys.display(combo)))
+        const actionNames = {
+            increaseSpeed: AIO.i18n.t('popupSpeedActionIncrease', '加速'),
+            decreaseSpeed: AIO.i18n.t('popupSpeedActionDecrease', '减速'),
+            presetSpeed: AIO.i18n.t('popupSpeedActionPreset', '预设')
+        };
+        hint.textContent = AIO.i18n.t('popupSpeedHintPrefix', '快捷键：') + Object.entries(settings.shortcuts)
+            .map(([action2, combo]) => (actionNames[action2] || action2) + ' ' + AIO.keys.display(combo))
             .join(' · ');
     };
     render();
@@ -142,7 +149,7 @@ async function initHotkeys(settings) {
     const context = await AIO.core.sendMessage({ type: 'hotkeys:context' });
     const hostname = (context && context.hostname) || '';
     if (!hostname) {
-        siteEl.textContent = '当前页面不支持（chrome:// 或扩展页）';
+        siteEl.textContent = AIO.i18n.t('popupHotkeyUnsupported', '当前页面不支持（chrome:// 或扩展页）');
         document.getElementById('hotkey-add').disabled = true;
         return;
     }
@@ -163,7 +170,7 @@ async function initHotkeys(settings) {
             const row = el('div', { className: 'mapping-row' });
             const keys = el('div', { className: 'mapping-keys' });
             keys.append(el('span', { className: 'key-badge' }, from), el('span', { className: 'arrow' }, '→'), el('span', { className: 'key-badge' }, to));
-            const remove = el('button', { type: 'button', className: 'link-btn', title: '删除' }, '✕');
+            const remove = el('button', { type: 'button', className: 'link-btn', title: AIO.i18n.t('popupHotkeyDelete', '删除') }, '✕');
             remove.addEventListener('click', async () => {
                 const result = await AIO.core.sendMessage({ type: 'hotkeys:deleteMapping', hostname, key: from });
                 mappings = (result && result.mappings) || {};

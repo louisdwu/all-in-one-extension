@@ -71,7 +71,7 @@ globalThis.chrome = {
         __calls: [],
         async setBadgeText(details) { this.__calls.push(['text', details && details.text]); },
         async setBadgeBackgroundColor() {},
-        async getBadgeText() { return { text: '' }; },
+        async getBadgeText() { return ''; }, // chrome.action.getBadgeText resolves to a string
         async setIcon() {},
         async setTitle() {}
     },
@@ -110,7 +110,7 @@ test('background module graph boots and registers its handlers', async () => {
     assert.ok(AIO.schema, 'schema must be installed');
     const { registeredTypes } = await import('../background/router.js');
     const types = registeredTypes();
-    for (const type of ['tabs:list', 'tabs:activate', 'incognito:open', 'hotkeys:context', 'speeder:getSettings', 'bili:getSettings', 'bili:loginState', 'bili:incognitoStatus', 'bili:seedIncognitoLogin', 'hud:refresh', 'diag:snapshot', 'diag:ping', 'getTabs', 'saveSpeederSettings']) {
+    for (const type of ['tabs:list', 'tabs:activate', 'incognito:open', 'hotkeys:context', 'hotkeys:setMappings', 'hotkeys:deleteMapping', 'hotkeys:clearSite', 'hotkeys:setSiteEnabled', 'speeder:getSettings', 'speeder:saveSettings', 'speeder:getShortcuts', 'speeder:setShortcuts', 'speeder:remember', 'speeder:tabSpeed', 'speeder:openOptions', 'bili:getSettings', 'bili:saveSettings', 'bili:loginState', 'bili:incognitoStatus', 'bili:verifyCredential', 'bili:seedIncognitoLogin', 'bili:reportLoginState', 'bili:captureCookies', 'screenshot:trigger', 'screenshot:getHistory', 'screenshot:deleteHistory', 'hud:refresh', 'hud:updateConfig', 'hud:getState', 'diag:snapshot', 'diag:clearLog', 'diag:ping', 'aio:notifyAll', 'getTabs', 'saveSpeederSettings']) {
         assert.ok(types.includes(type), 'missing handler: ' + type);
     }
 });
@@ -127,6 +127,8 @@ test('bili:captureCookies skips the regular window store', async () => {
     // must never return it. Only the incognito store's dedicated account may
     // be captured.
     const tabsQuery = globalThis.chrome.tabs.query;
+    const originalGetAll = globalThis.chrome.cookies.getAll;
+    const originalGetAllCookieStores = globalThis.chrome.cookies.getAllCookieStores;
     const cookiesByStore = {
         '0': [{ name: 'SESSDATA', value: 'MAIN-ACCOUNT-COOKIE' }, { name: 'DedeUserID', value: '999' }],
         '1': [{ name: 'SESSDATA', value: 'abc' }, { name: 'DedeUserID', value: '42' }]
@@ -155,12 +157,19 @@ test('bili:captureCookies skips the regular window store', async () => {
         assert.notEqual(reply && reply.sessdata, 'MAIN-ACCOUNT-COOKIE', 'the regular window must never be read');
     } finally {
         globalThis.chrome.tabs.query = tabsQuery;
+        globalThis.chrome.cookies.getAll = originalGetAll;
+        globalThis.chrome.cookies.getAllCookieStores = originalGetAllCookieStores;
     }
 });
 
 test('bili:reportLoginState drives the credential alert badge', async () => {
     const action = globalThis.chrome.action;
     action.__calls.length = 0;
+
+    // getBadgeText() resolves to a plain string in Chromium, NOT { text }.
+    // Guarding the stub shape prevents the restore-on-boot bug from returning.
+    const badgeText = await globalThis.chrome.action.getBadgeText({});
+    assert.equal(typeof badgeText, 'string', 'the chrome.action.getBadgeText stub must return a string');
 
     const send = (message, sender) => new Promise((resolve) => {
         globalThis.chrome.runtime.onMessage.__listeners.forEach(

@@ -33,8 +33,11 @@
     }
 
     const rate = resolveDescriptor('playbackRate');
-    const origGet = rate ? rate.descriptor.get : function () { return this.playbackRate; };
-    const origSet = rate ? rate.descriptor.set : function (value) { this.playbackRate = value; };
+    // Fallbacks are only used when the platform exposes no accessor at all
+    // (practically never in Chromium). Reading `this.playbackRate` through the
+    // patched getter would recurse forever, so keep a plain data slot instead.
+    const origGet = rate && rate.descriptor.get ? rate.descriptor.get : function () { return this.__aioRate || 1; };
+    const origSet = rate && rate.descriptor.set ? rate.descriptor.set : function (value) { this.__aioRate = value; };
 
     function safeDefine(proto, prop, descriptor) {
         if (!proto) return;

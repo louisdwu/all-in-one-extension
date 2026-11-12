@@ -13,6 +13,3 @@
 *.woff2 binary
 *.ttf binary
 *.eot binary
-
-# Vendored minified single-line lib
-libs/protobuf.min.js -text

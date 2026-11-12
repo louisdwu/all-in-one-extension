@@ -14,9 +14,9 @@
 
 | 维度 | 改造前 | 改造后 |
 |------|--------|--------|
-| 测试 | 0 用例 | 49 个 `node:test` 用例（含后台模块图启动测试） |
+| 测试 | 0 用例 | 83 个 `node:test` 用例（含后台模块图启动测试） |
 | 静态检查 | 无 | `tools/check.mjs`：语法 / import 解析 / DOM id / MAIN 世界越界 / 密钥扫描 |
-| 真机验证 | 手工 | `tools/smoke.mjs`（异常采集 + 样式断言）+ `tools/regression.mjs`（15 项行为断言） |
+| 真机验证 | 手工 | `tools/smoke.mjs`（异常采集 + 样式断言）+ `tools/regression.mjs`（24 项行为断言） |
 | 后台消息监听 | 7 个 `onMessage` 各自猜归属 | 1 个路由 + 显式 handler 注册表 |
 | 配置真相源 | 散落 10+ 文件，默认值各不相同 | `libs/schema.js` 单点，含旧数据迁移 |
 | 权限 | 9 个（3 个从未使用） | 6 个，全部有代码对应 |
@@ -81,7 +81,7 @@ Chrome 只会打一行 "An unknown error occurred when fetching the script." 然
   已删除；**建议去 aqicn.org 重新申请一个**，旧 Token 视为泄露。
 - `libs/protobuf.min.js` 是一个 7 行的**假占位文件**（注释写着 "This is an abbreviated placeholder"），
   全仓库无引用 —— 已删除。
-- `manifest.json` 声明了 `scripting` / `notifications` / `activeTab`，代码里 0 次使用 —— 已删除。
+- `manifest.json` 曾声明 `scripting` / `notifications` / `activeTab` 且代码 0 次使用 —— 已删除；`scripting` 后来因 `bili:verifyCredential` 的无痕标签探针重新引入（见 `background/features/bilibili.js`）。
 - `background/smart_speeder.js` 打开 `shortcuts.html`（文件不存在），
   还把生成的 Markdown 写进 `chrome.storage.sync`（占配额、无人读）—— 已删除。
 
@@ -186,9 +186,9 @@ MV3 的 content script **不能**用 ES module，而 service worker / 扩展页 
 ### 验收口径
 
 ```bash
-npm run verify      # 静态检查 + 49 个单测
+npm run verify      # 静态检查 + 83 个单测
 npm run smoke       # Chromium 真机：SW 0 异常、options/popup 0 异常、页面可交互
-npm run regression  # 15 项行为断言（标签切换 / 倍速开关 / 快捷键映射 / 倍速记忆 / 子帧）
+npm run regression  # 24 项行为断言（标签切换 / 倍速开关 / 快捷键映射 / 倍速记忆 / 子帧 / 全屏 / 字幕 / 1080P）
 ```
 
 `regression` 覆盖最容易回归的三条路径：
@@ -199,7 +199,7 @@ npm run regression  # 15 项行为断言（标签切换 / 倍速开关 / 快捷�
 `smoke` 的关键断言（改造后应稳定通过）：
 
 - 后台启动无异常；
-- `options.html` 渲染出 9 个分区、3 个快捷键录制项、11 个 WAQI 指标；
+- `options.html` 渲染出 10 个分区、3 个快捷键录制项、11 个 WAQI 指标；
 - `popup.html` 渲染出 5 张卡片并读到当前倍速；
 - 测试页面的 `<video>` 被锁到目标倍速，且**页面 JS 仍可执行**（不再冻结）。
 
@@ -218,7 +218,7 @@ npm run regression  # 15 项行为断言（标签切换 / 倍速开关 / 快捷�
 | 项 | 状态 | 落地方式 |
 |----|------|---------|
 | 按站点记住倍速 | ✅ | `libs/speed_memory.js` 三态模式（`off` / `global` / `site`），旧布尔 `speederRememberSpeed` 自动迁移；每站点一条、上限 200 条、LRU 淘汰；写入防抖 800ms；回归测试覆盖"换标签页后恢复" |
-| host 权限收窄 | ✅ | 声明期只留 bilibili + WAQI；Home Assistant 走 `optional_host_permissions`，由设置页在用户手势中申请；后台抓取前 `permissions.contains` 预检，把"未授权"与"网络失败"区分开 |
+| host 权限收窄 | ⚠️ 已调整 | 定时签到的 `captureVisibleTab` 要求声明期 `<all_urls>`，故所有 http(s) 站点访问已在声明期获得；Home Assistant 的 `optional_host_permissions` 已移除，设置页仍保留按需授权按钮用于手动恢复被收窄的网站权限 |
 | 诊断可视化 | ✅ | `libs/core.js` 日志环形缓冲（60 条）+ 路由按消息类型统计（调用/失败/平均耗时）+ 「关于与诊断」面板（消息表、最近告警、存储占用、配置快照、复制诊断） |
 | i18n | ✅ 基础设施 | `_locales/{zh_CN,en}` + `libs/i18n.js`（`data-i18n` 注解式，缺失即回退内联中文）+ manifest 本地化；**弹窗已全量双语**，设置页保留内联中文（增量迁移路径已就绪） |
 | CI | ❌ 已移除 | 曾在 `.github/workflows/verify.yml` 接过 Actions，但本项目个人自用，不在 GitHub 上跑；

@@ -450,7 +450,9 @@
             return hasChrome() && typeof location !== 'undefined' && !location.protocol.startsWith('chrome-extension');
         },
         get isTopFrame() {
-            try { return root.top === root; } catch (e) { return true; }
+            // Cross-origin access to `top` throws in a sub-frame; treat it as
+            // NOT the top frame (matches content/lib/content.js).
+            try { return root.top === root; } catch (e) { return false; }
         },
         get isServiceWorker() {
             return typeof ServiceWorkerGlobalScope !== 'undefined' && root instanceof ServiceWorkerGlobalScope;

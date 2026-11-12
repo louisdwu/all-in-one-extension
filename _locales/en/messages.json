@@ -24,8 +24,20 @@
     "popupTabsToggle": {
         "message": "Right-click + wheel to switch tabs"
     },
-    "popupTabsHint": {
-        "message": "Hold the right mouse button and scroll to open the tab list."
+    "popupTabsHint1": {
+        "message": "Hold the "
+    },
+    "popupTabsHint2": {
+        "message": "right mouse button"
+    },
+    "popupTabsHint3": {
+        "message": " and "
+    },
+    "popupTabsHint4": {
+        "message": "scroll the wheel"
+    },
+    "popupTabsHint5": {
+        "message": " to open the tab list."
     },
     "popupSpeeder": {
         "message": "🎬 Video speeder"
@@ -35,6 +47,33 @@
     },
     "popupSpeedState": {
         "message": "Current tab"
+    },
+    "popupSpeedStateDormant": {
+        "message": "No video on this page"
+    },
+    "popupSpeedStateActive": {
+        "message": "Controlled"
+    },
+    "popupSpeedStateInactive": {
+        "message": "Disabled (rules/switch)"
+    },
+    "popupSpeedHintPrefix": {
+        "message": "Shortcuts: "
+    },
+    "popupSpeedActionIncrease": {
+        "message": "Faster"
+    },
+    "popupSpeedActionDecrease": {
+        "message": "Slower"
+    },
+    "popupSpeedActionPreset": {
+        "message": "Preset"
+    },
+    "popupHotkeyUnsupported": {
+        "message": "Unsupported page (chrome:// or extension page)"
+    },
+    "popupHotkeyDelete": {
+        "message": "Delete"
     },
     "popupSpeedDown": {
         "message": "− Slower"

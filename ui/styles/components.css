@@ -140,7 +140,6 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 
 .status-msg.show { opacity: 1; transform: none; }
 .status-msg.error { background: var(--danger); }
-.status-msg.info { background: var(--primary); }
 
 /* ------------------------------- rules ------------------------------- */
 .rule-input { display: flex; gap: 8px; margin-bottom: 10px; }

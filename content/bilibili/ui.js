@@ -157,13 +157,20 @@
     }, true);
 
     // Bilibili is a SPA: a new video may load without a document reload.
+    // history.pushState/replaceState do NOT fire `popstate`, and a content script
+    // in the ISOLATED world cannot patch the page realm's history, so compare
+    // `location.href` on a cheap 1s cadence (one string compare per tick; the
+    // MAIN-world injector already keeps a player loop alive on these pages).
     let lastUrl = location.href;
-    AIO.core.rafThrottle(() => {
+    function checkUrlChange() {
+        if (!config.enabled) return;
         if (location.href === lastUrl) return;
         lastUrl = location.href;
         autoRan = false;
         scheduleAutoSubtitle();
-    });
+    }
+    window.addEventListener('popstate', checkUrlChange);
+    setInterval(checkUrlChange, 1000);
 
     function apply(settingsValue) {
         const previous = config;
@@ -188,12 +195,4 @@
 
     settings().then(apply);
     onChange(apply);
-
-    AIO.core.onMessage((message) => {
-        if (message && message.type === 'bili:toggleSubtitle') {
-            toggleSubtitle();
-            return { ok: true };
-        }
-        return undefined;
-    });
 })();

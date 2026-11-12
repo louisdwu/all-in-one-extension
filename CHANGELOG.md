@@ -1,5 +1,28 @@
 # 更新记录
 
+## 2.6 — 2026-11-12
+
+### 全项目审查修复（P0 功能损坏）
+
+- **设置页快捷键录制整体失效**：`ui/options.js` 补 `import libs/keys.js`；录制异常路径用 try/finally 清理 document 级监听。
+- **B站字幕 SPA 切换检测是死代码**：`rafThrottle(...)` 从未被调用改为 `popstate` + 1s `location.href` 轮询。
+- **凭据失效徽标 API 用错**：`chrome.action.getBadgeText()` 返回 `Promise<string>`，两处按 `{text}` 解构恒假；实测修正并同步测试桩。
+- **画质降级路径抛 ReferenceError**：删掉已注释掉的 `sendCapHint()` 残留调用与整条 hint 通道死代码（guard/inject/文档/回归）。
+
+### 一致性 / 安全 / 性能
+
+- 诊断「复制」导出明文 SESSDATA / HA / WAQI Token → 复用脱敏快照；签到记录模板补齐 `image`/`id` 的 HTML 转义。
+- `screenshot.css` 6 个未定义 CSS 变量统一到 tokens 命名；弹窗运行时中文改为 `AIO.i18n.t()` 并补齐 zh/en 键（38 键对齐），`popupTabsHint` 保留 `<strong>` 结构、补 aria 翻译。
+- 删除孤儿 `libs/config_bridge.js`、`.gitattributes` stale 引用、死导出/死参数/死选择器；MAIN 的 B站 bundle 去掉 `libs/core.js`；顶层 bundle 去掉零消费者的 `keys`/`rules`（每页省 ~6.6 KB 解析）。
+- 后台删掉 4 类无监听者的广播；`content/bilibili/ui.js` 删掉无发送者的监听；速器手势/快捷键监听改为出现 `<video>` 才注册；B站注入器关闭时不再起轮询；HUD 阈值函数去重；`rules.js` 缓存满改为淘汰最旧而非全清；`isTopFrame` 两处 catch 语义统一。
+- 文档与清单对齐：`<all_urls>` 声明期权限（定时签到所必需）与 HA 授权 UI 的关系、权限数 7、回归 24 项、单测 83 项、10 个分区、5 个 MAIN bundle 描述、历史 `scripting` 权限复用的说明。
+
+### 验证工具
+
+- `smoke.mjs` 的 `options.dom`/`popup.dom`/`content.page` 从「只记录」改为真断言（含 SW 未加载失败路径），暗色偏好固定为 light 避免误报，`Log.enable` 失败不再静默。
+- `regression.mjs` 修重复 check 名、假通过的降级断言、补错误采集、文件头覆盖 A~H 八组。
+- `perf.mjs` CDP 失败不再静默记 0，缺调试端口/指标直接报错；`manifest.test.js` 补 `action.default_icon`、依赖识别、注释剥离误判修复、权限双向校验；`screenshot.test.js` 权限测试去同义反复；`schema.test.js` 修 `aioTabsEnabled` typo；`check.mjs` 补 i18n JS 键/全部 locale 校验。
+
 ## 2.5 — 2026-11-05
 
 ### 修复

@@ -1,6 +1,6 @@
 # All in One Extension (AIO)
 
-![Version](https://img.shields.io/badge/version-1.2026.1105.0940-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2026.1112.0830-blue.svg)
 ![Chrome](https://img.shields.io/badge/browser-Chrome-orange.svg)
 ![Manifest](https://img.shields.io/badge/manifest-v3-green.svg)
 
@@ -34,7 +34,7 @@
 ```bash
 npm run verify   # 静态检查 + 单元测试（零依赖，仅需 Node ≥ 20）
 npm run smoke      # 用本机 Chromium 真正加载扩展，采集后台/页面运行时错误
-npm run regression # 行为回归：标签切换 / 倍速开关 / 快捷键映射 / 倍速记忆 / 子帧（15 项断言）
+npm run regression # 行为回归：标签切换 / 倍速开关 / 快捷键映射 / 倍速记忆 / 子帧 / 全屏 / B站字幕 / 1080P（24 项断言）
 npm run verify:all # 以上全部
 npm run check      # 只跑静态检查
 npm test         # 只跑单元测试
@@ -51,11 +51,11 @@ npm run bump     # 更新 manifest.json / package.json 版本号
 
 ## 权限与隐私
 
-扩展只申请 6 项权限，全部有对应代码，逐条说明见 [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md)。
+扩展只申请 7 项权限，全部有对应代码，逐条说明见 [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md)。
 
 - 不采集、不上传任何数据；配置只存在本机 `chrome.storage`。
-- 声明期只申请 bilibili 与 WAQI 的域名权限；**Home Assistant 地址由你在设置页按需授权**
-  （`optional_host_permissions`），未授权时扩展不会访问该地址。
+- 声明期申请 bilibili、WAQI 与 `<all_urls>`（定时签到的截屏 API 要求）；Home Assistant 地址的
+  访问由此一并覆盖，设置页仍保留「授权此地址」按钮用于手动收窄权限后恢复。
 - 网络请求只发生在你自己配置的地址（WAQI、Home Assistant）与你访问的 bilibili 页面内。
 
 ## 性能

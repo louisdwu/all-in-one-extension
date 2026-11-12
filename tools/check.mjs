@@ -58,7 +58,7 @@ for (const script of manifest.content_scripts || []) {
     for (const file of script.js || []) {
       if (!exists(file) || MAIN_WORLD_SAFE.has(file)) continue;
       const source = read(file);
-      const match = source.match(/chrome\s*\.\s*(runtime|storage|tabs|cookies|alarms|action)/);
+      const match = source.match(/chrome\s*\.\s*(runtime|storage|tabs|cookies|alarms|action|windows|permissions|scripting|idle|webNavigation|commands|notifications|extension)/);
       if (match) fail('MAIN-world script uses chrome.* API: ' + file + ' (' + match[0] + ')');
     }
   }
@@ -144,19 +144,23 @@ try {
   /* no _locales directory at all */
 }
 
-// every __MSG_key__ referenced by the manifest must exist in the default locale
-const defaultMessages = localeMessages.get(manifest.default_locale) || {};
+// every __MSG_key__ referenced by the manifest must exist in EVERY locale
 const manifestText = read('manifest.json');
 for (const match of manifestText.matchAll(/__MSG_([A-Za-z0-9_@]+)__/g)) {
-  if (!defaultMessages[match[1]]) fail('manifest references __MSG_' + match[1] + '__ which is missing from the default locale');
+  for (const [localeName, messages] of localeMessages) {
+    if (!messages[match[1]]) fail('manifest references __MSG_' + match[1] + '__ which is missing from locale ' + localeName);
+  }
 }
 
-// every data-i18n key must exist in every locale, so translations cannot drift
-for (const htmlFile of allFiles.filter((f) => f.startsWith('ui/') && f.endsWith('.html'))) {
-  const source = read(htmlFile);
-  for (const match of source.matchAll(/data-i18n(?:-[a-z-]+)?="([^"]+)"/g)) {
+// every i18n key (HTML attributes AND JS AIO.i18n.t() calls) must exist in every locale
+for (const file of allFiles.filter((f) => f.startsWith('ui/') && (f.endsWith('.html') || f.endsWith('.js')))) {
+  const source = read(file);
+  const keys = new Set();
+  for (const match of source.matchAll(/data-i18n(?:-[a-z-]+)?="([^"]+)"/g)) keys.add(match[1]);
+  for (const match of source.matchAll(/\.i18n\.t\(\s*['"]([^'"]+)['"]/g)) keys.add(match[1]);
+  for (const key of keys) {
     for (const [localeName, messages] of localeMessages) {
-      if (!messages[match[1]]) fail(htmlFile + ' uses data-i18n="' + match[1] + '" but ' + localeName + ' has no such message');
+      if (!messages[key]) fail(file + ' uses i18n key "' + key + '" but ' + localeName + ' has no such message');
     }
   }
 }
@@ -229,6 +233,8 @@ for (const script of manifest.content_scripts || []) {
     if (/AIO\.md5\(/.test(source)) needs.push('libs/md5.js');
     if (/AIO\.wbi\./.test(source)) { needs.push('libs/wbi.js'); needs.push('libs/md5.js'); }
     if (/AIO\.bili\./.test(source)) needs.push('libs/bili.js');
+    if (/AIO\.speedMemory\./.test(source)) needs.push('libs/speed_memory.js');
+    if (/AIO\.aqi\./.test(source)) needs.push('libs/aqi.js');
     if (/AIO\.core\./.test(source)) needs.push('libs/core.js');
     for (const dep of needs) {
       const depIndex = files.indexOf(dep);
@@ -239,9 +245,13 @@ for (const script of manifest.content_scripts || []) {
 }
 
 /* ---------------- 5. secrets ---------------- */
+// Drop JSDoc / line comments but NOT `/* ... */` blocks: URL patterns such as
+// '*://*.bilibili.com/*' contain `/*` inside strings and a naive block strip
+// would swallow the rest of the file (hiding real code from the scan).
 const stripComments = (source) => source
-  .replace(/\/\*[\s\S]*?\*\//g, '')
-  .replace(/(^|[^:])\/\/.*$/gm, '$1');
+  .split('\n')
+  .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+  .join('\n');
 const SECRET_PATTERNS = [
   { re: /\b[0-9a-f]{32,40}\b/, why: 'possible hardcoded API token' },
   { re: /Bearer\s+[A-Za-z0-9_\-]{20,}/, why: 'possible hardcoded bearer token' },

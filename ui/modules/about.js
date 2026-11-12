@@ -134,16 +134,19 @@ async function renderStorage() {
     el.textContent = 'sync ' + syncBytes + ' B / local ' + localBytes + ' B';
 }
 
-async function renderSnapshot() {
-    const el = document.getElementById('about-snapshot');
-    if (!el) return;
-    const settings = await schema.load();
-    const safe = Object.assign({}, settings, {
-        biliCookies: { sessdata: settings.biliCookies.sessdata ? '***' : '', dedeUserId: settings.biliCookies.dedeUserId },
+/** Never put credentials into text that can be copied to the clipboard. */
+function safeSettings(settings) {
+    return Object.assign({}, settings, {
+        biliCookies: { sessdata: settings.biliCookies.sessdata ? '***' : '', dedeUserId: settings.biliCookies.dedeUserId ? '***' : '' },
         haToken: settings.haToken ? '***' : '',
         waqiToken: settings.waqiToken ? '***' : ''
     });
-    el.textContent = JSON.stringify(safe, null, 2);
+}
+
+async function renderSnapshot() {
+    const el = document.getElementById('about-snapshot');
+    if (!el) return;
+    el.textContent = JSON.stringify(safeSettings(await schema.load()), null, 2);
 }
 
 async function diagnosticsText() {
@@ -164,6 +167,6 @@ async function diagnosticsText() {
         'ha last success: ' + formatTime(data.hudLastSuccessHa),
         'waqi station time: ' + (data.hudLastWaqiPubS || 'never'),
         'message handlers: ' + ((snapshot && snapshot.registeredTypes) || []).join(', '),
-        'settings: ' + JSON.stringify(settings)
+        'settings: ' + JSON.stringify(safeSettings(settings))
     ].join('\n');
 }

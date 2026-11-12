@@ -116,9 +116,16 @@
     // Speed changes made by the site itself must be fought; speed changes the
     // user made through the site's own menu must be adopted. The only reliable
     // signal separating them is "did a user gesture just happen?".
+    // Listeners are registered lazily by track() so frames without a <video>
+    // pay nothing at all (the speeder is injected into every iframe).
     let lastGestureAt = 0;
-    for (const type of ['pointerdown', 'keydown', 'touchstart']) {
-        window.addEventListener(type, () => { lastGestureAt = Date.now(); }, true);
+    let gestureListeners = false;
+    function ensureGestureListeners() {
+        if (gestureListeners) return;
+        gestureListeners = true;
+        for (const type of ['pointerdown', 'keydown', 'touchstart']) {
+            window.addEventListener(type, () => { lastGestureAt = Date.now(); }, true);
+        }
     }
 
     const onRateChange = (event) => {
@@ -142,6 +149,7 @@
 
     function track(video) {
         if (state.videos.has(video)) return;
+        ensureGestureListeners();
         state.videos.add(video);
         video.addEventListener('ratechange', onRateChange);
         video.addEventListener('loadedmetadata', () => applySpeed());
@@ -523,6 +531,7 @@
         bootPromise = settings().then((loaded) => {
             apply(loaded);
             onChange(apply);
+            ensureKeyboardListener();
             return loaded;
         });
         return bootPromise;
@@ -533,9 +542,11 @@
     scanVideos();
 
     /* ------------------------------ keyboard ------------------------------ */
-    window.addEventListener('keydown', (event) => {
+    // Registered only when this frame actually boots (has a video). Blending
+    // the shortcut handling into the lazy boot keeps dormant iframes free of
+    // a global capture listener.
+    function onShortcutKey(event) {
         if (!state.active || event.defaultPrevented || isEditable(event.target)) return;
-        if (event.altKey || event.metaKey) { /* combos may include them; still matched below */ }
         const action = keys.matchAction(event, state.settings.shortcuts);
         if (!action) return;
         event.preventDefault();
@@ -543,7 +554,13 @@
         if (action === 'increaseSpeed') step(state.settings.speederStep);
         else if (action === 'decreaseSpeed') step(-state.settings.speederStep);
         else if (action === 'presetSpeed') cyclePreset();
-    }, true);
+    }
+    let keyboardListener = false;
+    function ensureKeyboardListener() {
+        if (keyboardListener) return;
+        keyboardListener = true;
+        window.addEventListener('keydown', onShortcutKey, true);
+    }
 
     /* ------------------------------ messages ------------------------------ */
     AIO.core.onMessage((message) => {

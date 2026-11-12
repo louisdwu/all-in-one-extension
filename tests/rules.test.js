@@ -36,3 +36,18 @@ test('regex cache survives repeated lookups', () => {
     const second = globalThis.AIO.rules.compile('abc');
     assert.equal(first, second);
 });
+
+test('regex cache evicts the oldest entry instead of clearing everything', () => {
+    clearCache();
+    const kept = globalThis.AIO.rules.compile('keep-me');
+    // MAX_CACHE is 200. Re-accessing `keep-me` on every iteration keeps it
+    // hot; a full `cache.clear()` (the old behaviour) would still drop it.
+    for (let i = 0; i < 210; i++) {
+        globalThis.AIO.rules.compile('pattern-' + i);
+        globalThis.AIO.rules.compile('keep-me');
+    }
+    assert.equal(
+        globalThis.AIO.rules.compile('keep-me'), kept,
+        'a hot regex must not be invalidated by later patterns'
+    );
+});

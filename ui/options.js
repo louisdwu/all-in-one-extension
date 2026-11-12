@@ -7,6 +7,7 @@
  */
 import '../libs/core.js';
 import '../libs/schema.js';
+import '../libs/keys.js';
 import '../libs/i18n.js';
 import { uiLog } from './modules/shared.js';
 
@@ -69,9 +70,9 @@ function setupNav() {
     });
 }
 
-function guard(name, fn) {
+async function guard(name, fn) {
     try {
-        fn();
+        await fn();
     } catch (err) {
         uiLog.error('panel "' + name + '" failed to initialize', err);
     }
@@ -81,20 +82,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     globalThis.AIO.i18n.apply();
     globalThis.AIO.schema.load()
         .then((settings) => globalThis.AIO.core.applyDebugSetting(settings))
-        .catch(() => {});
+        .catch((err) => uiLog.debug('debug setting unavailable', err));
     const versionEl = document.getElementById('sidebar-version');
     if (versionEl) versionEl.textContent = 'v' + chrome.runtime.getManifest().version;
 
     setupNav();
 
-    guard('dashboard', initDashboard);
-    guard('aiotabs', initAioTabs);
-    guard('incognito', initIncognito);
-    guard('speeder', initSpeeder);
-    guard('bilibili', initBilibili);
-    guard('screenshot', initScreenshot);
-    guard('hotkeys', initHotkeys);
-    guard('hud', initHud);
-    guard('backup', initBackup);
-    guard('about', initAbout);
+    await Promise.all([
+        guard('dashboard', initDashboard),
+        guard('aiotabs', initAioTabs),
+        guard('incognito', initIncognito),
+        guard('speeder', initSpeeder),
+        guard('bilibili', initBilibili),
+        guard('screenshot', initScreenshot),
+        guard('hotkeys', initHotkeys),
+        guard('hud', initHud),
+        guard('backup', initBackup),
+        guard('about', initAbout)
+    ]);
 });

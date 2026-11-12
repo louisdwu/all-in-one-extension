@@ -12,7 +12,7 @@
 import '../../libs/core.js';
 import '../../libs/schema.js';
 import '../../libs/bili.js';
-import { handle, broadcast } from '../router.js';
+import { handle } from '../router.js';
 import { isAllowedIncognitoAccess } from './incognito.js';
 
 const { log, storage } = globalThis.AIO.core;
@@ -172,7 +172,9 @@ async function applyCredentialAlert(on) {
 async function restoreCredentialAlert() {
     try {
         if (!chrome.action || !chrome.action.getBadgeText) return;
-        const { text } = await chrome.action.getBadgeText({});
+        const text = await chrome.action.getBadgeText({});
+        // chrome.action.getBadgeText() resolves to a plain string (Promise<string>),
+        // NOT an object. Older code destructured `{ text }` and never matched.
         credentialAlert.on = text === '!';
     } catch (err) { /* ignore */ }
 }
@@ -281,7 +283,6 @@ export function registerBilibili() {
         const patch = message.settings || message.patch || {};
         const settings = await globalThis.AIO.schema.save(patch);
         await syncPlayNextCookie(settings.biliPlayNextDisabled);
-        await broadcast({ type: 'bili:settingsChanged' }, { url: ['*://*.bilibili.com/*'] });
         return { ok: true, success: true, settings };
     });
 
@@ -293,7 +294,6 @@ export function registerBilibili() {
 
     handle('saveBilibiliSettings', async (message) => {
         const settings = await globalThis.AIO.schema.save({ bilibiliSubtitles: message.settings || {} });
-        await broadcast({ type: 'bili:settingsChanged' }, { url: ['*://*.bilibili.com/*'] });
         return { ok: true, success: true, bilibiliSubtitles: settings.bilibiliSubtitles };
     });
 
@@ -304,7 +304,6 @@ export function registerBilibili() {
 
     handle('saveBilibili1080PSettings', async (message) => {
         const settings = await globalThis.AIO.schema.save({ bilibili1080PEnabled: message.enabled !== false });
-        await broadcast({ type: 'bili:settingsChanged' }, { url: ['*://*.bilibili.com/*'] });
         return { ok: true, success: true, enabled: settings.bilibili1080PEnabled };
     });
 

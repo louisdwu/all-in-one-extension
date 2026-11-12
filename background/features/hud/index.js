@@ -14,7 +14,7 @@ import '../../../libs/core.js';
 import '../../../libs/schema.js';
 import { setIcon, resetIcon } from './icon.js';
 import { fetchWaqi, enabledWaqiMetrics, WAQI_METRIC_KEYS } from './waqi.js';
-import { fetchHa } from './ha.js';
+import { fetchHa, colorForEntity } from './ha.js';
 import { handle } from '../../router.js';
 
 const { log, storage } = globalThis.AIO.core;
@@ -107,27 +107,12 @@ function colorForItem(key, item, settings) {
     if (key.startsWith('ha_')) {
         const id = key.slice(3);
         const entity = (settings.haEntities || []).find((candidate) => candidate.id.replace(/[\s\r\n]/g, '') === id);
-        const threshold = colorFromThresholds(entity, item.raw !== undefined ? item.raw : item.value);
+        const threshold = colorForEntity(entity, item.raw !== undefined ? item.raw : item.value);
         if (threshold === 'critical') return COLORS.waqiCritical;
         if (threshold === 'warning') return COLORS.waqiWarn;
         return COLORS.ha;
     }
     return COLORS.idle;
-}
-
-function colorFromThresholds(entity, rawValue) {
-    const value = parseFloat(rawValue);
-    if (!entity || !isFinite(value)) return null;
-    const warn = parseFloat(entity.warn);
-    const crit = parseFloat(entity.crit);
-    if (entity.op === '<') {
-        if (!isNaN(crit) && value <= crit) return 'critical';
-        if (!isNaN(warn) && value <= warn) return 'warning';
-    } else {
-        if (!isNaN(crit) && value >= crit) return 'critical';
-        if (!isNaN(warn) && value >= warn) return 'warning';
-    }
-    return null;
 }
 
 async function renderCurrent() {

@@ -69,7 +69,8 @@ function imageDataFor(text, color) {
 async function clearBadgeUnlessAlert() {
     try {
         const current = await chrome.action.getBadgeText({});
-        if (current && current.text === '!') return; // credential alert owns the badge
+        // Promise<string>: "!" means the credential-alert badge owns the badge.
+        if (current === '!') return; // credential alert owns the badge
     } catch (err) { /* ignore */ }
     try { chrome.action.setBadgeText({ text: '' }); } catch (err) { /* ignore */ }
 }
@@ -104,9 +105,4 @@ export function resetIcon(title) {
     } catch (err) {
         iconLog.warn('resetIcon failed', err.message);
     }
-}
-
-export function invalidateIconCache() {
-    imageCache.clear();
-    lastKey = '';
 }

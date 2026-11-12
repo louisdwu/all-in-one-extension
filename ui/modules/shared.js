@@ -22,17 +22,11 @@ export function toast(message, level = 'success') {
     toast.timer = setTimeout(() => element.classList.remove('show'), 3000);
 }
 
-export function on(el, type, handler, options) {
-    if (el) el.addEventListener(type, handler, options);
-    return el;
-}
-
 /** Wire a checkbox to a boolean settings key. */
-export function bindToggle(id, key, { save = true } = {}) {
+export function bindToggle(id, key) {
     const input = document.getElementById(id);
     if (!input) return null;
     input.addEventListener('change', async () => {
-        if (!save) return;
         await schema.save({ [key]: input.checked });
         uiLog.debug('saved', key, input.checked);
     });
@@ -51,7 +45,7 @@ export function bindSelect(id, key, { numeric = true } = {}) {
 }
 
 /** Wire a text/number input; debounced so typing does not hammer storage. */
-export function bindInput(id, key, { numeric = false, debounceMs = 400, transform } = {}) {
+export function bindInput(id, key, { numeric = false, debounceMs = 400 } = {}) {
     const input = document.getElementById(id);
     if (!input) return null;
     const commit = core.debounce(async () => {
@@ -60,7 +54,6 @@ export function bindInput(id, key, { numeric = false, debounceMs = 400, transfor
             value = parseFloat(value);
             if (!isFinite(value)) return;
         }
-        if (transform) value = transform(value);
         await schema.save({ [key]: value });
     }, debounceMs);
     input.addEventListener('input', commit);
@@ -68,8 +61,8 @@ export function bindInput(id, key, { numeric = false, debounceMs = 400, transfor
 }
 
 /** Show the incognito-access status text below the modifier selector. */
-export async function renderIncognitoState(targetId = 'ez-incognito-state') {
-    const el = document.getElementById(targetId);
+export async function renderIncognitoState() {
+    const el = document.getElementById('ez-incognito-state');
     if (!el) return;
     const allowed = await new Promise((resolve) => {
         try {
@@ -100,7 +93,7 @@ export function formatMetric(value, round) {
     if (!isFinite(num) || !round) return String(value);
     if (Math.abs(num) >= 1000) {
         let text = (num / 1000).toFixed(1);
-        if (text.endsWith('.0')) text = text.slice(0, -2);
+        if (text.endsWith('.0')) text = text.slice(0, -2); // "10.0K" → "10K"
         return text + 'K';
     }
     return String(Math.round(num));

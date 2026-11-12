@@ -26,6 +26,7 @@ test('every referenced resource exists', () => {
         if (script.css) refs.push(...script.css);
     }
     refs.push(manifest.action.default_popup, manifest.options_page, ...Object.values(manifest.icons));
+    if (manifest.action.default_icon) refs.push(...Object.values(manifest.action.default_icon));
     for (const ref of refs) {
         assert.ok(existsSync(join(ROOT, ref)), 'missing referenced file: ' + ref);
     }
@@ -41,6 +42,8 @@ test('content script bundles load shared libs before consumers', () => {
             if (/AIO\.keys\./.test(source)) deps.push('libs/keys.js');
             if (/AIO\.rules\./.test(source)) deps.push('libs/rules.js');
             if (/AIO\.schema\./.test(source)) deps.push('libs/schema.js');
+            if (/AIO\.speedMemory\./.test(source)) deps.push('libs/speed_memory.js');
+            if (/AIO\.aqi\./.test(source)) deps.push('libs/aqi.js');
             if (/AIO\.wbi\./.test(source)) deps.push('libs/wbi.js', 'libs/md5.js');
             if (/AIO\.md5\(/.test(source)) deps.push('libs/md5.js');
             for (const dep of deps) {
@@ -55,11 +58,13 @@ test('content script bundles load shared libs before consumers', () => {
 test('MAIN world scripts never touch the chrome API', () => {
     // libs/core.js is a shared runtime whose chrome access is guarded by hasChrome().
     const safe = new Set(['libs/core.js']);
+    const MAIN_APIS = 'runtime|storage|tabs|cookies|alarms|action|windows|permissions|scripting|idle|webNavigation|commands|notifications|extension';
     for (const script of manifest.content_scripts) {
         if (script.world !== 'MAIN') continue;
         for (const file of script.js) {
             if (safe.has(file)) continue;
-            assert.equal(/chrome\s*\.\s*(runtime|storage|tabs|cookies|alarms)/.test(read(file)), false, file);
+            assert.equal(
+                new RegExp('chrome\\s*\\.\\s*(?:' + MAIN_APIS + ')').test(read(file)), false, file);
         }
     }
 });
@@ -88,20 +93,26 @@ test('every relative import resolves to a real file', () => {
             const rel = dir ? dir + '/' + entry : entry;
             const stat = statSync(join(ROOT, rel));
             if (stat.isDirectory()) walk(rel);
-            else if (extname(entry) === '.js') {
+            else if (['.js', '.mjs'].includes(extname(entry))) {
                 const source = read(rel);
                 const specs = [];
                 for (const m of source.matchAll(/(?:import|export)[^'"\n]*from\s*['"]([^'"]+)['"]/g)) specs.push(m[1]);
                 for (const m of source.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)) specs.push(m[1]);
                 for (const spec of specs) {
                     if (!spec.startsWith('.')) continue;
-                    assert.ok(existsSync(join(ROOT, dir || '.', spec)), rel + ' imports missing ' + spec);
+                    // Resolve relative to the importing file's own directory.
+                    const target = join(ROOT, dir, spec);
+                    assert.ok(existsSync(target), rel + ' imports missing ' + spec);
                 }
             }
         }
     };
     walk('background');
     walk('libs');
+    walk('content');
+    walk('ui');
+    walk('tools');
+    walk('tests');
     walk('ui');
 });
 
@@ -125,8 +136,14 @@ test('no unused permission is declared', () => {
             const rel = join(dir, entry);
             const stat = statSync(join(ROOT, rel));
             if (stat.isDirectory()) walk(rel);
-            else if (extname(entry) === '.js') {
-                for (const match of read(rel).matchAll(/chrome\.([a-zA-Z]+)\./g)) used.add(match[1]);
+            else if (['.js', '.mjs'].includes(extname(entry))) {
+                // Strip line comments only. A naive /* ... */ strip breaks on
+                // strings like '*://*.bilibili.com/*' (URL match patterns).
+                const source = read(rel)
+                    .split('\n')
+                    .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+                    .join('\n');
+                for (const match of source.matchAll(/chrome\.([a-zA-Z]+)\./g)) used.add(match[1]);
             }
         }
     };

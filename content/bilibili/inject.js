@@ -28,7 +28,11 @@
     const AIO = window.AIO;
     if (!AIO || !AIO.md5 || !AIO.wbi) return;
     const { encWbi, useWebKey } = AIO.wbi;
-    const log = AIO.core ? AIO.core.log('bili:inject') : { debug() {}, warn() {}, error() {} };
+    // MAIN world has no chrome.* and must not load the shared core layer, so
+    // the shared logger is unavailable here. Failures in this injector are surfaced by
+    // the smoke/regression tools (console exceptions), not by console output —
+    // shipping console.* calls is forbidden by the project rules (AGENTS §8).
+    const log = { debug() {}, warn() {}, error() {} };
 
     /* ------------------------------ config ------------------------------ */
     let config = {};
@@ -318,20 +322,12 @@
     }
 
     /* ------------------- quality observation (server-side cap) ------------------- */
-    const QUALITY_LABELS = {
-        127: '8K', 126: '杜比视界', 125: 'HDR', 120: '4K', 116: '1080P60',
-        112: '1080P+', 80: '1080P', 74: '720P60', 64: '720P', 32: '480P', 16: '360P'
-    };
-
-    const qualityLabel = (qn) => QUALITY_LABELS[qn] || (qn ? qn + 'P' : '未知');
-
     /**
      * What the server actually granted. bilibili keeps *advertising* 1080P in
      * `accept_quality` for logged-out clients but only hands out 480P/360P
      * renditions, so `quality` is the only honest field.
      */
     const observed = { granted: 0, height: 0, accept: [], capped: false };
-    let hintSent = false;
     /** Tracks the last known login state so we can react to transitions. */
     let prevLoginState = loginState();
 
@@ -340,25 +336,7 @@
         observed.height = 0;
         observed.accept = [];
         observed.capped = false;
-        hintSent = false;
     }
-
-    /** What the user can actually watch right now, in human terms. */
-    function observedLabel() {
-        if (observed.height) return observed.height + 'P';
-        return qualityLabel(observed.granted);
-    }
-
-    // Disabled: no longer show quality cap hint to users
-    // function sendCapHint() {
-    //     if (hintSent) return;
-    //     hintSent = true;
-    //     const message = 'B站未登录最高只有 ' + observedLabel() +
-    //         '。在设置页填入账号 SESSDATA 并勾选「无痕窗口沿用此账号」后即可看 1080P。';
-    //     try {
-    //         document.documentElement.setAttribute('data-aio-bili-hint', JSON.stringify({ reason: 'quality_capped', message }));
-    //     } catch (err) { /* ignore */ }
-    // }
 
     function observePlayurl(text) {
         try {
@@ -381,8 +359,10 @@
             // received a reply yet), the first playurl may arrive before the
             // cookie was seeded, yielding a false positive; don't lock out.
             const confirmedUnlogged = loginState() === 'no';
+            // When the server caps the quality we simply stop re-requesting 1080P
+            // (see request1080p / startFastPoll). The retired hint channel was
+            // removed; user-facing feedback is now the toolbar credential badge.
             observed.capped = confirmedUnlogged && observed.accept.indexOf(80) >= 0 && observed.granted > 0 && observed.granted < 80;
-            if (observed.capped) sendCapHint();
         } catch (err) {
             log.debug('playurl body is not json', err.message);
         }
@@ -565,6 +545,7 @@
         }
     }
     function startFastPoll() {
+        if (config.enabled === false) return;
         stopFastPoll();
         let attempts = 0;
         fastPollTimer = setInterval(() => {
@@ -578,6 +559,7 @@
 
     function loop() {
         readConfig();
+        if (config.enabled === false) return; // feature off: no polling work
         if (location.href !== lastHref) {
             lastHref = location.href;
             resetQualityObservation();

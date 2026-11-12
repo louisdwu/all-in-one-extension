@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "__MSG_extName__",
-    "version": "1.2026.1105.0940",
+    "version": "1.2026.1112.0830",
     "description": "__MSG_extDescription__",
     "default_locale": "zh_CN",
     "permissions": [
@@ -29,8 +29,6 @@
             ],
             "js": [
                 "libs/core.js",
-                "libs/keys.js",
-                "libs/rules.js",
                 "libs/schema.js",
                 "content/lib/content.js",
                 "content/aio_tabs.js",
@@ -89,7 +87,6 @@
                 "*://*.bilibili.com/list/*"
             ],
             "js": [
-                "libs/core.js",
                 "libs/md5.js",
                 "libs/wbi.js",
                 "content/bilibili/inject.js"

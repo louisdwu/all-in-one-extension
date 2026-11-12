@@ -126,7 +126,9 @@ async function main() {
   child.stderr.on('data', (d) => {
     for (const line of String(d).split('\n')) {
       if (!line.trim()) continue;
-      if (/CONSOLE|Uncaught|Failed to load extension|extension/i.test(line)) {
+      // Only real failures matter; "extension" alone matches normal DevTools
+      // lines and just adds noise to the report.
+      if (/^(CONSOLE|Uncaught|ERROR:|Failed to load extension)/.test(line)) {
         report.stderr.push(line.trim().slice(0, 500));
       }
     }
@@ -162,7 +164,12 @@ async function main() {
   const attach = async (targetId) => {
     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
     await cdp.send('Runtime.enable', {}, sessionId);
-    try { await cdp.send('Log.enable', {}, sessionId); } catch (e) { /* ignore */ }
+    try {
+      await cdp.send('Log.enable', {}, sessionId);
+    } catch (err) {
+      // Without Log.enable, Log.entryAdded errors are invisible to this run.
+      report.assertionFailures.push('Log.enable failed on a target: ' + err.message);
+    }
     return sessionId;
   };
 
@@ -196,11 +203,22 @@ async function main() {
     } catch (e) { swErrors.push('PROBE: ' + e.message); }
   } else {
     report.assertions.push({ name: 'extensionLoaded', value: 'FAILED: no service worker target' });
+    report.assertionFailures.push('no service worker target was found — the extension did not load');
   }
 
+  /** Record an assertion AND make it affect the exit code. */
+  const check = (name, passed, detail) => {
+    report.assertions.push({ name, value: passed ? 'PASS' : 'FAILED: ' + (detail || '') });
+    if (!passed) report.assertionFailures.push(name + (detail ? ': ' + detail : ''));
+  };
+
+  const ATTACH_LIGHT_SCHEME = 'light'; // computed-style expectations assume the light theme
   const loadPage = async (url, label, waitMs) => {
     const { targetId } = await cdp.send('Target.createTarget', { url });
     const sessionId = await attach(targetId);
+    // Pin the colour scheme so a host with prefers-color-scheme:dark cannot
+    // make the light-theme computed-style assertions fail spuriously.
+    try { await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: ATTACH_LIGHT_SCHEME }] }, sessionId); } catch (e) { /* older Chromium */ }
     const info = { label, url, errors: [] };
     cdp.onEvent((msg) => {
       if (msg.sessionId !== sessionId) return;
@@ -227,10 +245,13 @@ async function main() {
   if (extId) {
     LOG('loading options page');
     const opt = await loadPage('chrome-extension://' + extId + '/ui/options.html', 'options', 2200);
-    report.assertions.push({
-      name: 'options.dom',
-      value: await opt.evaluate('JSON.stringify({version: (document.getElementById("sidebar-version") || {}).textContent, panes: document.querySelectorAll(".tab-pane").length, navButtons: document.querySelectorAll(".nav button").length, shortcutItems: document.querySelectorAll(".shortcut-item").length, hudMetrics: document.querySelectorAll("[id^=waqi-metric-]").length})'),
-    });
+    const optDom = await opt.evaluate('JSON.stringify({version: (document.getElementById("sidebar-version") || {}).textContent, panes: document.querySelectorAll(".tab-pane").length, navButtons: document.querySelectorAll(".nav button").length, shortcutItems: document.querySelectorAll(".shortcut-item").length, hudMetrics: document.querySelectorAll("[id^=waqi-metric-]").length})');
+    report.assertions.push({ name: 'options.dom', value: optDom });
+    try {
+      const d = JSON.parse(optDom || '{}');
+      check('options renders its panes', d.panes === 10 && d.navButtons === 10, JSON.stringify(d));
+      check('options renders the shortcut recorder', d.shortcutItems === 3 && d.hudMetrics === 11, JSON.stringify(d));
+    } catch (err) { check('options.dom parses', false, err.message); }
     const stylesJson = await opt.evaluate([
         'JSON.stringify((function () {',
         '  function cs(sel, prop) { var el = document.querySelector(sel); return el ? getComputedStyle(el)[prop] : null; }',
@@ -288,29 +309,36 @@ async function main() {
       report.assertionFailures.push('could not parse style probe: ' + err.message);
     }
     const pop = await loadPage('chrome-extension://' + extId + '/ui/popup.html', 'popup', 1600);
-    report.assertions.push({
-      name: 'popup.dom',
-      value: await pop.evaluate('JSON.stringify({title: (document.querySelector(".title") || {}).textContent, cards: document.querySelectorAll(".card").length, speed: (document.getElementById("speed-value") || {}).textContent, hud: (document.getElementById("hud-list") || {}).textContent.slice(0, 30)})'),
-    });
+    const popDom = await pop.evaluate('JSON.stringify({title: (document.querySelector(".title") || {}).textContent, cards: document.querySelectorAll(".card").length, speed: (document.getElementById("speed-value") || {}).textContent, hud: (document.getElementById("hud-list") || {}).textContent.slice(0, 30)})');
+    report.assertions.push({ name: 'popup.dom', value: popDom });
+    try {
+      const d = JSON.parse(popDom || '{}');
+      check('popup renders its cards', d.cards === 5 && !!d.title, JSON.stringify(d));
+      check('popup reads the current speed', typeof d.speed === 'string' && d.speed.includes('x'), JSON.stringify(d));
+    } catch (err) { check('popup.dom parses', false, err.message); }
   }
 
   LOG('loading test page', targetUrl);
   const page = await loadPage(targetUrl, 'web-page', 3000);
-  report.assertions.push({
-    name: 'content.page',
-    value: await page.evaluate([
+  const contentPage = await page.evaluate([
       'JSON.stringify({',
       '  ball: !!(document.getElementById("aio-speed-ui") && document.getElementById("aio-speed-ui").shadowRoot),',
       '  uiHost: !!document.getElementById("aio-speed-ui"),',
-      '  styles: !!document.getElementById("aio-speed-ui"),',
       '  rate1: document.getElementById("v1").playbackRate,',
       '  rate2: document.getElementById("v2").playbackRate,',
       '  pageErrors: window.__pageErrors || [],',
       '  attrAction: document.documentElement.getAttribute("data-aio-speed-action"),',
       '  attrValue: document.documentElement.getAttribute("data-aio-speed-value")',
       '})',
-    ].join('\n')),
-  });
+    ].join('\n'));
+  report.assertions.push({ name: 'content.page', value: contentPage });
+  try {
+    const d = JSON.parse(contentPage || '{}');
+    check('speeder UI exists on a page with video', d.ball === true && d.uiHost === true, JSON.stringify(d));
+    check('speeder locks the rate (site reset fought)', d.rate1 === 1 && d.rate2 === 1, JSON.stringify(d));
+    check('MAIN-world lock attribute is published', d.attrAction === 'lock' && Number(d.attrValue) === 1, JSON.stringify(d));
+    check('page JS is still alive (no freeze)', Array.isArray(d.pageErrors) && d.pageErrors.length === 0, JSON.stringify(d));
+  } catch (err) { check('content.page parses', false, err.message); }
 
   report.background = swErrors;
   LOG('done, shutting down');

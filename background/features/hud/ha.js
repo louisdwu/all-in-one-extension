@@ -31,10 +31,11 @@ export function haOriginPattern(url) {
 }
 
 /**
- * Home Assistant lives on an arbitrary (usually private) origin, so it is
- * covered by optional_host_permissions and the user grants it from the options
- * page. Without the grant, a service-worker fetch would fail with an opaque
- * CORS error — we detect that up front and report it.
+ * Home Assistant lives on an arbitrary (usually private) origin. Since the
+ * extension declares `<all_urls>` in host_permissions (required by
+ * captureVisibleTab), `permissions.contains` is always true for http(s)
+ * origins; the check stays as a cheap guard for profiles where site access
+ * was manually narrowed in chrome://extensions.
  */
 export async function hasHaPermission(pattern) {
     if (!pattern) return false;

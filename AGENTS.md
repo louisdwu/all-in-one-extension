@@ -29,7 +29,7 @@ npm run bump          # 同时更新 manifest.json 与 package.json
 ```bash
 npm run verify      # 静态检查 + 单测，提交前必须全绿
 npm run smoke       # 采集 SW/页面运行时异常（本机 Chromium）
-npm run regression  # 15 项行为断言（标签切换/倍速开关/快捷键映射/倍速记忆/子帧）
+npm run regression  # 24 项行为断言（标签/倍速/快捷键/记忆/子帧/全屏/字幕/1080P）
 npm run bump        # 版本号
 ```
 
@@ -168,7 +168,7 @@ docs/                       ARCHITECTURE / PERMISSIONS / IMPROVEMENT_PLAN
 - **帧内懒启动**：速器注入每个 iframe，但只有真的出现 `<video>` 才 `boot()`
   （读配置 + 订阅变更）。新增全站脚本时请沿用这个模式：先做零成本探测，再启动。
 - **MAIN 世界 bundle 不引共享层**：`libs/core.js` 在 MAIN 里没有用途（那里没有 chrome
-  API），只会让每个 iframe 多解析一份。两个 MAIN 脚本已合并为一个 bundle。
+  API），只会让每个 iframe 多解析一份。两个 MAIN bundle（全站 + B站视频页）均不含共享层。
 - **性能基线**：20 个无视频 iframe 下，扩展带来的主线程开销约 46 ms（每帧 ~2.3 ms）。
   新增全站注入的代码后，用 `npm run perf` 复测（对比"不装扩展"的同一页面），别凭感觉。
 

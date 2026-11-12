@@ -146,15 +146,19 @@ async function renderHistory() {
     const items = history.map((item) => {
         const url = escapeHtml(item.url || '');
         const shortUrl = url.length > 60 ? url.slice(0, 57) + '…' : url;
+        // item.image / item.id come from storage.local and could have been
+        // restored from a backup: escape every interpolated attribute value.
+        const image = escapeHtml(item.image || '');
+        const id = escapeHtml(String(item.id));
         return `
             <div class="screenshot-item">
-                <img src="${item.image}" class="screenshot-preview" alt="签到 ${formatTime(item.timestamp)}" loading="lazy">
+                <img src="${image}" class="screenshot-preview" alt="签到 ${formatTime(item.timestamp)}" loading="lazy">
                 <div class="screenshot-info">
                     <div class="screenshot-url" title="${url}">${shortUrl}</div>
                     <div class="screenshot-time">${formatTime(item.timestamp)}</div>
                     <div class="screenshot-actions">
-                        <button type="button" class="screenshot-btn view" data-id="${item.id}">查看</button>
-                        <button type="button" class="screenshot-btn delete" data-id="${item.id}">删除</button>
+                        <button type="button" class="screenshot-btn view" data-id="${id}">查看</button>
+                        <button type="button" class="screenshot-btn delete" data-id="${id}">删除</button>
                     </div>
                 </div>
             </div>`;

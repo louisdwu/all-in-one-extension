@@ -14,7 +14,8 @@
 | `cookies` | `background/features/bilibili.js` | ① 读取**无痕窗口**中登录的专用账号 SESSDATA（需你手动点击按钮；普通窗口的 store `'0'` 一律不读）② 把这份「专用账号」写成无痕会话的 cookie（B站只给登录用户下发 1080P；写的是会话 cookie，无痕窗口关闭即消失）③ 维护 `aio_pnd` 开关 cookie（仅功能开启时存在） |
 | `webNavigation` | `background/features/bilibili.js` | 进入 bilibili 页面时：给无痕标签写入登录态、把开关 cookie 同步到该标签所在的 cookie store |
 
-> 已删除的历史权限：`scripting`、`notifications`、`activeTab`（代码中从未使用）。
+> `notifications` / `activeTab` 仍是未使用的历史权限（已删除）。`scripting` 现由
+> `bili:verifyCredential` 的无痕标签探针重新使用（`chrome.scripting.executeScript`）。
 > `tests/manifest.test.js` 会持续校验"声明的权限必须被代码使用"。
 
 ## `host_permissions`
@@ -22,6 +23,9 @@
 ```json
 "host_permissions": ["*://*.bilibili.com/*", "https://api.waqi.info/*", "<all_urls>"]
 ```
+
+> `<all_urls>` 使所有 http(s) 站点访问在声明期即已授予；Home Assistant 不再走按需授权。
+> 设置页的「授权此地址」按钮保留，用于用户在 `chrome://extensions` 手动收窄网站权限后恢复。
 
 | 域名 | 为什么必须在声明期就拿到 |
 |------|------------------------|

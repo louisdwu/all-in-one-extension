@@ -36,9 +36,10 @@ test('empty storage yields a complete, typed default object', () => {
 });
 
 test('explicit false is preserved (the classic !== false bug)', () => {
-    const settings = normalize({ hudEnabled: false, globalEnabled: false, aioTabEnabled: false });
+    const settings = normalize({ hudEnabled: false, globalEnabled: false, aioTabsEnabled: false });
     assert.equal(settings.hudEnabled, false);
     assert.equal(settings.globalEnabled, false);
+    assert.equal(settings.aioTabsEnabled, false);
 });
 
 test('legacy arrow shortcut spellings are migrated', () => {

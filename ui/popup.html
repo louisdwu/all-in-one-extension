@@ -14,7 +14,7 @@
     </header>
 
     <main class="dashboard">
-        <section class="card" id="card-hud">
+        <section class="card">
             <div class="card-title">
                 <span data-i18n="popupHud">🖥️ HUD 监控</span>
                 <label class="toggle" title="HUD 总开关" data-i18n-title="popupHudToggle">
@@ -29,18 +29,18 @@
             <div class="card-title">
                 <span data-i18n="popupTabs">🖱️ 标签页切换</span>
                 <label class="toggle" title="右键 + 滚轮切换标签页" data-i18n-title="popupTabsToggle">
-                    <input type="checkbox" id="aio-tabs-toggle" aria-label="标签页切换">
+                    <input type="checkbox" id="aio-tabs-toggle" aria-label="标签页切换" data-i18n-aria-label="popupTabs">
                     <span class="slider"></span>
                 </label>
             </div>
-            <p class="hint" data-i18n="popupTabsHint">按住<strong>鼠标右键</strong>并<strong>滚动滚轮</strong>呼出标签列表。</p>
+            <p class="hint"><span data-i18n="popupTabsHint1">按住</span><strong data-i18n="popupTabsHint2">鼠标右键</strong><span data-i18n="popupTabsHint3">并</span><strong data-i18n="popupTabsHint4">滚动滚轮</strong><span data-i18n="popupTabsHint5">呼出标签列表。</span></p>
         </section>
 
         <section class="card">
             <div class="card-title">
                 <span data-i18n="popupSpeeder">🎬 视频倍速</span>
                 <label class="toggle" title="全局启用倍速" data-i18n-title="popupSpeederToggle">
-                    <input type="checkbox" id="speeder-toggle" aria-label="视频倍速">
+                    <input type="checkbox" id="speeder-toggle" aria-label="视频倍速" data-i18n-aria-label="popupSpeeder">
                     <span class="slider"></span>
                 </label>
             </div>
@@ -60,15 +60,15 @@
             <div class="card-title">
                 <span data-i18n="popupHotkeys">🎹 本站快捷键映射</span>
                 <label class="toggle" title="在本站启用映射" data-i18n-title="popupHotkeysToggle">
-                    <input type="checkbox" id="hotkey-toggle" aria-label="本站快捷键映射">
+                    <input type="checkbox" id="hotkey-toggle" aria-label="本站快捷键映射" data-i18n-aria-label="popupHotkeys">
                     <span class="slider"></span>
                 </label>
             </div>
             <div class="site-row"><span id="hotkey-site">读取中…</span></div>
             <div class="recorder">
-                <input type="text" id="hotkey-original" readonly placeholder="原键" aria-label="原按键" data-i18n-placeholder="popupHotkeyOriginal">
+                <input type="text" id="hotkey-original" readonly placeholder="原键" aria-label="原按键" data-i18n-placeholder="popupHotkeyOriginal" data-i18n-aria-label="popupHotkeyOriginal">
                 <span class="arrow">→</span>
-                <input type="text" id="hotkey-new" readonly placeholder="新键" aria-label="新按键" data-i18n-placeholder="popupHotkeyNew">
+                <input type="text" id="hotkey-new" readonly placeholder="新键" aria-label="新按键" data-i18n-placeholder="popupHotkeyNew" data-i18n-aria-label="popupHotkeyNew">
             </div>
             <div class="btn-row">
                 <button type="button" id="hotkey-add" class="primary" data-i18n="popupHotkeyAdd">添加映射</button>

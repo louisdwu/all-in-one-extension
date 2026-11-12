@@ -20,7 +20,7 @@
     } catch (err) { /* not allowed in some contexts */ }
 
     if (!AIO || !AIO.content) return;
-    const { log, settings, onChange, isTopFrame, toast } = AIO.content;
+    const { log, settings, onChange, isTopFrame } = AIO.content;
     const guardLog = log('bili:guard');
 
     /**
@@ -130,47 +130,7 @@
         observer = null;
     }
 
-    /* --------------------------- quality-cap hints --------------------------- */
-    let hintObserver = null;
-    let lastHint = '';
-
-    /**
-     * The injector flags "the server capped the stream below 1080P" on a DOM
-     * attribute (cross-world contract); we own the user-visible toast.
-     */
-    function readHint() {
-        let raw = '';
-        try {
-            raw = document.documentElement.getAttribute('data-aio-bili-hint') || '';
-        } catch (err) {
-            return;
-        }
-        if (!raw || raw === lastHint) return;
-        lastHint = raw;
-        try {
-            document.documentElement.removeAttribute('data-aio-bili-hint');
-        } catch (err) { /* ignore */ }
-        let message = '';
-        try {
-            message = JSON.parse(raw).message || '';
-        } catch (err) {
-            guardLog.debug('bad hint payload', err.message);
-        }
-        if (message) toast(message, 'info', 6500);
-    }
-
-    function startHintObserver() {
-        if (hintObserver) return;
-        hintObserver = new MutationObserver(readHint);
-        hintObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-aio-bili-hint'] });
-        readHint();
-    }
-
-    function stopHintObserver() {
-        if (hintObserver) hintObserver.disconnect();
-        hintObserver = null;
-    }
-
+    /* --------------------------- config publishing --------------------------- */
     function publishConfig(settingsValue) {
         const payload = {
             enabled: settingsValue.biliEnabled !== false,
@@ -196,7 +156,6 @@
         const config = publishConfig(settingsValue);
         if (!enabled) {
             stopObserver();
-            stopHintObserver();
             if (styleEl) styleEl.remove();
             styleEl = null;
             return;
@@ -204,7 +163,6 @@
         if (isTopFrame) {
             installStyles();
             startObserver();
-            startHintObserver();
             removePopups();
         }
         guardLog.debug('config published', config);
