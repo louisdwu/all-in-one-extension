@@ -155,9 +155,14 @@ async function refresh(source = 'FULL') {
         const patch = {};
         let ok = false;
         let failed = false;
+        // "Nothing configured" is not a failure: the panel should not claim
+        // "抓取失败" when the user simply has no WAQI token / HA entities yet.
+        let attempted = false;
 
         if (source === 'WAQI' || source === 'FULL') {
-            if (enabledWaqiMetrics(settings).length) {
+            const wantsWaqi = enabledWaqiMetrics(settings).length > 0 && !!settings.waqiToken;
+            if (wantsWaqi) {
+                attempted = true;
                 const result = await fetchWaqi(settings);
                 Object.assign(runtime.state, result.metrics);
                 failed = failed || Object.values(result.metrics).some((item) => item.error);
@@ -173,14 +178,17 @@ async function refresh(source = 'FULL') {
 
         let haReason = null;
         if (source === 'HA' || source === 'FULL') {
+            const wantsHa = !!(settings.haUrl && settings.haToken && settings.haEntities.length);
             const result = await fetchHa(settings);
             if (result.reason) haReason = result.reason;
             if (Object.keys(result.metrics).length) {
+                attempted = true;
                 Object.assign(runtime.state, result.metrics);
                 ok = ok || result.ok;
                 failed = failed || !result.ok;
                 if (result.ok) patch[STORAGE.lastHa] = Date.now();
-            } else if (result.reason && result.reason !== 'unconfigured') {
+            } else if (wantsHa && result.reason && result.reason !== 'unconfigured') {
+                attempted = true;
                 failed = true;
             }
         }
@@ -191,7 +199,8 @@ async function refresh(source = 'FULL') {
         await storage.setLocal(patch);
         await renderCurrent();
 
-        hudLog.debug('refresh', source, { ok, failed, items: runtime.queue.length, haReason });
+        hudLog.debug('refresh', source, { ok, failed, attempted, items: runtime.queue.length, haReason });
+        if (!attempted) return { ok: true, failed: false, items: runtime.queue.length, reason: 'unconfigured' };
         return { ok, failed, items: runtime.queue.length, reason: haReason };
     })();
 

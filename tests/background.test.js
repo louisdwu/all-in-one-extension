@@ -115,6 +115,24 @@ test('background module graph boots and registers its handlers', async () => {
     }
 });
 
+test('speeder:getSettings returns the normalized schema shape', async () => {
+    const { AIO } = globalThis;
+    const reply = await new Promise((resolve) => {
+        globalThis.chrome.runtime.onMessage.__listeners.forEach(
+            (fn) => fn({ type: 'speeder:getSettings' }, {}, resolve)
+        );
+    });
+    const expected = AIO.schema.normalize({});
+    for (const key of ['globalEnabled', 'defaultSpeed', 'shortcuts', 'speederMinRate', 'speederMaxRate', 'speederStep', 'speederSpeedMemory']) {
+        assert.ok(key in reply, 'speeder:getSettings must expose ' + key);
+    }
+    // Aliased names would silently diverge from every other consumer.
+    for (const alias of ['minRate', 'maxRate', 'step', 'speedMemory']) {
+        assert.equal(alias in reply, false, 'speeder:getSettings must not rename ' + alias);
+    }
+    assert.equal(reply.speederStep, expected.speederStep);
+});
+
 test('settings normalize to a usable object without storage', async () => {
     const { AIO } = globalThis;
     const settings = AIO.schema.normalize({});

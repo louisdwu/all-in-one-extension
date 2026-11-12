@@ -58,21 +58,12 @@ async function broadcastTabSpeed(tabId, speed) {
 
 
 export function registerSpeeder() {
+    // The documented contract is "the normalized settings object". Do not
+    // rename keys here: content scripts and the schema use the flat names
+    // (speederMinRate / speederMaxRate / speederStep), and an aliased shape
+    // silently diverges from everything else.
     handle('speeder:getSettings', async () => {
-        const settings = await globalThis.AIO.schema.load();
-        return {
-            globalEnabled: settings.globalEnabled,
-            hideFloatingBall: settings.hideFloatingBall,
-            excludeRules: settings.excludeRules,
-            includeRules: settings.includeRules,
-            defaultSpeed: settings.defaultSpeed,
-            presetSpeed: settings.presetSpeed,
-            shortcuts: settings.shortcuts,
-            minRate: settings.speederMinRate,
-            maxRate: settings.speederMaxRate,
-            step: settings.speederStep,
-            speedMemory: settings.speederSpeedMemory
-        };
+        return globalThis.AIO.schema.load();
     }, ['getSpeederSettings']);
 
     handle('speeder:saveSettings', async (message) => {

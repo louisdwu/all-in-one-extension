@@ -12,7 +12,7 @@
 | `scripting` | `background/features/bilibili.js` | `bili:verifyCredential` 用 `executeScript` 在已打开的无痕 B站标签页注入 nav 探针 |
 | `alarms` | `background/features/hud/index.js` | Service Worker 被挂起后重新拉起 HUD 调度（MV3 无长驻后台） |
 | `idle` | `background/features/hud/index.js` | 系统唤醒/解锁后立即刷新数据，避免展示过期数值 |
-| `cookies` | `background/features/bilibili.js` | ① 读取**无痕窗口**中登录的专用账号 SESSDATA（需你手动点击按钮；普通窗口的 store `'0'` 一律不读）② 把这份「专用账号」写成无痕会话的 cookie（B站只给登录用户下发 1080P；写的是会话 cookie，无痕窗口关闭即消失）③ 维护 `aio_pnd` 开关 cookie（仅功能开启时存在） |
+| `cookies` | `background/features/bilibili.js` | ① 读取**无痕窗口**中登录的专用账号 SESSDATA（需你手动点击按钮；普通窗口的 store `'0'` 一律不读）② 把这份「专用账号」写成无痕会话的 cookie（B站只给登录用户下发 1080P；写的是会话 cookie，无痕窗口关闭即消失）③ 清理旧版本遗留的 `aio_pnd` 标记 cookie（现由设置直接控制，cookie 已无读取方） |
 | `webNavigation` | `background/features/bilibili.js` | 进入 bilibili 页面时：给无痕标签写入登录态、把开关 cookie 同步到该标签所在的 cookie store |
 
 > `notifications` / `activeTab` 仍是未使用的历史权限（已删除）。`scripting` 现由
@@ -31,7 +31,7 @@
 
 | 域名 | 为什么必须在声明期就拿到 |
 |------|------------------------|
-| `*://*.bilibili.com/*` | `chrome.cookies` 读写 `aio_pnd` / 读取 SESSDATA；`chrome.webNavigation` 事件需要对应 host 权限才会触发 |
+| `*://*.bilibili.com/*` | `chrome.cookies` 读写 SESSDATA / 注入无痕登录态 / 清理遗留 cookie；`chrome.webNavigation` 事件需要对应 host 权限才会触发 |
 | `https://api.waqi.info/*` | 后台直接抓取空气质量数据（跨域 fetch 需要 host 权限） |
 | `<all_urls>` | 定时签到（`chrome.tabs.captureVisibleTab`）后台自动截屏；Chromium 截屏 API 严格要求 `<all_urls>` 匹配模式 |
 

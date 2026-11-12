@@ -3,11 +3,12 @@
  *
  * Responsibilities:
  *  - persist bilibili toggles through the schema (single source of truth)
- *  - keep the `aio_pnd` cookie in sync with the "stop after finish" toggle.
- *    The old code wrote this cookie on *every* install and page navigation even
- *    when the feature was off, permanently polluting the user's bilibili cookie
- *    jar; now the cookie only exists while the feature is enabled.
  *  - capture SESSDATA / DedeUserID from any cookie store (including incognito)
+ *  - seed that credential into incognito cookie stores
+ *
+ * The legacy `aio_pnd` flag cookie is no longer written: the page reads the
+ * `playNextDisabled` setting directly, so the cookie had no reader. A one-shot
+ * cleanup still removes copies left behind by older builds.
  */
 import '../../libs/core.js';
 import '../../libs/schema.js';
@@ -18,10 +19,9 @@ import { isAllowedIncognitoAccess } from './incognito.js';
 const { log, storage } = globalThis.AIO.core;
 const biliLog = log('bilibili');
 
-const COOKIE_NAME = 'aio_pnd';
+const LEGACY_COOKIE_NAME = 'aio_pnd';
 const COOKIE_DOMAIN = '.bilibili.com';
 const BILI_URL = 'https://www.bilibili.com';
-const ONE_YEAR = 365 * 24 * 60 * 60;
 
 async function listStores() {
     try {
@@ -80,48 +80,22 @@ async function isSafeIncognitoTarget(storeId) {
     return !!store && regular.size > 0 && stores.length > 1;
 }
 
-/** Create the flag cookie when enabled, delete it when disabled. */
-export async function syncPlayNextCookie(enabled) {
+/**
+ * Remove the legacy `aio_pnd` flag cookie from every store.
+ *
+ * Nothing reads it any more (the page uses `playNextDisabled` from settings),
+ * so any surviving copy is pure pollution left by an older build. Runs once on
+ * worker start and is a no-op when the cookie is already gone.
+ */
+async function removeLegacyPlayNextCookie() {
     const stores = await listStores();
     await Promise.all(stores.map(async (store) => {
         try {
-            if (enabled) {
-                await chrome.cookies.set({
-                    url: 'https://www.bilibili.com',
-                    name: COOKIE_NAME,
-                    value: '1',
-                    domain: COOKIE_DOMAIN,
-                    path: '/',
-                    secure: true,
-                    sameSite: 'lax',
-                    expirationDate: Math.floor(Date.now() / 1000) + ONE_YEAR,
-                    storeId: store.id
-                });
-            } else {
-                await chrome.cookies.remove({ url: 'https://www.bilibili.com', name: COOKIE_NAME, storeId: store.id });
-            }
+            await chrome.cookies.remove({ url: BILI_URL, name: LEGACY_COOKIE_NAME, storeId: store.id });
         } catch (err) {
-            biliLog.debug('cookie sync skipped for store', store.id, err.message);
+            biliLog.debug('legacy cookie cleanup skipped for store', store.id, err.message);
         }
     }));
-}
-
-async function ensureCookieInStore(storeId) {
-    try {
-        await chrome.cookies.set({
-            url: 'https://www.bilibili.com',
-            name: COOKIE_NAME,
-            value: '1',
-            domain: COOKIE_DOMAIN,
-            path: '/',
-            secure: true,
-            sameSite: 'lax',
-            expirationDate: Math.floor(Date.now() / 1000) + ONE_YEAR,
-            storeId
-        });
-    } catch (err) {
-        biliLog.debug('navigation cookie sync skipped', err.message);
-    }
 }
 
 export async function resolveStoreId(tab) {
@@ -436,9 +410,6 @@ export function registerBilibili() {
     // Keep the cookie aligned with the stored setting.
     chrome.storage.onChanged.addListener(async (changes, area) => {
         if (area !== 'sync') return;
-        if (changes.biliPlayNextDisabled) {
-            syncPlayNextCookie(!!changes.biliPlayNextDisabled.newValue);
-        }
         // A freshly saved/captured credential (or a toggled switch) must reach
         // incognito windows that are already open. A new credential is assumed
         // good; the alert badge goes away (pages will re-report if not).
@@ -471,21 +442,19 @@ export function registerBilibili() {
         });
     }
 
-    // Cookie work runs per navigation: seed the incognito login (1080P needs a
-    // real session) and keep the play-next flag cookie in the tab's store.
+    // Seed the incognito login before the page requests its playurl (1080P
+    // needs a real session). The `aio_pnd` flag cookie was removed: the page
+    // reads `config.playNextDisabled` directly, so nothing ever read it.
     chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
         if (details.frameId !== 0) return;
         const settings = await globalThis.AIO.schema.load();
-        if (!settings.biliIncognitoLogin && !settings.biliPlayNextDisabled) return;
+        if (!settings.biliIncognitoLogin) return;
         const tab = await chrome.tabs.get(details.tabId).catch(() => null);
         if (!tab) return;
         const storeId = await resolveStoreId(tab);
-        if (tab.incognito && settings.biliIncognitoLogin) await seedIncognitoLogin(storeId);
-        if (settings.biliPlayNextDisabled) await ensureCookieInStore(storeId);
+        if (tab.incognito) await seedIncognitoLogin(storeId);
     }, { url: [{ hostSuffix: 'bilibili.com' }] });
 
-    // Align once on worker start.
-    storage.getSync(['biliPlayNextDisabled']).then((res) => {
-        syncPlayNextCookie(!!res.biliPlayNextDisabled);
-    });
+    // One-shot cleanup: earlier builds left an `aio_pnd` cookie behind.
+    removeLegacyPlayNextCookie();
 }

@@ -1,5 +1,24 @@
 # 更新记录
 
+## 2.8 — 2026-11-12
+
+### 第三轮复查：修掉两轮修改留下的问题
+
+- **`speeder:getSettings` 字段名与 schema 不一致**（真问题，虽暂无调用方）：旧实现把
+  `speederMinRate / speederMaxRate / speederStep / speederSpeedMemory` 改名成
+  `minRate / maxRate / step / speedMemory`，与内容脚本、schema、其他 handler 全部不一致。
+  改为直接返回 `schema.load()`，并新增单测锁定该契约（禁止再出现别名）。
+- **HUD「立即抓取」在未配置时误报失败**：只配 WAQI 或只配 HA 时，另一侧返回空结果会让
+  `ok` 保持 `false`，设置了「抓取失败：请检查 Token / 地址 / 网络」。现在区分
+  `unconfigured`（提示"尚未配置监控数据源"）与真实失败。
+- **`aio_pnd` cookie 变成纯写入**：页面早已改为直接读 `playNextDisabled` 设置，cookie
+  不再有任何读取方却仍在每次导航/状态变更时写入并常驻用户的 bilibili cookie jar。
+  删除写入路径，改为启动时一次性清理旧版本遗留的副本。
+- `content/bilibili/ui.js` 的 SPA 轮询只在顶层帧启动（子帧不做字幕自动化）。
+- `ui/options.html` 去掉 `hud-icon-round` 上无效的 HTML `checked` 预置属性。
+- 文档标注 `diag:ping` / `hud:getState` / `speeder:getShortcuts` 等为「当前 UI 未使用、
+  保留给排查/外部调用」的已文档化接口，避免再次被当成死代码。
+
 ## 2.7 — 2026-11-12
 
 ### 审查第二轮：把第一轮放过的一致性问题全部收口

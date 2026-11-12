@@ -42,7 +42,10 @@ export async function initHud() {
         const result = await core.sendMessage({ type: 'hud:refresh' }, 20000);
         button.disabled = false;
         if (result && result.ok) {
-            toast('已抓取 ' + (result.items || 0) + ' 项数据');
+            toast(result.reason === 'unconfigured'
+                ? '尚未配置监控数据源（WAQI Token 或 Home Assistant 实体）'
+                : '已抓取 ' + (result.items || 0) + ' 项数据',
+            result.reason === 'unconfigured' ? 'info' : 'success');
             renderLiveValues(await core.storage.getLocal(['hudState']), settings);
         } else {
             toast('抓取失败：请检查 Token / 地址 / 网络', 'error');

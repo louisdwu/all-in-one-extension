@@ -170,7 +170,8 @@
         scheduleAutoSubtitle();
     }
     window.addEventListener('popstate', checkUrlChange);
-    setInterval(checkUrlChange, 1000);
+    // Only the top frame drives subtitle automation, so only it needs the poll.
+    if (isTopFrame) setInterval(checkUrlChange, 1000);
 
     function apply(settingsValue) {
         const previous = config;

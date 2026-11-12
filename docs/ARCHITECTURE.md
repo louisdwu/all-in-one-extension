@@ -56,7 +56,7 @@ background/index.js        组装（显式 import 顺序）
        incognito.js        净化 URL + 无痕打开 + 权限检测 + 失败提示
        hotkeys.js          站点映射 CRUD（只广播给匹配域名）
        speeder.js          倍速设置（读写走 schema）
-       bilibili.js         设置 + aio_pnd cookie 策略 + Cookie 抓取
+       bilibili.js         无痕登录注入 + Cookie 抓取 + 凭据告警
        commands.js         chrome.commands → 活动标签页
        diagnostics.js      diag:snapshot（消息统计 + 日志环 + 存储占用）
        screenshot_scheduler.js  定时签到：每日 alarm + 随机偏移 + 截图历史
@@ -136,7 +136,7 @@ toast（`content/lib/content.js`）和速器 UI（`content/speeder.js`）都走�
 | `incognito:open` | 内容脚本 → 后台 | `{ url }` → `{ ok, url?, error? }` |
 | `hotkeys:context` | 弹窗 → 后台 | → `{ hostname, mappings, enabled }` |
 | `hotkeys:setMappings` / `deleteMapping` / `clearSite` / `setSiteEnabled` | 弹窗/设置页 → 后台 | → `{ ok, mappings? }` |
-| `speeder:getSettings` / `saveSettings` / `getShortcuts` / `setShortcuts` | 页面 → 后台 | 设置对象 |
+| `speeder:getSettings` / `saveSettings` / `getShortcuts` / `setShortcuts` | 页面 → 后台 | 设置对象（`getSettings` 返回的字段名与 schema 完全一致；当前 UI 直接读 schema，这几个接口保留给外部调用/排查） |
 | `speeder:command` | 后台 → 内容脚本（所有帧） | `{ action: increase\|decrease\|preset\|reset }` |
 | `speeder:getSpeed` | 弹窗 → 内容脚本 | → `{ speed, active }` |
 | `speeder:remember` | 内容脚本 → 后台 | `{ speed, mode, hostname }` → 写记忆（mode=off 时跳过）并广播 `speeder:applySpeed` 给该标签页**所有帧** |
@@ -146,11 +146,11 @@ toast（`content/lib/content.js`）和速器 UI（`content/speeder.js`）都走�
 | `bili:loginState` | 页面 → 后台 | → `{ loggedIn, incognito }`：按发送方标签的 cookie store 判断 |
 | `bili:incognitoStatus` | 设置页 → 后台 | → `{ allowed, loginEnabled, hasCredential }`（无痕权限 / 开关 / 是否存了 SESSDATA） |
 | `bili:seedIncognitoLogin` | 设置页 → 后台 | 把「专用账号」写进所有活着的无痕 cookie store → `{ ok, seeded }` |
-| `hud:refresh` / `hud:updateConfig` / `hud:getState` | 页面 → 后台 | 抓取结果 / 状态 |
+| `hud:refresh` / `hud:updateConfig` / `hud:getState` | 页面 → 后台 | 抓取结果 / 状态（`hud:getState` 当前 UI 未使用，保留给排查） |
 | `screenshot:trigger` | 设置页 → 后台 | 立即执行一次截图 → `{ history }` |
 | `screenshot:getHistory` | 设置页 → 后台 | → `{ history }`（storage.local，最近 20 条） |
 | `screenshot:deleteHistory` | 设置页 → 后台 | `{ ids }` → `{ history }` |
-| `diag:snapshot` / `diag:clearLog` / `diag:ping` | 设置页 → 后台 | 消息统计、日志环、存储占用、健康检查 |
+| `diag:snapshot` / `diag:clearLog` / `diag:ping` | 设置页 → 后台 | 消息统计、日志环、存储占用、健康检查（`diag:ping` 为健康检查探针，当前 UI 未使用） |
 | `aio:settingsChanged` | 后台 → 所有标签页 | `{ keys }`（页面自行重读 schema） |
 | `aio:toast` | 后台 → 指定标签页 | `{ message, level }` |
 
