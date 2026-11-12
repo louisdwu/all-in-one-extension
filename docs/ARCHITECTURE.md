@@ -36,7 +36,7 @@ Chrome 把扩展代码隔离在多个世界里，**跨世界不能直接共享�
 
 | 文件 | 职责 |
 |------|------|
-| `core.js` | `log` / `storage`（含 `createWriter` 合并写入）/ `sendMessage` / `onMessage` / `debounce` / `throttle` / `rafThrottle` / `dom.shadowHost` / `dom.waitFor` / `env` |
+| `core.js` | `log` / `storage`（含 `createWriter` 合并写入）/ `sendMessage` / `onMessage` / `debounce` / `rafThrottle` / `dom.shadowHost` / `dom.waitFor` / `dom.listen` / `dom.topLayer` / `dom.escapeHtml` |
 | `schema.js` | `DEFAULTS`、`normalize()`、`migrate()`、`load()`、`save()`、`subscribe()`、`presetList()` |
 | `keys.js` | `serialize()` / `parse()` / `matches()` / `matchAction()` / `isValid()` / `display()` |
 | `rules.js` | `matches(url, {includeRules, excludeRules})`，正则编译缓存 + 非法正则兜底 |
@@ -59,6 +59,7 @@ background/index.js        组装（显式 import 顺序）
        bilibili.js         设置 + aio_pnd cookie 策略 + Cookie 抓取
        commands.js         chrome.commands → 活动标签页
        diagnostics.js      diag:snapshot（消息统计 + 日志环 + 存储占用）
+       screenshot_scheduler.js  定时签到：每日 alarm + 随机偏移 + 截图历史
        lifecycle.js        onInstalled 补全缺失键（绝不覆盖用户设置）、迁移、变更广播
        hud/
          index.js          调度器：定时器 + alarm 保活 + 抓取串行化 + 轮播
@@ -145,7 +146,7 @@ toast（`content/lib/content.js`）和速器 UI（`content/speeder.js`）都走�
 | `bili:loginState` | 页面 → 后台 | → `{ loggedIn, incognito }`：按发送方标签的 cookie store 判断 |
 | `bili:incognitoStatus` | 设置页 → 后台 | → `{ allowed, loginEnabled, hasCredential }`（无痕权限 / 开关 / 是否存了 SESSDATA） |
 | `bili:seedIncognitoLogin` | 设置页 → 后台 | 把「专用账号」写进所有活着的无痕 cookie store → `{ ok, seeded }` |
-| `hud:refresh` / `hud:updateConfig` / `hud:getState` | 页面 → 后台 | 抓取结果 / 状态（`reason: 'needs_permission'` 表示 HA 地址未授权） |
+| `hud:refresh` / `hud:updateConfig` / `hud:getState` | 页面 → 后台 | 抓取结果 / 状态 |
 | `screenshot:trigger` | 设置页 → 后台 | 立即执行一次截图 → `{ history }` |
 | `screenshot:getHistory` | 设置页 → 后台 | → `{ history }`（storage.local，最近 20 条） |
 | `screenshot:deleteHistory` | 设置页 → 后台 | `{ ids }` → `{ history }` |
@@ -168,7 +169,7 @@ toast（`content/lib/content.js`）和速器 UI（`content/speeder.js`）都走�
 - 定时签到：`screenshotEnabled`、`screenshotUrl`、`screenshotTime`（HH:MM）、`screenshotOffsetMin`（0–60）、`screenshotWaitSec`（秒，0–600；旧 `screenshotWaitMs` 自动换算迁移）
 - 元信息：`aioDebug`、`aioSchemaVersion`
 
-运行态在 `chrome.storage.local`：`hudState`、`hudQueueKeys`、`hudCarouselIndex`、`hudLastSuccessWaqi`、`hudLastSuccessHa`、`hudLastWaqiPubV/S`、`hudLastWaqiLag`、`speederLastSpeed`（全局模式）、`speederSpeeds`（按站点模式，最多 200 条）、`aioScreenshotHistory`（定时签到记录，图片内嵌，最多 20 条）。
+运行态在 `chrome.storage.local`：`hudState`、`hudQueueKeys`、`hudCarouselIndex`、`hudLastSuccessWaqi`、`hudLastSuccessHa`、`hudLastWaqiPubS`、`speederLastSpeed`（全局模式）、`speederSpeeds`（按站点模式，最多 200 条）、`aioScreenshotHistory`（定时签到记录，图片内嵌，最多 20 条）。
 
 ## 5.1 样式表结构
 

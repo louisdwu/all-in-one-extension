@@ -243,25 +243,6 @@
         return wrapped;
     }
 
-    function throttle(fn, wait) {
-        let last = 0;
-        let timer = null;
-        return function (...args) {
-            const now = Date.now();
-            const remaining = wait - (now - last);
-            if (remaining <= 0) {
-                last = now;
-                fn.apply(this, args);
-            } else if (!timer) {
-                timer = setTimeout(() => {
-                    timer = null;
-                    last = Date.now();
-                    fn.apply(this, args);
-                }, remaining);
-            }
-        };
-    }
-
     /** Run at most once per animation frame (falls back to a 16ms timer). */
     function rafThrottle(fn) {
         let queued = false;
@@ -280,16 +261,6 @@
         };
     }
 
-    function idle(fn, timeout = 1000) {
-        const ric = root.requestIdleCallback;
-        if (typeof ric === 'function') ric(fn, { timeout });
-        else setTimeout(fn, 200);
-    }
-
-    function sleep(ms) {
-        return new Promise((resolve) => setTimeout(resolve, ms));
-    }
-
     /* ------------------------------------------------------------------ *
      * DOM helpers — used by content scripts and extension pages.
      * ------------------------------------------------------------------ */
@@ -300,40 +271,6 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
-    }
-
-    /** Create an element: el('div', {className:'x', dataset:{a:1}}, ['text']) */
-    function el(tag, props, children) {
-        const node = document.createElement(tag);
-        if (props) {
-            for (const [key, value] of Object.entries(props)) {
-                if (value === undefined || value === null) continue;
-                if (key === 'dataset') Object.assign(node.dataset, value);
-                else if (key === 'style' && typeof value === 'object') Object.assign(node.style, value);
-                else if (key === 'text') node.textContent = String(value);
-                else if (key === 'html') node.innerHTML = value;
-                else if (key.startsWith('on') && typeof value === 'function') node.addEventListener(key.slice(2).toLowerCase(), value);
-                else node.setAttribute(key, String(value));
-            }
-        }
-        if (children) {
-            for (const child of [].concat(children)) {
-                if (child == null) continue;
-                node.appendChild(typeof child === 'string' ? document.createTextNode(child) : child);
-            }
-        }
-        return node;
-    }
-
-    /** Apply camelCase style objects without touching inline cssText strings. */
-    function css(node, styles) {
-        if (!node || !styles) return node;
-        for (const [key, value] of Object.entries(styles)) {
-            if (value === undefined || value === null) continue;
-            if (key.startsWith('--')) node.style.setProperty(key, String(value));
-            else node.style[key] = String(value);
-        }
-        return node;
     }
 
     /**
@@ -442,24 +379,6 @@
         };
     }
 
-    /* ------------------------------------------------------------------ *
-     * Environment
-     * ------------------------------------------------------------------ */
-    const env = {
-        get isContentScript() {
-            return hasChrome() && typeof location !== 'undefined' && !location.protocol.startsWith('chrome-extension');
-        },
-        get isTopFrame() {
-            // Cross-origin access to `top` throws in a sub-frame; treat it as
-            // NOT the top frame (matches content/lib/content.js).
-            try { return root.top === root; } catch (e) { return false; }
-        },
-        get isServiceWorker() {
-            return typeof ServiceWorkerGlobalScope !== 'undefined' && root instanceof ServiceWorkerGlobalScope;
-        },
-        get hasChrome() { return hasChrome(); }
-    };
-
     AIO.core = {
         VERSION: 2,
         hasChrome,
@@ -487,12 +406,8 @@
             clear: () => { logRing.length = 0; }
         },
         debounce,
-        throttle,
         rafThrottle,
-        idle,
-        sleep,
-        dom: { el, css, escapeHtml, shadowHost, topLayer, waitFor, listen },
-        env
+        dom: { escapeHtml, shadowHost, topLayer, waitFor, listen }
     };
 
     /**

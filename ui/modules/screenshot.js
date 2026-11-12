@@ -12,58 +12,6 @@ import { schema, core, toast, uiLog, formatTime } from './shared.js';
 
 const escapeHtml = (value) => core.dom.escapeHtml(value);
 
-/**
- * Ask Chrome for host access needed by captureVisibleTab.
- *
- * Per-origin grants are NOT enough in practice: the sign-in page often
- * redirects to another domain (SSO, www-apex, error pages), and the capture
- * check runs against the URL shown at capture time — Chrome then rejects
- * with "Either the '<all_urls>' or 'activeTab' permission is required".
- * So we request the ALL-SITES pattern (declared in optional_host_permissions)
- * inside the click gesture; the help text explains why the prompt is broad.
- */
-async function requestOriginPermission() {
-    if (typeof chrome === 'undefined' || !chrome.permissions) return true;
-    try {
-        const granted = await chrome.permissions.request({ origins: ['*://*/*'] });
-        if (!granted) uiLog.warn('all-sites host permission denied');
-        return !!granted;
-    } catch (err) {
-        // Already-granted requests resolve true; failures here mean the call
-        // lost the user gesture or the origin is unsupported — non-fatal.
-        uiLog.warn('permission request failed:', err && err.message);
-        return false;
-    }
-}
-
-/** Reflect whether Chrome has granted host access for captures. */
-async function renderPermissionStatus() {
-    const el = document.getElementById('screenshot-perm-status');
-    const grantBtn = document.getElementById('screenshot-grant');
-    if (!el) return;
-    const granted = await hasCapturePermission();
-    if (granted) {
-        el.textContent = '✅ 已拥有截图权限（已支持所有网站）';
-        el.style.color = '';
-        if (grantBtn) grantBtn.style.display = 'none';
-    } else {
-        el.textContent = '⚠️ 尚未授予「所有网站」访问权限：可在 chrome://extensions 扩展详情的「网站访问权限」里开启。';
-        el.style.color = 'var(--warning)';
-        if (grantBtn) grantBtn.style.display = 'inline-block';
-    }
-}
-
-async function hasCapturePermission() {
-    if (typeof chrome === 'undefined' || !chrome.permissions) return true;
-    try {
-        if (await chrome.permissions.contains({ origins: ['<all_urls>'] })) return true;
-        return await chrome.permissions.contains({ origins: ['*://*/*'] });
-    } catch (err) {
-        uiLog.debug('permission contains failed:', err && err.message);
-        return false;
-    }
-}
-
 function send(type, payload = {}) {
     return new Promise((resolve, reject) => {
         try {
@@ -103,7 +51,6 @@ async function saveSettings(statusEl) {
     });
     toast('签到设置已保存');
     if (statusEl) statusEl.textContent = '设置已保存，定时任务已更新';
-    await renderPermissionStatus();
 }
 
 async function triggerNow(statusEl) {
@@ -122,8 +69,7 @@ async function triggerNow(statusEl) {
         toast(msg, 'error');
         if (statusEl) statusEl.textContent = msg.startsWith('签到失败') ? msg : ('签到失败：' + msg);
     } finally {
-        await renderPermissionStatus();
-    }
+        }
 }
 
 async function renderHistory() {
@@ -240,20 +186,6 @@ export async function initScreenshot() {
     const triggerButton = document.getElementById('screenshot-trigger');
     if (triggerButton) triggerButton.addEventListener('click', () => triggerNow(document.getElementById('screenshot-status')));
 
-    const grantButton = document.getElementById('screenshot-grant');
-    if (grantButton) {
-        grantButton.addEventListener('click', async () => {
-            const ok = await requestOriginPermission();
-            if (ok) {
-                toast('已成功授权所有网站访问权限');
-            } else {
-                toast('授权未完成（弹框被取消或拒绝）', 'error');
-            }
-            await renderPermissionStatus();
-        });
-    }
-
     await renderHistory();
-    await renderPermissionStatus();
     uiLog.debug('screenshot panel ready');
 }

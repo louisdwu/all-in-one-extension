@@ -14,8 +14,21 @@ test('manifest declares a valid MV3 background service worker', () => {
     assert.ok(existsSync(join(ROOT, worker)), worker + ' must exist');
 });
 
-test('version follows 1.YYYY.MMDD.HHMM', () => {
+test('version follows 1.YYYY.MMDD.HHMM (Asia/Shanghai)', () => {
     assert.match(manifest.version, /^1\.\d{4}\.\d{4}\.\d{4}$/);
+    // The regex above is only shape: also enforce plausible calendar values so
+    // a bump that produced e.g. "2405" (h24 ICU) or month 99 cannot slip in.
+    const parts = manifest.version.split('.');
+    const mmdd = parts[2];
+    const hhmm = parts[3];
+    const month = Number(mmdd.slice(0, 2));
+    const day = Number(mmdd.slice(2, 4));
+    const hour = Number(hhmm.slice(0, 2));
+    const minute = Number(hhmm.slice(2, 4));
+    assert.ok(month >= 1 && month <= 12, 'month out of range: ' + month);
+    assert.ok(day >= 1 && day <= 31, 'day out of range: ' + day);
+    assert.ok(hour >= 0 && hour <= 23, 'hour out of range: ' + hour);
+    assert.ok(minute >= 0 && minute <= 59, 'minute out of range: ' + minute);
 });
 
 test('every referenced resource exists', () => {
@@ -56,13 +69,12 @@ test('content script bundles load shared libs before consumers', () => {
 });
 
 test('MAIN world scripts never touch the chrome API', () => {
-    // libs/core.js is a shared runtime whose chrome access is guarded by hasChrome().
-    const safe = new Set(['libs/core.js']);
+    // No MAIN bundle ships libs/core.js any more: every chrome.* access is
+    // guarded by hasChrome() in that file, but it is not injected into MAIN.
     const MAIN_APIS = 'runtime|storage|tabs|cookies|alarms|action|windows|permissions|scripting|idle|webNavigation|commands|notifications|extension';
     for (const script of manifest.content_scripts) {
         if (script.world !== 'MAIN') continue;
         for (const file of script.js) {
-            if (safe.has(file)) continue;
             assert.equal(
                 new RegExp('chrome\\s*\\.\\s*(?:' + MAIN_APIS + ')').test(read(file)), false, file);
         }
@@ -113,12 +125,13 @@ test('every relative import resolves to a real file', () => {
     walk('ui');
     walk('tools');
     walk('tests');
-    walk('ui');
 });
 
-test('options page has no duplicate element ids', () => {
-    const ids = Array.from(read('ui/options.html').matchAll(/\sid="([^"]+)"/g)).map((m) => m[1]);
-    assert.equal(new Set(ids).size, ids.length);
+test('options and popup pages have no duplicate element ids', () => {
+    for (const html of ['ui/options.html', 'ui/popup.html']) {
+        const ids = Array.from(read(html).matchAll(/\sid="([^"]+)"/g)).map((m) => m[1]);
+        assert.equal(new Set(ids).size, ids.length, html + ' has duplicate ids');
+    }
 });
 
 test('host permissions cover bilibili, waqi, and <all_urls>', () => {

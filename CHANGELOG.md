@@ -1,5 +1,38 @@
 # 更新记录
 
+## 2.7 — 2026-11-12
+
+### 审查第二轮：把第一轮放过的一致性问题全部收口
+
+- **删掉整套「按需授权」死 UI/代码**：实测 `permissions.request` 在扩展页手势下虽返回 `true`，
+  但 `<all_urls>` 已在声明期授予，按钮不产生任何效果 → 删除 HUD 的授权栏/按钮/`haOriginPattern`
+  相关逻辑、截图的授权按钮/状态栏/`requestOriginPermission`，后台 `fetchHa` 改为纯 URL 校验
+  （`reason: 'invalid_url'`），文档同步（README / PERMISSIONS / IMPROVEMENT_PLAN）。
+- **删除无调用方的消息接口**：`bili:getSettings` / `bili:saveSettings`（后者返回完整设置含
+  cookies，是带敏感数据的死接口；cookie 同步本就由 `storage.onChanged` 承担）、
+  `getBilibiliSettings` / `saveBilibiliSettings` / `getBilibili1080PSettings` /
+  `saveBilibili1080PSettings`、`aio:notifyAll` 及其别名。
+- **去掉重复监听**：`content/ezincognito.js` 的 `aio:toast` 监听与 `content/speeder.js` 重复
+  （后者在所有页面无条件注册，兜底已覆盖），删除前者。
+- **清理只写不读的运行态**：`hudLastWaqiPubV` / `hudLastWaqiLag` 从未被读取却每次刷新增加写入，删除。
+- **`libs/core.js` 收敛到真正在用的 API**：移除零使用的 `throttle` / `idle` / `sleep` /
+  `dom.el` / `dom.css` / `env`（`isTopFrame` 语义已统一到 `content/lib/content.js`）。
+- **`shouldLockPlayNext` 的恒真条件**：`document.cookie.includes('aio_pnd=1') || !!config.playNextDisabled`
+  的后半段恒真，简化为直接读开关。
+
+### 验证工具与文档
+
+- `bump-version.mjs`：ICU h24 在午夜可能给出 `hour: "24"`，归一化为 `00`，避免生成非法 HHMM。
+- `manifest.test.js`：版本号除格式外校验月/日/时/分范围；补 `popup.html` 重复 id 检查、
+  import 解析覆盖 `content/tools/tests` 与 `.mjs`；移除已不存在的 `MAIN_WORLD_SAFE`。
+- `check.mjs`：`@import` 同时识别 `url() ` 与裸字符串形式；`MAIN` 世界不再有 core.js 豁免；
+  新增「未被引用的 icons 资源」提示（`icon.svg` 这类源文件会以 note 形式出现）。
+- `regression.mjs`：world 上下文消失时只在**同一世界**重试，不再静默降级到 MAIN 导致假通过；
+  修正 `/frame` 注释；`perf.mjs` 的 socket 关闭静默 catch 补注释。
+- 文档：架构地图补 `screenshot_scheduler`、`core.js` 职责清单与 `features/` 列表对齐、
+  开发流程补 `npm run perf`、`cookie_guide` 的画质提示描述改到徽标。
+- 测试：`screenshotWaitSec` 增加 0/600 钳制断言（85 项）。
+
 ## 2.6 — 2026-11-12
 
 ### 全项目审查修复（P0 功能损坏）

@@ -27,9 +27,7 @@ const STORAGE = {
     index: 'hudCarouselIndex',
     lastWaqi: 'hudLastSuccessWaqi',
     lastHa: 'hudLastSuccessHa',
-    pubValue: 'hudLastWaqiPubV',
-    pubLabel: 'hudLastWaqiPubS',
-    lag: 'hudLastWaqiLag'
+    pubLabel: 'hudLastWaqiPubS'
 };
 
 const COLORS = { waqi: '#673AB7', waqiWarn: '#FF9800', waqiCritical: '#F44336', ha: '#03A9F4', idle: '#9E9E9E' };
@@ -165,9 +163,7 @@ async function refresh(source = 'FULL') {
                 failed = failed || Object.values(result.metrics).some((item) => item.error);
                 if (result.meta) {
                     patch[STORAGE.lastWaqi] = result.meta.fetchTs;
-                    patch[STORAGE.pubValue] = result.meta.pubTs;
                     patch[STORAGE.pubLabel] = result.meta.pubStr;
-                    patch[STORAGE.lag] = result.meta.lagMinutes;
                 } else {
                     failed = true;
                 }
@@ -184,7 +180,7 @@ async function refresh(source = 'FULL') {
                 ok = ok || result.ok;
                 failed = failed || !result.ok;
                 if (result.ok) patch[STORAGE.lastHa] = Date.now();
-            } else if (result.reason === 'needs_permission') {
+            } else if (result.reason && result.reason !== 'unconfigured') {
                 failed = true;
             }
         }

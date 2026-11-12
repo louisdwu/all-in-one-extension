@@ -14,16 +14,21 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const dry = process.argv.includes('--dry');
 
-const parts = new Intl.DateTimeFormat('en-CA', {
+const fmt = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Asia/Shanghai',
   year: 'numeric', month: '2-digit', day: '2-digit',
   hour: '2-digit', minute: '2-digit', hour12: false
-}).formatToParts(new Date()).reduce((acc, part) => {
+});
+const parts = fmt.formatToParts(new Date()).reduce((acc, part) => {
   acc[part.type] = part.value;
   return acc;
 }, {});
+// Some ICU builds emit hour "24" at midnight with hour12:false (h24 cycle).
+// Normalize to 00 so the version stays a valid HHMM that Chrome accepts.
+const hour = parts.hour === '24' ? '00' : parts.hour.padStart(2, '0');
+const minute = parts.minute.padStart(2, '0');
 
-const version = '1.' + parts.year + '.' + parts.month + parts.day + '.' + parts.hour + parts.minute;
+const version = '1.' + parts.year + '.' + parts.month + parts.day + '.' + hour + minute;
 
 const manifestPath = resolve(ROOT, 'manifest.json');
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));

@@ -264,49 +264,6 @@ export async function seedAllIncognitoStores(options) {
 }
 
 export function registerBilibili() {
-    handle('bili:getSettings', async () => {
-        const settings = await globalThis.AIO.schema.load();
-        return {
-            enabled: settings.biliEnabled,
-            autoSubtitle: settings.biliAutoSubtitle,
-            subtitleHotkey: settings.bilibiliSubtitles.subtitleHotkey,
-            video1080p: settings.bilibili1080PEnabled,
-            comments: settings.biliCommentsEnabled,
-            aiSubtitle: settings.biliAISubtitleEnabled,
-            autoplay: settings.biliAutoPlay,
-            playNextDisabled: settings.biliPlayNextDisabled,
-            cookies: settings.biliCookies
-        };
-    });
-
-    handle('bili:saveSettings', async (message) => {
-        const patch = message.settings || message.patch || {};
-        const settings = await globalThis.AIO.schema.save(patch);
-        await syncPlayNextCookie(settings.biliPlayNextDisabled);
-        return { ok: true, success: true, settings };
-    });
-
-    /* --- legacy message names, kept while older UI bundles may still be cached --- */
-    handle('getBilibiliSettings', async () => {
-        const settings = await globalThis.AIO.schema.load();
-        return { bilibiliSubtitles: settings.bilibiliSubtitles };
-    });
-
-    handle('saveBilibiliSettings', async (message) => {
-        const settings = await globalThis.AIO.schema.save({ bilibiliSubtitles: message.settings || {} });
-        return { ok: true, success: true, bilibiliSubtitles: settings.bilibiliSubtitles };
-    });
-
-    handle('getBilibili1080PSettings', async () => {
-        const settings = await globalThis.AIO.schema.load();
-        return { enabled: settings.bilibili1080PEnabled };
-    });
-
-    handle('saveBilibili1080PSettings', async (message) => {
-        const settings = await globalThis.AIO.schema.save({ bilibili1080PEnabled: message.enabled !== false });
-        return { ok: true, success: true, enabled: settings.bilibili1080PEnabled };
-    });
-
     /**
      * Is the page that asked us logged in? Answering from the background is the
      * only reliable way: SESSDATA/DedeUserID are HttpOnly, so a content script

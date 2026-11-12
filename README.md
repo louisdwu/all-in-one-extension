@@ -1,6 +1,6 @@
 # All in One Extension (AIO)
 
-![Version](https://img.shields.io/badge/version-1.2026.1112.0830-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2026.1112.1211-blue.svg)
 ![Chrome](https://img.shields.io/badge/browser-Chrome-orange.svg)
 ![Manifest](https://img.shields.io/badge/manifest-v3-green.svg)
 
@@ -55,7 +55,7 @@ npm run bump     # 更新 manifest.json / package.json 版本号
 
 - 不采集、不上传任何数据；配置只存在本机 `chrome.storage`。
 - 声明期申请 bilibili、WAQI 与 `<all_urls>`（定时签到的截屏 API 要求）；Home Assistant 地址的
-  访问由此一并覆盖，设置页仍保留「授权此地址」按钮用于手动收窄权限后恢复。
+  访问由此一并覆盖，无需单独授权。
 - 网络请求只发生在你自己配置的地址（WAQI、Home Assistant）与你访问的 bilibili 页面内。
 
 ## 性能

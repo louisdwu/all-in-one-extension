@@ -218,7 +218,7 @@ npm run regression  # 24 项行为断言（标签切换 / 倍速开关 / 快捷�
 | 项 | 状态 | 落地方式 |
 |----|------|---------|
 | 按站点记住倍速 | ✅ | `libs/speed_memory.js` 三态模式（`off` / `global` / `site`），旧布尔 `speederRememberSpeed` 自动迁移；每站点一条、上限 200 条、LRU 淘汰；写入防抖 800ms；回归测试覆盖"换标签页后恢复" |
-| host 权限收窄 | ⚠️ 已调整 | 定时签到的 `captureVisibleTab` 要求声明期 `<all_urls>`，故所有 http(s) 站点访问已在声明期获得；Home Assistant 的 `optional_host_permissions` 已移除，设置页仍保留按需授权按钮用于手动恢复被收窄的网站权限 |
+| host 权限收窄 | ⚠️ 已调整 | 定时签到的 `captureVisibleTab` 要求声明期 `<all_urls>`，故所有 http(s) 站点访问已在声明期获得；`optional_host_permissions` 与设置页的「按需授权」UI 已一并删除（实测恒真、无实际作用） |
 | 诊断可视化 | ✅ | `libs/core.js` 日志环形缓冲（60 条）+ 路由按消息类型统计（调用/失败/平均耗时）+ 「关于与诊断」面板（消息表、最近告警、存储占用、配置快照、复制诊断） |
 | i18n | ✅ 基础设施 | `_locales/{zh_CN,en}` + `libs/i18n.js`（`data-i18n` 注解式，缺失即回退内联中文）+ manifest 本地化；**弹窗已全量双语**，设置页保留内联中文（增量迁移路径已就绪） |
 | CI | ❌ 已移除 | 曾在 `.github/workflows/verify.yml` 接过 Actions，但本项目个人自用，不在 GitHub 上跑；

@@ -9,7 +9,8 @@
  * streams — so this file can only *ask*. Real 1080P needs a session, which the
  * background provides by writing the user's saved SESSDATA into the incognito
  * cookie store (see background/features/bilibili.js). When the cap is detected
- * we stop re-requesting and raise a hint instead of fighting the server.
+ * we simply stop re-requesting 1080P; user-facing feedback is the toolbar
+ * credential-alert badge (the old DOM hint channel has been removed).
  *
  * Deliberate removals from the previous version (each one broke unrelated sites):
  *   - global override of `Object.defineProperty` (patched every library on the page)
@@ -73,9 +74,11 @@
     }
 
     const shouldLockPlayNext = () => {
+        // The `aio_pnd` cookie is written by the background for this feature;
+        // config.playNextDisabled is the authoritative switch, so the cookie
+        // check used to be an always-true `|| config.playNextDisabled` tail.
         if (config.enabled === false || !config.playNextDisabled) return false;
-        if (!isIncognito()) return false;
-        return document.cookie.includes('aio_pnd=1') || !!config.playNextDisabled;
+        return isIncognito();
     };
 
     /* ----------------------- localStorage play-next lock ----------------------- */

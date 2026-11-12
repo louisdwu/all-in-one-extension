@@ -4,7 +4,7 @@
 import '../../libs/core.js';
 import '../../libs/schema.js';
 import '../../libs/speed_memory.js';
-import { handle, broadcast } from '../router.js';
+import { handle } from '../router.js';
 
 const { log, storage } = globalThis.AIO.core;
 const speedLog = log('speeder');
@@ -130,10 +130,4 @@ export function registerSpeeder() {
         chrome.runtime.openOptionsPage();
         return { ok: true };
     }, ['openOptions', 'openOptionsPage']);
-
-    // When the popup/options change a setting, every speeder tab must re-read it.
-    handle('aio:notifyAll', async () => {
-        await broadcast({ type: 'aio:settingsChanged', keys: [] }, {});
-        return { ok: true };
-    }, ['reloadSettings', 'UPDATE_CONFIG']);
 }

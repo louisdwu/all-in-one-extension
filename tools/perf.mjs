@@ -66,7 +66,9 @@ class Cdp {
             this.pending.set(id, { res, rej, timer });
         });
     }
-    close() { try { this.ws.close(); } catch (e) {} }
+    // A close failure is harmless (the process is being torn down) but must
+    // not be an unexplained silent catch.
+    close() { try { this.ws.close(); } catch (e) { /* socket already gone */ } }
 }
 
 async function runOnce(withExtension) {

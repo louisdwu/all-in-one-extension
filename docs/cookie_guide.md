@@ -126,6 +126,7 @@ B站现在只给**已登录**客户端下发 1080P：未登录时 `playurl` 即�
 1. 你先在无痕窗口里登录专用账号，然后点按钮读取（或手动粘贴）保存一份 `SESSDATA`；
 2. 打开无痕窗口里的 B站页面时，后台用 `chrome.cookies.set({ storeId, httpOnly: true })` 把它写进**无痕 cookie store**（不写 `expirationDate`，即会话 cookie，窗口关闭就消失）；
 3. 页面因此是「真登录」状态，播放器自己就会给到 1080P（账号有大会员时连 1080P+/4K 也能用）；
-4. 如果没存过 `SESSDATA`，页面会提示「未登录最高 480P」，而不是反复请求注定失败的 1080P。
+4. 如果没存过 `SESSDATA`，页面仍会停在被降级的画质并停止反复请求 1080P；失效提示改由
+   工具栏图标的红色 `!` 徽标承担（旧的「未登录最高 480P」页面提示已下线）。
 
 相关设置项：`biliCookies`（`sessdata` / `dedeUserId`）与 `biliIncognitoLogin`（无痕是否沿用）。

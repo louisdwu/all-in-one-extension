@@ -30,6 +30,7 @@ npm run bump          # 同时更新 manifest.json 与 package.json
 npm run verify      # 静态检查 + 单测，提交前必须全绿
 npm run smoke       # 采集 SW/页面运行时异常（本机 Chromium）
 npm run regression  # 24 项行为断言（标签/倍速/快捷键/记忆/子帧/全屏/字幕/1080P）
+npm run perf        # 全站注入改动后复测主线程开销
 npm run bump        # 版本号
 ```
 
@@ -46,7 +47,7 @@ npm run bump        # 版本号
 manifest.json               MV3 清单（background: module worker）
 package.json                零依赖脚本：verify / test / check / smoke / bump
 libs/                       ★ 共享层（无 import/export，挂 globalThis.AIO，Node 可 import）
-├─ core.js                  日志/存储/消息/定时/DOM/Shadow DOM/环境
+├─ core.js                  日志/存储/消息/定时/DOM/Shadow DOM
 ├─ schema.js                默认值 + 归一化 + 迁移 + load/save/subscribe
 ├─ keys.js                  快捷键序列化/解析/匹配
 ├─ rules.js                 include/exclude 正则匹配（缓存 + 兜底）
@@ -59,7 +60,8 @@ background/
 ├─ index.js                 组装入口（显式顺序）
 ├─ router.js                唯一 onMessage 路由 + handle() + broadcast()
 └─ features/                tabs / incognito / hotkeys / speeder / bilibili /
-                            commands / lifecycle / diagnostics / hud/*
+                            screenshot_scheduler / commands / lifecycle /
+                            diagnostics / hud/*
 content/
 ├─ lib/content.js           内容脚本运行时（缓存配置 + toast + 顶层帧判定）
 ├─ aio_tabs.js              右键+滚轮标签切换（Shadow DOM UI）

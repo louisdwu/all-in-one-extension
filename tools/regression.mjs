@@ -98,8 +98,9 @@ function startServer() {
     return new Promise((res) => {
         const server = createServer((req, resp) => {
             resp.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-            // /frame is served under a *different* hostname (localhost) so the
-            // per-site speed memory cannot accidentally satisfy the assertion.
+            // /frame returns a separate page; the cross-origin hostname is
+            // supplied by the iframe's src (see the test below), not by the
+            // server, so per-site speed memory cannot satisfy the assertion.
             resp.end(req.url.startsWith('/frame') ? FRAME_PAGE : req.url.startsWith('/bili') ? BILI_PAGE : PAGE);
         });
         // Bind on all interfaces so both 127.0.0.1 and localhost resolve.
@@ -222,9 +223,14 @@ async function main() {
                 result = await cdp.send('Runtime.evaluate', params, sessionId);
             } catch (err) {
                 if (!params.contextId) throw err;
-                // The context vanished between lookup and evaluation: use the
-                // session's default context instead of failing the whole run.
-                delete params.contextId;
+                // The context vanished between lookup and evaluation. Retry in
+                // the SAME execution world; falling back to the default (page)
+                // context would silently run isolated-world probes in MAIN and
+                // could make an assertion pass for the wrong reason.
+                const refreshed = (contexts.get(sessionId) || []).filter((c) =>
+                    world === 'iso' ? c.name === 'All in One Extension' : (c.auxData && c.auxData.isDefault)).pop();
+                if (!refreshed) throw err;
+                params.contextId = refreshed.id;
                 result = await cdp.send('Runtime.evaluate', params, sessionId);
             }
             if (result.exceptionDetails) {

@@ -57,13 +57,4 @@
 
     settings().then(apply);
     onChange(apply);
-
-    // Background toasts (e.g. incognito access not granted).
-    AIO.core.onMessage((message) => {
-        if (message && message.type === 'aio:toast') {
-            AIO.content.toast(message.message, message.level || 'info');
-            return { ok: true };
-        }
-        return undefined;
-    });
 })();

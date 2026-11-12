@@ -153,6 +153,12 @@ test('screenshotWaitMs converts to screenshotWaitSec in seconds', () => {
     assert.equal(normalize({ screenshotWaitSec: 5, screenshotWaitMs: 40000 }).screenshotWaitSec, 5);
 });
 
+test('screenshotWaitSec is clamped to 0..600 seconds', () => {
+    assert.equal(normalize({ screenshotWaitSec: -5 }).screenshotWaitSec, 0);
+    assert.equal(normalize({ screenshotWaitSec: 9999 }).screenshotWaitSec, 600);
+    assert.equal(normalize({ screenshotWaitMs: 999999 }).screenshotWaitSec, 600);
+});
+
 test('migrate() removes the legacy screenshotWaitMs key', async () => {
     const { migrate } = globalThis.AIO.schema;
     const removed = [];

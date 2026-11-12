@@ -310,8 +310,6 @@
                     <label for="screenshot-url">签到网页 URL</label>
                     <input type="url" id="screenshot-url" placeholder="https://example.com" autocomplete="off">
                     <div class="help-text">要打开的网页地址，必须以 http:// 或 https:// 开头。每天定时在后台静默打开、完成渲染后截图保存到下方历史记录。</div>
-                    <p class="help-text" id="screenshot-perm-status"></p>
-                    <button type="button" id="screenshot-grant" class="secondary" style="display:none;margin-top:6px;font-size:12px;padding:4px 10px;">立即授权所有网站</button>
                 </div>
                 <div class="form-group">
                     <label for="screenshot-time">执行时间</label>
@@ -425,10 +423,6 @@
                 <h3>🏠 智能家居（Home Assistant）</h3>
                 <div class="status-bar">
                     <span>🕒 上次成功：<strong id="ha-last-success-time">从未</strong></span>
-                </div>
-                <div class="status-bar" id="ha-permission-bar" hidden>
-                    <span>🔐 访问该地址需要单独授权</span>
-                    <button type="button" id="ha-grant" class="secondary" style="padding:4px 10px">授权此地址</button>
                 </div>
                 <div class="row">
                     <div class="form-group">

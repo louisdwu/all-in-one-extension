@@ -31,22 +31,6 @@ export function haOriginPattern(url) {
 }
 
 /**
- * Home Assistant lives on an arbitrary (usually private) origin. Since the
- * extension declares `<all_urls>` in host_permissions (required by
- * captureVisibleTab), `permissions.contains` is always true for http(s)
- * origins; the check stays as a cheap guard for profiles where site access
- * was manually narrowed in chrome://extensions.
- */
-export async function hasHaPermission(pattern) {
-    if (!pattern) return false;
-    try {
-        return await chrome.permissions.contains({ origins: [pattern] });
-    } catch (err) {
-        return false;
-    }
-}
-
-/**
  * @param {object} settings normalized settings
  * @returns {Promise<{metrics: object, ok: boolean}>}
  */
@@ -56,11 +40,9 @@ export async function fetchHa(settings) {
     const entities = Array.isArray(settings.haEntities) ? settings.haEntities : [];
     if (!base || !token || !entities.length) return { metrics: {}, ok: false, reason: 'unconfigured' };
 
-    const originPattern = haOriginPattern(base);
-    if (originPattern && !(await hasHaPermission(originPattern))) {
-        haLog.debug('missing host permission for', originPattern);
-        return { metrics: {}, ok: false, reason: 'needs_permission', origin: originPattern };
-    }
+    // `<all_urls>` is declared in host_permissions (required by the screenshot
+    // scheduler), so http(s) origins are always reachable. Just validate the URL.
+    if (!haOriginPattern(base)) return { metrics: {}, ok: false, reason: 'invalid_url' };
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);

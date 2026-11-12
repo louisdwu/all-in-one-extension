@@ -51,12 +51,11 @@ addRef(manifest.background && manifest.background.service_worker);
 for (const script of manifest.content_scripts || []) {
   for (const file of script.js || []) addRef(file);
   for (const file of script.css || []) addRef(file);
-  // libs/core.js is explicitly written to be safe in a MAIN world: every
-  // `chrome` access is behind a `hasChrome()` guard (see the file header).
-  const MAIN_WORLD_SAFE = new Set(['libs/core.js']);
+  // No MAIN-world bundle ships libs/core.js any more, so there is no safe
+  // exception left: every MAIN script must be free of chrome.* access.
   if (script.world === 'MAIN') {
     for (const file of script.js || []) {
-      if (!exists(file) || MAIN_WORLD_SAFE.has(file)) continue;
+      if (!exists(file)) continue;
       const source = read(file);
       const match = source.match(/chrome\s*\.\s*(runtime|storage|tabs|cookies|alarms|action|windows|permissions|scripting|idle|webNavigation|commands|notifications|extension)/);
       if (match) fail('MAIN-world script uses chrome.* API: ' + file + ' (' + match[0] + ')');
@@ -64,6 +63,9 @@ for (const script of manifest.content_scripts || []) {
   }
 }
 if (manifest.action && manifest.action.default_popup) addRef(manifest.action.default_popup);
+if (manifest.action && manifest.action.default_icon) {
+  for (const size of Object.values(manifest.action.default_icon)) addRef(size);
+}
 if (manifest.options_page) addRef(manifest.options_page);
 for (const size of Object.values(manifest.icons || {})) addRef(size);
 for (const entry of manifest.web_accessible_resources || []) {
@@ -192,7 +194,8 @@ for (const htmlFile of allFiles.filter((file) => file.endsWith('.html'))) {
 
 for (const cssFile of allFiles.filter((file) => file.endsWith('.css'))) {
     const source = read(cssFile);
-    for (const match of source.matchAll(/@import\s+url\(\s*['"]?([^'")]+)['"]?\s*\)/g)) {
+    // Accept both `@import url('x.css')` and the bare `@import 'x.css'` form.
+    for (const match of source.matchAll(/@import\s+(?:url\(\s*)?['"]([^'")]+)['"]/g)) {
         if (!isFile(resolveFrom(cssFile, match[1]))) fail(cssFile + ' imports a missing stylesheet: ' + match[1]);
     }
 }
@@ -265,6 +268,19 @@ for (const file of jsFiles) {
     const match = source.match(pattern.re);
     if (match) fail('possible secret in ' + file + ': "' + match[0].slice(0, 12) + '…" (' + pattern.why + ')');
   }
+}
+
+/* ---------------- 6. shipped-but-unreferenced assets ---------------- */
+// A file under icons/ that neither the manifest nor any page/script references
+// is almost always a leftover; report it as a note (not a failure) so it does
+// not silently accumulate. Source art (e.g. icon.svg) is expected to show up.
+for (const file of allFiles.filter((f) => f.startsWith('icons/'))) {
+  if (referenced.has(file)) continue;
+  const base = file.split('/').pop();
+  const usedByCode = allFiles
+    .filter((f) => f.endsWith('.html') || f.endsWith('.js'))
+    .some((f) => read(f).includes(base));
+  if (!usedByCode) note('icon asset is not referenced anywhere: ' + file + ' (source art is fine)');
 }
 
 /* ---------------- report ---------------- */
