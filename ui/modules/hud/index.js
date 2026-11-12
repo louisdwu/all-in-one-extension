@@ -151,6 +151,9 @@ function addEntityRow(entity) {
     remove.addEventListener('click', () => {
         item.remove();
         if (!container.querySelector('.entity-item')) renderEntities([]);
+        // Removing a row is a real settings change: without this the deleted
+        // entity comes back on the next reload (nothing ever saved).
+        document.dispatchEvent(new Event('aio:hud-dirty'));
     });
 
     main.append(name, id, value, remove);

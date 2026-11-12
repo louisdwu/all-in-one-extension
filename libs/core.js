@@ -380,7 +380,6 @@
     }
 
     AIO.core = {
-        VERSION: 2,
         hasChrome,
         log,
         setLevel,

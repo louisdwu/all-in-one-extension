@@ -29,7 +29,7 @@ npm run bump          # 同时更新 manifest.json 与 package.json
 ```bash
 npm run verify      # 静态检查 + 单测，提交前必须全绿
 npm run smoke       # 采集 SW/页面运行时异常（本机 Chromium）
-npm run regression  # 24 项行为断言（标签/倍速/快捷键/记忆/子帧/全屏/字幕/1080P）
+npm run regression  # 28 项行为断言（标签/倍速/快捷键/记忆/子帧/全屏/字幕/1080P/设置页交互）
 npm run perf        # 全站注入改动后复测主线程开销
 npm run bump        # 版本号
 ```

@@ -122,7 +122,6 @@
     AIO.content = {
         /** Use as `AIO.content.log('tag')` — same signature as AIO.core.log. */
         log,
-        logger: contentLog,
         settings,
         onChange,
         toast,

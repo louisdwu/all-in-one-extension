@@ -1,6 +1,6 @@
 # All in One Extension (AIO)
 
-![Version](https://img.shields.io/badge/version-1.2026.1112.1301-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2026.1112.1349-blue.svg)
 ![Chrome](https://img.shields.io/badge/browser-Chrome-orange.svg)
 ![Manifest](https://img.shields.io/badge/manifest-v3-green.svg)
 
@@ -34,7 +34,7 @@
 ```bash
 npm run verify   # 静态检查 + 单元测试（零依赖，仅需 Node ≥ 20）
 npm run smoke      # 用本机 Chromium 真正加载扩展，采集后台/页面运行时错误
-npm run regression # 行为回归：标签切换 / 倍速开关 / 快捷键映射 / 倍速记忆 / 子帧 / 全屏 / B站字幕 / 1080P（24 项断言）
+npm run regression # 行为回归：标签切换 / 倍速开关 / 快捷键映射 / 倍速记忆 / 子帧 / 全屏 / B站字幕 / 1080P（28 项断言）
 npm run verify:all # 以上全部
 npm run check      # 只跑静态检查
 npm test         # 只跑单元测试

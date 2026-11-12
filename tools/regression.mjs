@@ -548,8 +548,63 @@ async function main() {
     const stableTitle = await biliInject.main('document.title');
     check('quality logic leaves the document title untouched', stableTitle === '回归测试标题_哔哩哔哩_bilibili', stableTitle);
 
+    // ---------- I. options page: real interactions actually persist ----------
+    // The smoke test only proves the options page renders its DOM. These
+    // assertions drive the real widgets, because "rendered" never caught the
+    // missing libs/keys.js (recorder threw) or the entity "remove" button that
+    // deleted the row without saving (it came back on reload).
+    log('I: options page interactions');
+    if (!extId) {
+        check('options page interactions (needs extension id)', false, 'no service worker target');
+    } else {
+    const optionsPage = await openPage('chrome-extension://' + extId + '/ui/options.html');
+    await wait(800);
+
+    const keysLib = await optionsPage.main('typeof AIO.keys');
+    check('options page loads the shared keys lib', keysLib === 'object', String(keysLib));
+
+    const recorded = await optionsPage.main([
+        '(async function () {',
+        '  document.querySelector(".nav button[data-target=tab-speeder]").click();',
+        '  await new Promise(function (r) { setTimeout(r, 300); });',
+        '  var input = document.querySelector(".shortcut-input");',
+        '  if (!input) return { error: "no recorder" };',
+        '  input.dispatchEvent(new FocusEvent("focus"));',
+        '  await new Promise(function (r) { setTimeout(r, 50); });',
+        '  document.dispatchEvent(new KeyboardEvent("keydown", { key: "j", ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true }));',
+        '  await new Promise(function (r) { setTimeout(r, 50); });',
+        '  var value = input.value;',
+        '  document.getElementById("shortcuts-saveBtn").click();',
+        '  await new Promise(function (r) { setTimeout(r, 500); });',
+        '  var saved = await AIO.schema.load();',
+        '  return { value: value, saved: saved.shortcuts.increaseSpeed };',
+        '})()'
+    ].join('\n'));
+    check('recording a shortcut persists it', recorded && recorded.saved === 'Ctrl+Shift+J', JSON.stringify(recorded));
+
+    const entities = await optionsPage.main([
+        '(async function () {',
+        '  document.querySelector(".nav button[data-target=tab-hud]").click();',
+        '  await new Promise(function (r) { setTimeout(r, 300); });',
+        '  document.getElementById("ha-add-entity").click();',
+        '  await new Promise(function (r) { setTimeout(r, 100); });',
+        '  var idInput = document.querySelector(".entity-item .e-id");',
+        '  idInput.value = "sensor.regression";',
+        '  idInput.dispatchEvent(new Event("change", { bubbles: true }));',
+        '  await new Promise(function (r) { setTimeout(r, 900); });',
+        '  var added = (await AIO.schema.load()).haEntities.length;',
+        '  document.querySelector(".entity-item .danger").click();',
+        '  await new Promise(function (r) { setTimeout(r, 900); });',
+        '  var removed = (await AIO.schema.load()).haEntities.length;',
+        '  return { added: added, removed: removed };',
+        '})()'
+    ].join('\n'));
+    check('adding an entity persists', entities && entities.added === 1, JSON.stringify(entities));
+    check('removing an entity persists', entities && entities.removed === 0, JSON.stringify(entities));
+    }
+
     // cleanup state so the profile is not left with test mappings/speeds
-    await page1.iso('AIO.schema.save({ hotkeyMappings: {}, speederSpeedMemory: "site" })').catch(() => {});
+    await page1.iso('AIO.schema.save({ hotkeyMappings: {}, speederSpeedMemory: "site", shortcuts: AIO.schema.DEFAULT_SHORTCUTS })').catch(() => {});
     await page1.iso('AIO.core.storage.setLocal({ speederSpeeds: {} })').catch(() => {});
 
     cdp.close();

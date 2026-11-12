@@ -16,7 +16,7 @@
 |------|--------|--------|
 | 测试 | 0 用例 | 83 个 `node:test` 用例（含后台模块图启动测试） |
 | 静态检查 | 无 | `tools/check.mjs`：语法 / import 解析 / DOM id / MAIN 世界越界 / 密钥扫描 |
-| 真机验证 | 手工 | `tools/smoke.mjs`（异常采集 + 样式断言）+ `tools/regression.mjs`（24 项行为断言） |
+| 真机验证 | 手工 | `tools/smoke.mjs`（异常采集 + 样式断言）+ `tools/regression.mjs`（28 项行为断言） |
 | 后台消息监听 | 7 个 `onMessage` 各自猜归属 | 1 个路由 + 显式 handler 注册表 |
 | 配置真相源 | 散落 10+ 文件，默认值各不相同 | `libs/schema.js` 单点，含旧数据迁移 |
 | 权限 | 9 个（3 个从未使用） | 6 个，全部有代码对应 |
@@ -188,7 +188,7 @@ MV3 的 content script **不能**用 ES module，而 service worker / 扩展页 
 ```bash
 npm run verify      # 静态检查 + 83 个单测
 npm run smoke       # Chromium 真机：SW 0 异常、options/popup 0 异常、页面可交互
-npm run regression  # 24 项行为断言（标签切换 / 倍速开关 / 快捷键映射 / 倍速记忆 / 子帧 / 全屏 / 字幕 / 1080P）
+npm run regression  # 28 项行为断言（标签 / 倍速 / 快捷键 / 记忆 / 子帧 / 全屏 / 字幕 / 1080P / 设置页交互）
 ```
 
 `regression` 覆盖最容易回归的三条路径：
